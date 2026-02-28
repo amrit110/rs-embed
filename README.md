@@ -13,8 +13,11 @@
 
 </div>
 
+> Get Start on [I-GUIDE](https://platform.i-guide.io/notebooks/a013ce97-d963-4262-9f21-edd09976181a) Today!
 
 <img src="./docs/assets/background.png" /> 
+
+
 
 
 ## TL;DR
@@ -24,6 +27,9 @@ emb = get_embedding("tessera", spatial=..., temporal=..., output=...)
 ```
 
 `tessera` / `copernicus` / `gse` are precomputed products with fixed data sources; `rs-embed` now auto-selects a compatible access backend for them.
+
+
+
 
 
 ## Install (temporary)
