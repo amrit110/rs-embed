@@ -80,10 +80,6 @@ For new users, start with these primary APIs:
 - `export_batch(...)`: export datasets / experiments (single or multiple ROIs)
 - `inspect_provider_patch(...)`: inspect raw provider patches before inference
 
-Compatibility / convenience wrappers (still supported, but not required to learn first):
-
-- `export_npz(...)`: single-ROI `.npz` convenience wrapper around `export_batch(...)`
-- `inspect_gee_patch(...)`: GEE-focused wrapper around `inspect_provider_patch(...)`
 
 ## Supported Models (Quick Reference)
 
@@ -117,8 +113,6 @@ This is a convenience index with basic model info only (for quick scanning / lin
 | `terrafm` | S2 12-band / S1 VV-VH | [ICLR 2026](https://arxiv.org/abs/2506.06281) | [link](https://github.com/mbzuai-oryx/TerraFM) |
 | `thor` | S2 10-band | [arXiv 2026](https://arxiv.org/abs/2601.16011) | [link](https://github.com/FM4CS/THOR) |
 | `agrifm` | S2 time series (10-band) | [RSE 2026](https://www.sciencedirect.com/science/article/pii/S0034425726000040) | [link](https://github.com/flyakon/AgriFM) |
-
-SatMAE++ model docs (both variants): [satmaepp family](https://cybergis.github.io/rs-embed/models/satmaepp/).
 
 
 
