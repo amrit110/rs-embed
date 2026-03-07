@@ -64,10 +64,7 @@ def get_embedder_cls(name: str) -> Type[Any]:
         )
         if k in _REGISTRY_IMPORT_ERRORS:
             err = _REGISTRY_IMPORT_ERRORS[k]
-            msg += (
-                f" Import error for '{k}': "
-                f"{type(err).__name__}: {err}"
-            )
+            msg += f" Import error for '{k}': {type(err).__name__}: {err}"
         elif _REGISTRY_IMPORT_ERRORS:
             parts = [
                 f"{mid}: {type(e).__name__}: {e}"
