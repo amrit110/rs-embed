@@ -78,7 +78,7 @@ def test_satvision_single_forces_unit_norm_when_fetch_is_unit_scaled(monkeypatch
     import rs_embed.embedders.onthefly_satvision_toa as sv
 
     emb = SatVisionTOAEmbedder()
-    monkeypatch.setattr(emb, "_get_provider", lambda: object())
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
     monkeypatch.setattr(
         emb,
         "_resolve_runtime",

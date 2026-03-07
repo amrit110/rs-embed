@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import os
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
 
@@ -227,68 +226,16 @@ def _stitch_spatial_last2_arrays(
     scale_m: int,
     fill_value: float,
 ) -> np.ndarray:
-    from ..internal.api import api_helpers as _ah
+    from ..internal.api.api_helpers import _stitch_bbox_split_arrays
 
-    arr_a = np.asarray(a, dtype=np.float32)
-    arr_b = np.asarray(b, dtype=np.float32)
-    if arr_a.ndim < 3 or arr_b.ndim < 3:
-        raise ModelError(
-            f"Expected arrays with spatial last2 dims for bbox stitching, got {arr_a.shape} and {arr_b.shape}"
-        )
-    if tuple(arr_a.shape[:-2]) != tuple(arr_b.shape[:-2]):
-        raise ModelError(f"Leading shape mismatch while stitching bbox tiles: {arr_a.shape} vs {arr_b.shape}")
-
-    spatial_bbox = _ah._coerce_bbox_like(parent_spatial)
-    axis = str(axis).lower()
-    split_axis = arr_a.ndim - 1 if axis == "x" else arr_a.ndim - 2
-    nonsplit_axis = arr_a.ndim - 2 if axis == "x" else arr_a.ndim - 1
-
-    if int(arr_a.shape[nonsplit_axis]) != int(arr_b.shape[nonsplit_axis]):
-        raise ModelError(f"Non-split spatial dim mismatch while stitching bbox tiles: {arr_a.shape} vs {arr_b.shape}")
-
-    if axis == "y":
-        # Normalize each child tile before north/south stitching (same rationale as CHW fallback).
-        arr_a = np.flip(arr_a, axis=arr_a.ndim - 2)
-        arr_b = np.flip(arr_b, axis=arr_b.ndim - 2)
-
-    target_h, target_w = _ah._bbox_span_pixels_estimate(spatial_bbox, scale_m=int(scale_m))
-    target_len = int(target_w if axis == "x" else target_h)
-    len_a = int(arr_a.shape[split_axis])
-    len_b = int(arr_b.shape[split_axis])
-    combined_len = int(len_a + len_b)
-    delta = int(combined_len - target_len)
-    tol = int(getattr(_ah, "_GEE_BBOX_STITCH_LEN_TOLERANCE_PX", 4))
-
-    if delta > 0:
-        if delta > tol:
-            raise ModelError(
-                "Excessive overlap while stitching bbox tiles: "
-                f"combined={combined_len}, target~={target_len}, delta={delta}"
-            )
-        trim_a = int(delta // 2)
-        trim_b = int(delta - trim_a)
-        if trim_a > 0:
-            slicer = [slice(None)] * arr_a.ndim
-            slicer[split_axis] = slice(0, max(0, len_a - trim_a))
-            arr_a = arr_a[tuple(slicer)]
-            len_a = int(arr_a.shape[split_axis])
-        if trim_b > 0:
-            slicer = [slice(None)] * arr_b.ndim
-            slicer[split_axis] = slice(min(trim_b, len_b), None)
-            arr_b = arr_b[tuple(slicer)]
-    elif delta < 0:
-        gap = int(-delta)
-        if gap > tol:
-            raise ModelError(
-                "Excessive gap while stitching bbox tiles: "
-                f"combined={combined_len}, target~={target_len}, gap={gap}"
-            )
-        pad_shape = list(arr_a.shape)
-        pad_shape[split_axis] = gap
-        gap_arr = np.full(tuple(pad_shape), float(fill_value), dtype=np.float32)
-        return np.concatenate([arr_a, gap_arr, arr_b], axis=split_axis).astype(np.float32, copy=False)
-
-    return np.concatenate([arr_a, arr_b], axis=split_axis).astype(np.float32, copy=False)
+    return _stitch_bbox_split_arrays(
+        arr_a=np.asarray(a, dtype=np.float32),
+        arr_b=np.asarray(b, dtype=np.float32),
+        parent_spatial=parent_spatial,
+        axis=axis,
+        scale_m=scale_m,
+        fill_value=fill_value,
+    )
 
 
 def _fetch_spatial_array_with_bbox_fallback(
@@ -558,19 +505,5 @@ def call_provider_getter(
     getter: Callable[..., ProviderBase],
     backend: str,
 ) -> ProviderBase:
-    """Call _get_provider with backward-compatible signature handling.
-
-    Some tests monkeypatch `_get_provider` as a zero-arg lambda. This helper lets
-    new backend-aware call sites remain compatible with those older patches.
-    """
-    try:
-        sig = inspect.signature(getter)
-        if len(sig.parameters) == 0:
-            return getter()
-    except Exception:
-        pass
-
-    try:
-        return getter(backend)
-    except TypeError:
-        return getter()
+    """Call a provider getter with the given backend name."""
+    return getter(backend)

@@ -101,11 +101,19 @@ class TestResolveBackend:
 class TestProviderFactory:
     """Tests for _provider_factory_for_backend."""
 
-    def test_auto_creates_gee(self):
-        """auto → gee provider factory (when gee is available)."""
-        with patch("rs_embed.api.has_provider", return_value=True):
-            factory = _provider_factory_for_backend("auto")
-            assert factory is not None
+    def test_auto_delegates_to_default_provider(self):
+        """auto → uses _default_provider_backend_for_api, not hard-coded gee."""
+        with patch("rs_embed.api._default_provider_backend_for_api", return_value="gee"):
+            with patch("rs_embed.api.has_provider", return_value=True):
+                factory = _provider_factory_for_backend("auto")
+                assert factory is not None
+
+    def test_auto_uses_non_gee_default(self):
+        """auto → picks the first available provider when gee is absent."""
+        with patch("rs_embed.api._default_provider_backend_for_api", return_value="planetary_computer"):
+            with patch("rs_embed.api.has_provider", return_value=True):
+                factory = _provider_factory_for_backend("auto")
+                assert factory is not None
 
     def test_unknown_backend_returns_none(self):
         with patch("rs_embed.api.has_provider", return_value=False):

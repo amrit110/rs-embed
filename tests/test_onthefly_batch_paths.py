@@ -34,7 +34,7 @@ def test_satmae_batch_loads_once_and_batches_forward(monkeypatch):
     emb = SatMAERGBEmbedder()
     calls = {"fetch": 0, "load": 0, "forward_batch": 0}
 
-    monkeypatch.setattr(emb, "_get_provider", lambda: object())
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
     monkeypatch.setenv("RS_EMBED_SATMAE_FETCH_WORKERS", "1")
     monkeypatch.setenv("RS_EMBED_SATMAE_BATCH_SIZE", "2")
 
@@ -89,7 +89,7 @@ def test_satmaepp_batch_loads_once_and_batches_forward(monkeypatch):
     emb = SatMAEPPEmbedder()
     calls = {"fetch": 0, "load": 0, "forward_batch": 0}
 
-    monkeypatch.setattr(emb, "_get_provider", lambda: object())
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
     monkeypatch.setenv("RS_EMBED_SATMAEPP_FETCH_WORKERS", "1")
     monkeypatch.setenv("RS_EMBED_SATMAEPP_BATCH_SIZE", "2")
 
@@ -143,7 +143,7 @@ def test_satmaepp_s2_batch_loads_once_and_batches_forward(monkeypatch):
     emb = SatMAEPPSentinel10Embedder()
     calls = {"fetch": 0, "load": 0, "forward_batch": 0}
 
-    monkeypatch.setattr(emb, "_get_provider", lambda: object())
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
     monkeypatch.setenv("RS_EMBED_SATMAEPP_S2_FETCH_WORKERS", "1")
     monkeypatch.setenv("RS_EMBED_SATMAEPP_S2_BATCH_SIZE", "2")
 
@@ -204,7 +204,7 @@ def test_dofa_gee_uses_cached_provider_path(monkeypatch):
     fake_provider = object()
     seen = {"provider_ok": False}
 
-    monkeypatch.setattr(emb, "_get_provider", lambda: fake_provider)
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: fake_provider)
 
     def _fake_fetch(
         provider,
