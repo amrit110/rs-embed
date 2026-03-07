@@ -519,7 +519,7 @@ class TerraFMBEmbedder(EmbedderBase):
                     raise ModelError("modality must be 's2' or 's1'.")
 
             # Optional: inspect on-the-fly provider input
-            from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+            from ..tools.inspection import maybe_inspect_chw, checks_should_raise
 
             check_meta.clear()
             exp_c = 12 if modality == "s2" else 2

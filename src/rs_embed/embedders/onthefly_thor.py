@@ -590,7 +590,7 @@ class THORBaseEmbedder(EmbedderBase):
                 np.nan_to_num(raw_chw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
             ).astype(np.float32)
 
-        from ..core.input_checks import checks_should_raise, maybe_inspect_chw
+        from ..tools.inspection import checks_should_raise, maybe_inspect_chw
 
         check_meta: Dict[str, Any] = {}
         report = maybe_inspect_chw(

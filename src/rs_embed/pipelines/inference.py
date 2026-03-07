@@ -12,18 +12,18 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from ..core.embedding import Embedding
-from ..core.export_helpers import embedding_to_numpy, jsonable, sensor_cache_key
+from ..tools.serialization import embedding_to_numpy, jsonable, sensor_cache_key
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import ExportConfig, ModelConfig, Status, TaskResult
-from ..internal.api.output_helpers import normalize_embedding_output
-from ..internal.api.runtime_helpers import (
+from ..tools.output import normalize_embedding_output
+from ..tools.runtime import (
     call_embedder_get_embedding,
     get_embedder_bundle_cached,
     sensor_key,
     supports_batch_api,
     supports_prefetched_batch_api,
 )
-from ..internal.api.tiling_helpers import (
+from ..tools.tiling import (
     _call_embedder_get_embedding_with_input_prep,
     _resolve_input_prep_spec,
 )
@@ -123,7 +123,7 @@ class InferenceEngine:
             )
             needs_provider_input = skey is not None
 
-            from ..internal.api.api_helpers import normalize_model_name
+            from ..tools.normalization import normalize_model_name
             embedder, lock = get_embedder_bundle_cached(
                 normalize_model_name(mc.name), mc.backend, self.device, sensor_k
             )
@@ -289,7 +289,7 @@ class InferenceEngine:
     @staticmethod
     def resolve_embedder(model_config: ModelConfig, device: str) -> Tuple[Any, Any]:
         """Return ``(embedder, lock)`` for the given model config."""
-        from ..internal.api.api_helpers import normalize_model_name
+        from ..tools.normalization import normalize_model_name
         sensor_k = sensor_key(model_config.sensor)
         return get_embedder_bundle_cached(
             normalize_model_name(model_config.name),

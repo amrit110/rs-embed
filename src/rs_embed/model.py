@@ -19,23 +19,23 @@ from .core.specs import (
     TemporalSpec,
 )
 from .embedders.catalog import MODEL_ALIASES, MODEL_SPECS
-from .internal.api.api_helpers import (
+from .tools.normalization import (
     normalize_backend_name,
     normalize_device_name,
     normalize_model_name,
 )
-from .internal.api.model_defaults_helpers import default_sensor_for_model
-from .internal.api.output_helpers import normalize_embedding_output
-from .internal.api.runtime_helpers import (
+from .tools.model_defaults import default_sensor_for_model
+from .tools.output import normalize_embedding_output
+from .tools.runtime import (
     get_embedder_bundle_cached,
     run_with_retry,
     sensor_key,
 )
-from .internal.api.tiling_helpers import (
+from .tools.tiling import (
     _call_embedder_get_embedding_with_input_prep,
     _resolve_input_prep_spec,
 )
-from .internal.api.validation_helpers import assert_supported, validate_specs
+from .core.validation import assert_supported, validate_specs
 
 
 class Model:
@@ -198,7 +198,7 @@ class Model:
         import numpy as np
 
         from .api import _provider_factory_for_backend
-        from .internal.api.runtime_helpers import embedder_accepts_input_chw
+        from .tools.runtime import embedder_accepts_input_chw
 
         use_api_side = (self._input_prep is not None) and (
             self._input_prep_resolved.mode in {"tile", "auto"}
@@ -226,7 +226,7 @@ class Model:
                 )
             return None
 
-        from .internal.api.api_helpers import fetch_gee_patch_raw
+        from .providers.gee_utils import fetch_gee_patch_raw
 
         provider = factory()
         ensure_ready = getattr(provider, "ensure_ready", None)

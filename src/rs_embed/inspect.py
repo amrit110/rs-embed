@@ -7,9 +7,9 @@ from typing import Any, Dict, Optional, Tuple
 
 
 from .core.errors import ProviderError
-from .core.input_checks import inspect_chw, checks_save_dir, save_quicklook_rgb
+from .tools.inspection import inspect_chw, checks_save_dir, save_quicklook_rgb
 from .core.specs import SensorSpec, SpatialSpec, TemporalSpec
-from .internal.api.api_helpers import fetch_provider_patch_raw
+from .providers.gee_utils import fetch_provider_patch_raw
 from .providers import get_provider
 
 

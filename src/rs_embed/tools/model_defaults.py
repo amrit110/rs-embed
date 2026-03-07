@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from ...core.registry import get_embedder_cls
-from ...core.specs import SensorSpec
+from ..core.registry import get_embedder_cls
+from ..core.specs import SensorSpec
 
 
 def default_sensor_for_model(model_id: str) -> Optional[SensorSpec]:

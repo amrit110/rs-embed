@@ -21,24 +21,26 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .core.export_helpers import embedding_to_numpy as _embedding_to_numpy
-from .core.export_helpers import jsonable as _jsonable
-from .core.export_helpers import sanitize_key as _sanitize_key
-from .core.export_helpers import sensor_cache_key as _sensor_cache_key
-from .core.export_helpers import sha1 as _sha1
-from .internal.api.api_helpers import (
+from .tools.serialization import embedding_to_numpy as _embedding_to_numpy
+from .tools.serialization import jsonable as _jsonable
+from .tools.serialization import sanitize_key as _sanitize_key
+from .tools.serialization import sensor_cache_key as _sensor_cache_key
+from .tools.serialization import sha1 as _sha1
+from .providers.gee_utils import (
     fetch_gee_patch_raw as _fetch_gee_patch_raw,
     inspect_input_raw as _inspect_input_raw,
+)
+from .tools.normalization import (
     normalize_backend_name as _normalize_backend_name,
     normalize_device_name as _normalize_device_name,
     normalize_input_chw as _normalize_input_chw,
     normalize_model_name as _normalize_model_name,
 )
-from .internal.api.checkpoint_helpers import (
+from .tools.checkpoint_utils import (
     is_incomplete_combined_manifest as _is_incomplete_combined_manifest,
 )
-from .internal.api.prefetch_helpers import (
-    build_gee_prefetch_plan as _build_gee_prefetch_plan,
+from .providers.prefetch_plan import (
+    build_prefetch_plan as _build_gee_prefetch_plan,
     select_prefetched_channels as _select_prefetched_channels,
 )
 from .internal.api.export_flow_helpers import (
@@ -46,7 +48,7 @@ from .internal.api.export_flow_helpers import (
     export_combined as _export_combined_npz,
     write_one_payload as _write_one_payload,
 )
-from .internal.api.runtime_helpers import (
+from .tools.runtime import (
     call_embedder_get_embedding as _call_embedder_get_embedding,
     embedder_accepts_input_chw as _embedder_accepts_input_chw,
     get_embedder_bundle_cached as _get_embedder_bundle_cached,
@@ -55,21 +57,21 @@ from .internal.api.runtime_helpers import (
     supports_batch_api as _supports_batch_api,
     supports_prefetched_batch_api as _supports_prefetched_batch_api,
 )
-from .internal.api.validation_helpers import (
+from .core.validation import (
     assert_supported as _assert_supported,
     validate_specs as _validate_specs,
 )
-from .internal.api.manifest_helpers import (
+from .tools.manifest import (
     combined_resume_manifest as _combined_resume_manifest,
     load_json_dict as _load_json_dict,
     point_failure_manifest as _point_failure_manifest,
     point_resume_manifest as _point_resume_manifest,
 )
-from .internal.api.progress_helpers import create_progress as _create_progress
-from .internal.api.model_defaults_helpers import (
+from .tools.progress import create_progress as _create_progress
+from .tools.model_defaults import (
     default_sensor_for_model as _default_sensor_for_model,
 )
-from .internal.api.output_helpers import (
+from .tools.output import (
     normalize_embedding_output as _normalize_embedding_output,
 )
 from .core.embedding import Embedding
@@ -197,7 +199,7 @@ def _resolve_embedding_api_backend(model_n: str, backend_n: str) -> str:
 # ---------------------------------------------------------------------------
 # Tiling / input-prep (delegated to internal.api.tiling_helpers)
 # ---------------------------------------------------------------------------
-from .internal.api.tiling_helpers import (  # noqa: E402
+from .tools.tiling import (  # noqa: E402
     _ResolvedInputPrepSpec,
     _resolve_input_prep_spec,
     _call_embedder_get_embedding_with_input_prep,

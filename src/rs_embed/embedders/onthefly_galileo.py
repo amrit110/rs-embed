@@ -16,7 +16,7 @@ from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
-from ..core.temporal_utils import temporal_frame_midpoints
+from ..tools.temporal import temporal_frame_midpoints
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase

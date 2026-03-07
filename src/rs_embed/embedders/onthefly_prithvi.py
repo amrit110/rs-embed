@@ -519,7 +519,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             )
 
         # Optional: inspect on-the-fly provider input
-        from ..core.input_checks import (
+        from ..tools.inspection import (
             maybe_inspect_chw,
             checks_should_raise,
             checks_save_dir,

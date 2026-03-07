@@ -806,7 +806,7 @@ class AgriFMEmbedder(EmbedderBase):
             raw_tchw = np.clip(raw_tchw, 0.0, 10000.0).astype(np.float32)
 
         # Optional: inspect first frame on normalized [0,1] scale.
-        from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+        from ..tools.inspection import maybe_inspect_chw, checks_should_raise
 
         check_meta: Dict[str, Any] = {"input_frames": int(raw_tchw.shape[0])}
         report = maybe_inspect_chw(

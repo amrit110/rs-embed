@@ -13,18 +13,18 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from ...core.embedding import Embedding
-from ...core.errors import ModelError
-from ...core.specs import (
+from ..core.embedding import Embedding
+from ..core.errors import ModelError
+from ..core.specs import (
     BBox,
     InputPrepSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
 )
-from ...core.export_helpers import embedding_to_numpy as _embedding_to_numpy
-from .output_helpers import normalize_embedding_output as _normalize_embedding_output
-from .runtime_helpers import (
+from .serialization import embedding_to_numpy as _embedding_to_numpy
+from .output import normalize_embedding_output as _normalize_embedding_output
+from .runtime import (
     call_embedder_get_embedding as _call_embedder_get_embedding,
     embedder_accepts_input_chw as _embedder_accepts_input_chw,
     supports_prefetched_batch_api as _supports_prefetched_batch_api,

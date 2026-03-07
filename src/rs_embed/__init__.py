@@ -9,7 +9,7 @@ from .core.specs import (
 from .core.types import ExportConfig, ExportLayout, ExportTarget, ModelConfig
 from .api import export_batch, get_embedding, get_embeddings_batch, list_models
 from .model import Model
-from .engine.exporter import BatchExporter
+from .pipelines.exporter import BatchExporter
 from .inspect import inspect_gee_patch, inspect_provider_patch
 from .export import export_npz
 

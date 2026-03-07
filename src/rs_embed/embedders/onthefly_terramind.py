@@ -503,7 +503,7 @@ class TerraMindEmbedder(EmbedderBase):
                     10000.0,
                 ).astype(np.float32)
 
-            from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+            from ..tools.inspection import maybe_inspect_chw, checks_should_raise
 
             check_meta.clear()
             report = maybe_inspect_chw(

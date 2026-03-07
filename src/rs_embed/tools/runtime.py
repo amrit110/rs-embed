@@ -8,10 +8,10 @@ from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
 
 import numpy as np
 
-from ...core.embedding import Embedding
-from ...core.registry import get_embedder_cls
-from ...core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
-from .output_helpers import normalize_embedding_output
+from ..core.embedding import Embedding
+from ..core.registry import get_embedder_cls
+from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from .output import normalize_embedding_output
 
 _T = TypeVar("_T")
 

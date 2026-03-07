@@ -675,7 +675,7 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
             s2_rgb_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
 
         # Optional: inspect on-the-fly provider input
-        from ..core.input_checks import (
+        from ..tools.inspection import (
             maybe_inspect_chw,
             checks_save_dir,
             checks_should_raise,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ...core.errors import ModelError
-from ...core.specs import OutputSpec, SpatialSpec, TemporalSpec
-from ...providers import has_provider
+from .errors import ModelError
+from .specs import OutputSpec, SpatialSpec, TemporalSpec
+from ..providers import has_provider
 
 
 def validate_specs(

@@ -100,7 +100,7 @@ class ProviderBase:
         sensor: SensorSpec,
         to_float_image: bool = False,
     ) -> np.ndarray:
-        from ..internal.api.api_helpers import fetch_provider_patch_raw
+        from ..providers.gee_utils import fetch_provider_patch_raw
 
         x = fetch_provider_patch_raw(
             self,

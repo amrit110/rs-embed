@@ -75,7 +75,7 @@ def fetch_s2_rgb_u8_from_provider(
     s2_chw = np.clip(s2_raw / 10000.0, 0.0, 1.0).astype(np.float32)
 
     # Optional: inspect on-the-fly provider input (shared by multiple embedders)
-    from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+    from ..tools.inspection import maybe_inspect_chw, checks_should_raise
 
     report = maybe_inspect_chw(
         s2_chw,

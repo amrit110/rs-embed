@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Tuple
 
-from .errors import SpecError
-from .specs import TemporalSpec
+from ..core.errors import SpecError
+from ..core.specs import TemporalSpec
 
 
 def temporal_to_start_end(temporal: TemporalSpec) -> Tuple[str, str]:

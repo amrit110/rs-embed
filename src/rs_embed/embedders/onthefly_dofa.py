@@ -568,7 +568,7 @@ class DOFAEmbedder(EmbedderBase):
                 }
 
             # Optional: inspect on-the-fly provider input
-            from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+            from ..tools.inspection import maybe_inspect_chw, checks_should_raise
 
             check_meta.clear()
             report = maybe_inspect_chw(

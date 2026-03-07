@@ -14,12 +14,12 @@ import numpy as np
 
 from ..core.specs import SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import ExportConfig
-from ..internal.api.api_helpers import (
+from ..providers.gee_utils import (
     fetch_gee_patch_raw,
     inspect_input_raw,
-    normalize_input_chw,
 )
-from ..internal.api.prefetch_helpers import (
+from ..tools.normalization import normalize_input_chw
+from ..providers.prefetch_plan import (
     build_gee_prefetch_plan,
     select_prefetched_channels,
 )

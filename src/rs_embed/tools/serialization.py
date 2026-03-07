@@ -9,8 +9,8 @@ from typing import Any
 
 import numpy as np
 
-from .embedding import Embedding
-from .specs import SensorSpec
+from ..core.embedding import Embedding
+from ..core.specs import SensorSpec
 
 
 def utc_ts() -> str:

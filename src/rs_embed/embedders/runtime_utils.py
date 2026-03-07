@@ -13,7 +13,7 @@ from ..providers.base import ProviderBase
 _T = TypeVar("_T")
 
 
-from ..internal.api.api_helpers import normalize_backend_name
+from ..tools.normalization import normalize_backend_name
 
 
 def default_provider_backend_name() -> Optional[str]:
@@ -202,7 +202,7 @@ def _stitch_spatial_last2_arrays(
     scale_m: int,
     fill_value: float,
 ) -> np.ndarray:
-    from ..internal.api.api_helpers import _stitch_bbox_split_arrays
+    from ..providers.gee_utils import _stitch_bbox_split_arrays
 
     return _stitch_bbox_split_arrays(
         arr_a=np.asarray(a, dtype=np.float32),
@@ -223,7 +223,7 @@ def _fetch_spatial_array_with_bbox_fallback(
     fetch_fn: Callable[[SpatialSpec], np.ndarray],
     split_depth: int = 0,
 ) -> np.ndarray:
-    from ..internal.api import api_helpers as _ah
+    from ..providers import gee_utils as _ah
 
     try:
         return np.asarray(fetch_fn(spatial), dtype=np.float32)
@@ -300,7 +300,7 @@ def fetch_collection_patch_all_bands_chw(
         arr, names = _fetch_once(spatial)
         return np.asarray(arr, dtype=np.float32), tuple(names)
     except Exception as e:
-        from ..internal.api import api_helpers as _ah
+        from ..providers import gee_utils as _ah
 
         if not (
             _ah._looks_like_gee_sample_too_many_pixels(e)

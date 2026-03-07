@@ -4,8 +4,8 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from ...core.embedding import Embedding
-from ...core.specs import OutputSpec
+from ..core.embedding import Embedding
+from ..core.specs import OutputSpec
 
 
 def _infer_native_y_axis_direction(meta: Dict[str, Any]) -> Tuple[str, str]:

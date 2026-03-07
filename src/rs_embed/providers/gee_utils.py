@@ -5,11 +5,11 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-from ...core.errors import ModelError
-from ...core.export_helpers import jsonable as _jsonable
-from ...core.specs import BBox, SensorSpec, SpatialSpec, TemporalSpec
-from ...providers.base import ProviderBase
-from ...embedders.catalog import canonical_model_id
+from ..core.errors import ModelError
+from ..tools.serialization import jsonable as _jsonable
+from ..core.specs import BBox, SensorSpec, SpatialSpec, TemporalSpec
+from ..providers.base import ProviderBase
+from ..tools.normalization import normalize_input_chw
 
 
 _WEB_MERCATOR_R = 6378137.0
@@ -19,39 +19,6 @@ _GEE_SAMPLE_RECT_OP = "sampleRectangle"
 _GEE_SAMPLE_RECT_MUST_BE = "must be <="
 _MAX_GEE_BBOX_SPLIT_DEPTH = 12
 _GEE_BBOX_STITCH_LEN_TOLERANCE_PX = 4
-
-
-def normalize_model_name(model: str) -> str:
-    return canonical_model_id(model)
-
-
-def normalize_backend_name(backend: str) -> str:
-    return str(backend).strip().lower()
-
-
-def normalize_device_name(device: Optional[str]) -> str:
-    if device is None:
-        return "auto"
-    dev = str(device).strip().lower()
-    return dev or "auto"
-
-
-def normalize_input_chw(
-    x_chw: np.ndarray,
-    *,
-    expected_channels: Optional[int] = None,
-    name: str = "input_chw",
-) -> np.ndarray:
-    x = np.asarray(x_chw, dtype=np.float32)
-    if x.ndim != 3:
-        raise ModelError(
-            f"{name} must be CHW with ndim=3, got shape={getattr(x, 'shape', None)}"
-        )
-    if expected_channels is not None and int(x.shape[0]) != int(expected_channels):
-        raise ModelError(
-            f"{name} channel mismatch: got C={int(x.shape[0])}, expected C={int(expected_channels)}"
-        )
-    return x
 
 
 def _iter_exception_messages(exc: BaseException) -> tuple[str, ...]:
@@ -84,7 +51,6 @@ def _looks_like_gee_sample_too_many_pixels(exc: BaseException) -> bool:
     msgs = " | ".join(_iter_exception_messages(exc))
     if _GEE_SAMPLE_RECT_TOO_MANY_PIXELS not in msgs:
         return False
-    # Some EEException translations omit the operation name; keep the trigger broad.
     return (_GEE_SAMPLE_RECT_OP in msgs) or (_GEE_SAMPLE_RECT_MUST_BE in msgs)
 
 
@@ -154,7 +120,6 @@ def _split_bbox_for_recursive_fetch(
     axis = str(prefer_axis).lower()
     if axis not in {"x", "y"}:
         axis = "x" if dx >= dy else "y"
-    # If the preferred axis is numerically degenerate, fall back to the other one.
     if axis == "x" and dx <= 0.0 and dy > 0.0:
         axis = "y"
     if axis == "y" and dy <= 0.0 and dx > 0.0:
@@ -167,7 +132,6 @@ def _split_bbox_for_recursive_fetch(
     if axis == "x":
         xm = 0.5 * (x0 + x1)
         lon_mid, _ = _web_mercator_xy_to_lonlat(xm, 0.5 * (y0 + y1))
-        # Guard against numerical collapse at extreme precision.
         lon_mid = min(max(lon_mid, float(bbox.minlon)), float(bbox.maxlon))
         if not (float(bbox.minlon) < lon_mid < float(bbox.maxlon)):
             lon_mid = 0.5 * (float(bbox.minlon) + float(bbox.maxlon))
@@ -299,11 +263,7 @@ def _stitch_bbox_split_arrays(
     scale_m: int,
     fill_value: float,
 ) -> np.ndarray:
-    """Stitch two bbox-split arrays along a spatial axis.
-
-    Works for any array where the last two dims are spatial (H, W).
-    Handles overlap trimming and gap filling within a pixel tolerance.
-    """
+    """Stitch two bbox-split arrays along a spatial axis."""
     arr_a = np.asarray(arr_a, dtype=np.float32)
     arr_b = np.asarray(arr_b, dtype=np.float32)
     if arr_a.ndim < 2 or arr_b.ndim < 2:
@@ -326,8 +286,6 @@ def _stitch_bbox_split_arrays(
         )
 
     if axis == "y":
-        # sampleRectangle tiles can arrive with local row order opposite to the
-        # north/south BBox split order. Normalize each child tile before stitching.
         arr_a = np.flip(arr_a, axis=arr_a.ndim - 2)
         arr_b = np.flip(arr_b, axis=arr_b.ndim - 2)
     elif axis != "x":
@@ -340,8 +298,6 @@ def _stitch_bbox_split_arrays(
     combined_len = int(len_a + len_b)
     delta = int(combined_len - target_len)
 
-    # GEE sampleRectangle on adjacent clipped regions can duplicate or drop a boundary pixel
-    # because region edges need not land exactly on the projected pixel grid.
     if delta > 0:
         if delta > _GEE_BBOX_STITCH_LEN_TOLERANCE_PX:
             raise ModelError(
@@ -420,7 +376,7 @@ fetch_gee_patch_raw = fetch_provider_patch_raw
 def inspect_input_raw(
     x_chw: np.ndarray, *, sensor: SensorSpec, name: str
 ) -> Dict[str, Any]:
-    from ...core.input_checks import inspect_chw
+    from ..tools.inspection import inspect_chw
 
     x = normalize_input_chw(
         x_chw,

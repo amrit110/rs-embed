@@ -7,7 +7,7 @@ from pyproj import Transformer
 
 from ..core.errors import ProviderError, SpecError
 from ..core.specs import BBox, PointBuffer, SensorSpec, SpatialSpec, TemporalSpec
-from ..core.temporal_utils import split_date_range as _split_date_range_core
+from ..tools.temporal import split_date_range as _split_date_range_core
 from .base import ProviderBase
 
 
