@@ -82,21 +82,23 @@ GEEProvider: Optional[Callable[..., ProviderBase]] = None
 
 
 def _create_default_gee_provider() -> ProviderBase:
-    global GEEProvider
-    # Preserve monkeypatch behavior while keeping default creation registry-based.
-    if GEEProvider is None:
+    # If tests/downstream code set api.GEEProvider, use it directly.
+    cls = GEEProvider
+    if cls is None:
+        # Attempt import without caching in the module global — keeps the
+        # provider registry as the canonical source after first creation.
         try:
             from .providers import GEEProvider as _GEEProvider  # type: ignore
 
-            GEEProvider = _GEEProvider
+            cls = _GEEProvider
         except Exception:
-            GEEProvider = None
+            pass
 
-    if GEEProvider is not None:
+    if cls is not None:
         try:
-            return GEEProvider(auto_auth=True)
+            return cls(auto_auth=True)
         except TypeError:
-            return GEEProvider()
+            return cls()
 
     return get_provider("gee", auto_auth=True)
 
