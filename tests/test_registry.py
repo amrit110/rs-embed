@@ -96,7 +96,6 @@ def test_get_embedder_cls_includes_last_import_error(monkeypatch):
 
     registry._REGISTRY.clear()
     registry._REGISTRY_IMPORT_ERROR = RuntimeError("boom")
-    monkeypatch.setattr(registry, "_ensure_registry_loaded", lambda: None)
 
     with pytest.raises(ModelError) as ei:
         registry.get_embedder_cls("anything")

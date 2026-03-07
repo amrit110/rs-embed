@@ -14,8 +14,7 @@ from ..providers.base import ProviderBase
 _T = TypeVar("_T")
 
 
-def normalize_backend_name(backend: str) -> str:
-    return str(backend).strip().lower()
+from ..internal.api.api_helpers import normalize_backend_name
 
 
 def default_provider_backend_name() -> Optional[str]:

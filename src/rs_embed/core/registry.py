@@ -19,11 +19,6 @@ def register(name: str):
         return cls
     return deco
 
-def _ensure_registry_loaded() -> None:
-    """Backward-compatible hook; registry loading is now per-model lazy import."""
-    return
-
-
 def _try_lazy_load_model(name: str) -> None:
     """Load only the module that owns `name`, then backfill registration if needed."""
     global _REGISTRY_IMPORT_ERROR
@@ -55,7 +50,6 @@ def _try_lazy_load_model(name: str) -> None:
     _REGISTRY_IMPORT_ERROR = None
 
 def get_embedder_cls(name: str) -> Type[Any]:
-    _ensure_registry_loaded()
     k = canonical_model_id(name)
     if k not in _REGISTRY:
         _try_lazy_load_model(k)
