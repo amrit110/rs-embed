@@ -19,7 +19,6 @@ from .base import EmbedderBase
 from .meta_utils import build_meta, temporal_to_range, temporal_midpoint_str
 from .runtime_utils import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw_shared,
-    get_cached_provider,
     is_provider_backend,
     resolve_device_auto_torch,
 )
@@ -547,6 +546,7 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 64
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -569,17 +569,9 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
         }
 
     def __init__(self) -> None:
-        # Cache provider/model to avoid repeated auth + HF downloads inside batch loops.
-        self._providers: Dict[str, ProviderBase] = {}
+        super().__init__()
         # key: (ckpt, cache_dir, resolved_device) -> (model, weight_meta)
         self._model_cache: Dict[Tuple[str, str, str], Tuple[Any, Dict[str, Any]]] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     def _resolve_device(self, device: str) -> str:
         return resolve_device_auto_torch(device)

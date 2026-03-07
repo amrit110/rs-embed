@@ -19,7 +19,6 @@ from .meta_utils import build_meta, temporal_midpoint_str
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
     fetch_s1_vvvh_raw_chw as _fetch_s1_vvvh_raw_chw_shared,
-    get_cached_provider,
     is_provider_backend,
     normalize_s1_vvvh_chw as _normalize_s1_vvvh_chw,
     resolve_device_auto_torch as _auto_device,
@@ -349,6 +348,7 @@ class TerraFMBEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 64
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -377,16 +377,6 @@ class TerraFMBEmbedder(EmbedderBase):
             },
             "notes": "grid output is model feature-map grid (not pixel grid).",
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

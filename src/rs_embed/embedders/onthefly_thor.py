@@ -17,7 +17,6 @@ from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -483,9 +482,6 @@ class THORBaseEmbedder(EmbedderBase):
     DEFAULT_IMAGE_SIZE = 288
     DEFAULT_FETCH_WORKERS = 8
 
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
     def describe(self) -> Dict[str, Any]:
         return {
             "type": "on_the_fly",
@@ -509,13 +505,6 @@ class THORBaseEmbedder(EmbedderBase):
                 "Default weights come from Hugging Face FM4CS/THOR-1.0-base when pretrained=true.",
             ],
         }
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

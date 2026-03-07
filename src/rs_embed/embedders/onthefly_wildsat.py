@@ -26,7 +26,6 @@ from ._vit_mae_utils import (
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -709,9 +708,6 @@ class WildSATEmbedder(EmbedderBase):
     DEFAULT_IMAGE_SIZE = 224
     DEFAULT_FETCH_WORKERS = 8
 
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
     def describe(self) -> Dict[str, Any]:
         return {
             "type": "on_the_fly",
@@ -739,13 +735,6 @@ class WildSATEmbedder(EmbedderBase):
                 "If decoder image head weights are present, pooled features default to that branch; otherwise fallback to backbone output.",
             ],
         }
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

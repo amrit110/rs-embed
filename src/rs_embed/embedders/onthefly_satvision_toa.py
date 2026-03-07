@@ -23,7 +23,6 @@ from ._vit_mae_utils import (
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_sensor_patch_chw as _fetch_sensor_patch_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -790,9 +789,6 @@ class SatVisionTOAEmbedder(EmbedderBase):
     DEFAULT_BATCH_CPU = 2
     DEFAULT_BATCH_CUDA = 8
 
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
     def describe(self) -> Dict[str, Any]:
         return {
             "type": "on_the_fly",
@@ -836,13 +832,6 @@ class SatVisionTOAEmbedder(EmbedderBase):
             cloudy_pct=int(os.environ.get("RS_EMBED_SATVISION_TOA_CLOUDY_PCT", "100")),
             fill_value=float(os.environ.get("RS_EMBED_SATVISION_TOA_FILL", "0")),
             composite=os.environ.get("RS_EMBED_SATVISION_TOA_COMPOSITE", "mosaic"),
-        )
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
         )
 
     @staticmethod

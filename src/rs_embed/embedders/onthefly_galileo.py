@@ -23,7 +23,6 @@ from .base import EmbedderBase
 from .runtime_utils import (
     coerce_input_to_tchw as _coerce_input_to_tchw,
     fetch_s2_multiframe_raw_tchw as _fetch_s2_multiframe_raw_tchw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -497,9 +496,7 @@ class GalileoEmbedder(EmbedderBase):
     DEFAULT_IMAGE_SIZE = 64
     DEFAULT_FRAMES = 8
     DEFAULT_FETCH_WORKERS = 8
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -527,13 +524,6 @@ class GalileoEmbedder(EmbedderBase):
                 "Uses Sentinel-2 10 bands; pooled output averages visible Galileo tokens.",
             ],
         }
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

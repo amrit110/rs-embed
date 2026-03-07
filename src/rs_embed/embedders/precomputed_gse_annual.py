@@ -16,7 +16,6 @@ from .base import EmbedderBase
 from .meta_utils import build_meta, temporal_midpoint_str
 from .runtime_utils import (
     fetch_collection_patch_all_bands_chw as _fetch_collection_patch_all_bands_chw,
-    get_cached_provider,
     is_provider_backend,
 )
 
@@ -29,6 +28,7 @@ class GSEAnnualEmbedder(EmbedderBase):
     """
 
     DEFAULT_BATCH_WORKERS = 4
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -39,16 +39,6 @@ class GSEAnnualEmbedder(EmbedderBase):
             "source": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
             "notes": "Uses sampleRectangle in EPSG:3857; returns [C,H,W] or pooled [C].",
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     @staticmethod
     def _resolve_batch_workers(n_items: int) -> int:

@@ -22,7 +22,6 @@ from .base import EmbedderBase
 from .runtime_utils import (
     coerce_input_to_tchw as _coerce_input_to_tchw,
     fetch_s2_multiframe_raw_tchw as _fetch_s2_multiframe_raw_tchw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
 )
@@ -384,6 +383,7 @@ def _anysat_patch_features(
 class AnySatEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_FRAMES = 8
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -411,16 +411,6 @@ class AnySatEmbedder(EmbedderBase):
                 "grid output maps AnySat output='patch' to [D,H,W].",
             ],
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

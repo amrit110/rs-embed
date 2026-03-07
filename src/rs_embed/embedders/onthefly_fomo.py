@@ -19,7 +19,6 @@ from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
 from .runtime_utils import (
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -566,9 +565,6 @@ class FoMoEmbedder(EmbedderBase):
     DEFAULT_NUM_CLASSES = 1000
     DEFAULT_FETCH_WORKERS = 8
 
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
     def describe(self) -> Dict[str, Any]:
         return {
             "type": "on_the_fly",
@@ -599,13 +595,6 @@ class FoMoEmbedder(EmbedderBase):
                 "Grid output averages patch tokens across the provided S2 spectral modalities.",
             ],
         }
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

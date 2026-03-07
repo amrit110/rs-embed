@@ -14,7 +14,6 @@ from ..core.specs import SpatialSpec, TemporalSpec, SensorSpec, OutputSpec
 from ..providers.base import ProviderBase
 from .base import EmbedderBase
 from .runtime_utils import (
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
 )
@@ -158,16 +157,6 @@ class SatMAERGBEmbedder(EmbedderBase):
                 "composite": "median",
             },
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

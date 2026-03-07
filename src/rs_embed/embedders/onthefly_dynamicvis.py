@@ -18,7 +18,6 @@ from ..providers.base import ProviderBase
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -451,16 +450,6 @@ class DynamicVisEmbedder(EmbedderBase):
                 "Requires OpenMMLab runtime dependencies (mmengine/mmcv).",
             ],
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     @staticmethod
     def _default_sensor() -> SensorSpec:

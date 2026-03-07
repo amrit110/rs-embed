@@ -16,7 +16,6 @@ from ..providers import ProviderBase
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
 )
@@ -423,16 +422,6 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 "Requires temporal_coords (year, dayofyear-1) and location_coords (lon, lat).",
             ],
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=True,
-        )
 
     def _default_sensor(self) -> SensorSpec:
         return SensorSpec(

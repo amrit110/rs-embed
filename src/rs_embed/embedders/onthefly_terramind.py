@@ -16,7 +16,6 @@ from ..providers import ProviderBase
 from .base import EmbedderBase
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
-    get_cached_provider,
     is_provider_backend,
     load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device,
@@ -350,6 +349,7 @@ class TerraMindEmbedder(EmbedderBase):
     DEFAULT_MODALITY = "S2L2A"
     DEFAULT_IMAGE_SIZE = 224
     DEFAULT_FETCH_WORKERS = 8
+    _allow_auto_backend = False
 
     def describe(self) -> Dict[str, Any]:
         return {
@@ -377,16 +377,6 @@ class TerraMindEmbedder(EmbedderBase):
                 "grid output is ViT patch-token grid (typically 14x14 for 224/16).",
             ],
         }
-
-    def __init__(self) -> None:
-        self._providers: Dict[str, ProviderBase] = {}
-
-    def _get_provider(self, backend: str) -> ProviderBase:
-        return get_cached_provider(
-            self._providers,
-            backend=backend,
-            allow_auto=False,
-        )
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
