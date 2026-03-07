@@ -32,17 +32,16 @@ from ._vit_mae_utils import (
 )
 
 
-
-
 @lru_cache(maxsize=8)
 def _load_scalemae_cached(model_id: str, dev: str):
     ensure_torch()
-    import torch
 
     try:
         from rshf.scalemae import ScaleMAE  # type: ignore
     except Exception as e:
-        raise ModelError("ScaleMAE requires rshf with rshf.scalemae.ScaleMAE. Try: pip install -U rshf") from e
+        raise ModelError(
+            "ScaleMAE requires rshf with rshf.scalemae.ScaleMAE. Try: pip install -U rshf"
+        ) from e
 
     model = ScaleMAE.from_pretrained(model_id)
     try:
@@ -53,8 +52,11 @@ def _load_scalemae_cached(model_id: str, dev: str):
     meta = {"model_id": model_id, "device": dev}
     return model, meta
 
+
 def _load_scalemae(model_id: str, device: str = "auto"):
-    loaded, _dev = _load_cached_with_device(_load_scalemae_cached, device=device, model_id=model_id)
+    loaded, _dev = _load_cached_with_device(
+        _load_scalemae_cached, device=device, model_id=model_id
+    )
     return loaded
 
 
@@ -121,7 +123,9 @@ def _call_with_patch_size(fn, x, *, patch_size: int, input_res):
             try:
                 return fn(x, input_res, patch_size)
             except TypeError as e:
-                raise ModelError(f"ScaleMAE call failed even with patch_size/input_res: {e}") from e
+                raise ModelError(
+                    f"ScaleMAE call failed even with patch_size/input_res: {e}"
+                ) from e
 
 
 def _scalemae_forward_tokens_or_vec(
@@ -143,13 +147,17 @@ def _scalemae_forward_tokens_or_vec(
     import torch
 
     x = rgb_u8_to_tensor_clipnorm(rgb_u8, image_size).to(device)  # [B,3,H,W]
-    input_res = torch.tensor([float(input_res_m)], dtype=torch.float32, device=device)  # 1D
+    input_res = torch.tensor(
+        [float(input_res_m)], dtype=torch.float32, device=device
+    )  # 1D
     patch_size = _infer_patch_size(model)
 
     with torch.no_grad():
         ff = getattr(model, "forward_features", None)
         if callable(ff):
-            out = _call_with_patch_size(ff, x, patch_size=patch_size, input_res=input_res)
+            out = _call_with_patch_size(
+                ff, x, patch_size=patch_size, input_res=input_res
+            )
             out0 = out[0] if isinstance(out, (tuple, list)) else out
 
             if hasattr(out0, "ndim") and out0.ndim == 3:  # [B,N,D]
@@ -181,10 +189,14 @@ def _scalemae_forward_tokens_or_vec(
                     "tokens_shape": tuple(toks.shape),
                 }
 
-            raise ModelError(f"ScaleMAE forward_features returned unsupported: {type(out0)} {getattr(out0,'shape',None)}")
+            raise ModelError(
+                f"ScaleMAE forward_features returned unsupported: {type(out0)} {getattr(out0, 'shape', None)}"
+            )
 
         # fallback: forward (must pass patch_size + input_res)
-        out = _call_with_patch_size(model, x, patch_size=patch_size, input_res=input_res)
+        out = _call_with_patch_size(
+            model, x, patch_size=patch_size, input_res=input_res
+        )
         out0 = out[0] if isinstance(out, (tuple, list)) else out
 
         if hasattr(out0, "ndim") and out0.ndim == 3:
@@ -202,7 +214,9 @@ def _scalemae_forward_tokens_or_vec(
                 "vec_shape": tuple(out0.shape),
             }
 
-        raise ModelError("ScaleMAE: cannot obtain tokens or pooled vector from this model.")
+        raise ModelError(
+            "ScaleMAE: cannot obtain tokens or pooled vector from this model."
+        )
 
 
 def _scalemae_forward_tokens_or_vec_batch(
@@ -222,7 +236,9 @@ def _scalemae_forward_tokens_or_vec_batch(
 
     xs = [rgb_u8_to_tensor_clipnorm(rgb_u8, image_size) for rgb_u8 in rgb_u8_batch]
     xb = torch.cat(xs, dim=0).to(device)  # [B,3,H,W]
-    input_res = torch.full((len(rgb_u8_batch),), float(input_res_m), dtype=torch.float32, device=device)
+    input_res = torch.full(
+        (len(rgb_u8_batch),), float(input_res_m), dtype=torch.float32, device=device
+    )
     patch_size = _infer_patch_size(model)
 
     def _to_list(arr: np.ndarray) -> List[np.ndarray]:
@@ -231,7 +247,9 @@ def _scalemae_forward_tokens_or_vec_batch(
     with torch.inference_mode():
         ff = getattr(model, "forward_features", None)
         if callable(ff):
-            out = _call_with_patch_size(ff, xb, patch_size=patch_size, input_res=input_res)
+            out = _call_with_patch_size(
+                ff, xb, patch_size=patch_size, input_res=input_res
+            )
             out0 = out[0] if isinstance(out, (tuple, list)) else out
 
             if hasattr(out0, "ndim") and out0.ndim == 3:  # [B,N,D]
@@ -268,7 +286,9 @@ def _scalemae_forward_tokens_or_vec_batch(
                 f"ScaleMAE forward_features returned unsupported: {type(out0)} {getattr(out0, 'shape', None)}"
             )
 
-        out = _call_with_patch_size(model, xb, patch_size=patch_size, input_res=input_res)
+        out = _call_with_patch_size(
+            model, xb, patch_size=patch_size, input_res=input_res
+        )
         out0 = out[0] if isinstance(out, (tuple, list)) else out
         if hasattr(out0, "ndim") and out0.ndim == 3:
             toks = out0.detach().float().cpu().numpy().astype(np.float32)
@@ -287,7 +307,10 @@ def _scalemae_forward_tokens_or_vec_batch(
                 "batch_shape": tuple(vec.shape),
             }
 
-        raise ModelError("ScaleMAE: cannot obtain tokens or pooled vector from this model.")
+        raise ModelError(
+            "ScaleMAE: cannot obtain tokens or pooled vector from this model."
+        )
+
 
 @register("scalemae")
 class ScaleMAERGBEmbedder(EmbedderBase):
@@ -327,7 +350,6 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             },
         }
 
-    
     def __init__(self) -> None:
         self._providers: Dict[str, ProviderBase] = {}
 
@@ -350,115 +372,147 @@ class ScaleMAERGBEmbedder(EmbedderBase):
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
-        v = int(os.environ.get("RS_EMBED_SCALEMAE_FETCH_WORKERS", str(ScaleMAERGBEmbedder.DEFAULT_FETCH_WORKERS)))
+        v = int(
+            os.environ.get(
+                "RS_EMBED_SCALEMAE_FETCH_WORKERS",
+                str(ScaleMAERGBEmbedder.DEFAULT_FETCH_WORKERS),
+            )
+        )
         return max(1, min(int(n_items), v))
 
     @staticmethod
     def _resolve_infer_batch(dev: str) -> int:
-        default_bs = ScaleMAERGBEmbedder.DEFAULT_BATCH_CUDA if str(dev).startswith("cuda") else ScaleMAERGBEmbedder.DEFAULT_BATCH_CPU
+        default_bs = (
+            ScaleMAERGBEmbedder.DEFAULT_BATCH_CUDA
+            if str(dev).startswith("cuda")
+            else ScaleMAERGBEmbedder.DEFAULT_BATCH_CPU
+        )
         v = int(os.environ.get("RS_EMBED_SCALEMAE_BATCH_SIZE", str(default_bs)))
         return max(1, v)
 
     def get_embedding(
-            self,
-            *,
-            spatial: SpatialSpec,
-            temporal: Optional[TemporalSpec],
-            sensor: Optional[SensorSpec],
-            output: OutputSpec,
-            backend: str,
-            device: str = "auto",
-            input_chw: Optional[np.ndarray] = None,
-        ) -> Embedding:
-            if not is_provider_backend(backend, allow_auto=True):
-                raise ModelError("scalemae_rgb expects a provider backend (or 'auto').")
+        self,
+        *,
+        spatial: SpatialSpec,
+        temporal: Optional[TemporalSpec],
+        sensor: Optional[SensorSpec],
+        output: OutputSpec,
+        backend: str,
+        device: str = "auto",
+        input_chw: Optional[np.ndarray] = None,
+    ) -> Embedding:
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("scalemae_rgb expects a provider backend (or 'auto').")
 
-            if sensor is None:
-                sensor = self._default_sensor()
+        if sensor is None:
+            sensor = self._default_sensor()
 
-            model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-            image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
+        model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
+        image_size = int(
+            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
+        )
 
-            t = temporal_to_range(temporal)
-            # Fetch RGB patch (optionally reuse pre-fetched raw patch)
-            if input_chw is None:
-                rgb_u8 = fetch_s2_rgb_u8_from_provider(
-                    spatial=spatial,
-                    temporal=t,
-                    sensor=sensor,
-                    out_size=image_size,
-                    provider=_call_provider_getter(self._get_provider, backend),
-                )
-            else:
-                # input_chw expected to be raw S2 SR values in band order (B4,B3,B2)
-                if input_chw.ndim != 3 or input_chw.shape[0] != 3:
-                    raise ModelError(
-                        "input_chw must be CHW with 3 bands for scalemae_rgb, got {shape}".format(
-                            shape=getattr(input_chw, "shape", None),
-                        )
-                    )
-                s2_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
-                rgb_u8 = (s2_chw.transpose(1, 2, 0) * 255.0).astype(np.uint8)
-                rgb_u8 = resize_rgb_u8(rgb_u8, image_size)
-
-            model, wmeta = _load_scalemae(model_id=model_id, device=device)
-            dev = wmeta.get("device", device)
-            out, extra = _scalemae_forward_tokens_or_vec(
-                model,
-                rgb_u8,
-                image_size=image_size,
-                device=dev,
-                input_res_m=float(sensor.scale_m),
-            )
-            
-            meta = base_meta(
-                model_name=self.model_name,
-                hf_id=model_id,
-                backend=str(backend).lower(),
-                image_size=image_size,
-                sensor=sensor,
+        t = temporal_to_range(temporal)
+        # Fetch RGB patch (optionally reuse pre-fetched raw patch)
+        if input_chw is None:
+            rgb_u8 = fetch_s2_rgb_u8_from_provider(
+                spatial=spatial,
                 temporal=t,
-                source=sensor.collection,
-                extra={"used_scale_m": float(sensor.scale_m), **extra, "out_shape": tuple(out.shape)},
+                sensor=sensor,
+                out_size=image_size,
+                provider=_call_provider_getter(self._get_provider, backend),
+            )
+        else:
+            # input_chw expected to be raw S2 SR values in band order (B4,B3,B2)
+            if input_chw.ndim != 3 or input_chw.shape[0] != 3:
+                raise ModelError(
+                    "input_chw must be CHW with 3 bands for scalemae_rgb, got {shape}".format(
+                        shape=getattr(input_chw, "shape", None),
+                    )
+                )
+            s2_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
+            rgb_u8 = (s2_chw.transpose(1, 2, 0) * 255.0).astype(np.uint8)
+            rgb_u8 = resize_rgb_u8(rgb_u8, image_size)
+
+        model, wmeta = _load_scalemae(model_id=model_id, device=device)
+        dev = wmeta.get("device", device)
+        out, extra = _scalemae_forward_tokens_or_vec(
+            model,
+            rgb_u8,
+            image_size=image_size,
+            device=dev,
+            input_res_m=float(sensor.scale_m),
+        )
+
+        meta = base_meta(
+            model_name=self.model_name,
+            hf_id=model_id,
+            backend=str(backend).lower(),
+            image_size=image_size,
+            sensor=sensor,
+            temporal=t,
+            source=sensor.collection,
+            extra={
+                "used_scale_m": float(sensor.scale_m),
+                **extra,
+                "out_shape": tuple(out.shape),
+            },
+        )
+
+        if output.mode == "pooled":
+            if out.ndim == 2:
+                vec, cls_removed = pool_from_tokens(out, output.pooling)
+                meta.update(
+                    {
+                        "pooling": f"patch_{output.pooling}",
+                        "cls_removed": bool(cls_removed),
+                    }
+                )
+                return Embedding(data=vec, meta=meta)
+
+            if out.ndim == 1:
+                meta.update({"pooling": "model_pooled", "cls_removed": False})
+                return Embedding(data=out.astype(np.float32), meta=meta)
+
+            raise ModelError(f"Unexpected shape for pooled: {out.shape}")
+
+        if output.mode == "grid":
+            if out.ndim != 2:
+                raise ModelError(
+                    "grid output requires token sequence [N,D]. "
+                    f"Got {out.shape} (tokens_kind={meta.get('tokens_kind')})."
+                )
+
+            grid, (h, w), cls_removed = tokens_to_grid_dhw(out)
+            meta.update(
+                {
+                    "grid_hw": (h, w),
+                    "grid_kind": "patch_tokens",
+                    "cls_removed": bool(cls_removed),
+                }
             )
 
-            if output.mode == "pooled":
-                if out.ndim == 2:
-                    vec, cls_removed = pool_from_tokens(out, output.pooling)
-                    meta.update({"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)})
-                    return Embedding(data=vec, meta=meta)
+            try:
+                import xarray as xr
+            except Exception as e:
+                raise ModelError(
+                    "grid output requires xarray. Install: pip install xarray"
+                ) from e
 
-                if out.ndim == 1:
-                    meta.update({"pooling": "model_pooled", "cls_removed": False})
-                    return Embedding(data=out.astype(np.float32), meta=meta)
+            da = xr.DataArray(
+                grid,
+                dims=("d", "y", "x"),
+                coords={
+                    "d": np.arange(grid.shape[0]),
+                    "y": np.arange(h),
+                    "x": np.arange(w),
+                },
+                name="embedding",
+                attrs=meta,
+            )
+            return Embedding(data=da, meta=meta)
 
-                raise ModelError(f"Unexpected shape for pooled: {out.shape}")
-
-            if output.mode == "grid":
-                if out.ndim != 2:
-                    raise ModelError(
-                        "grid output requires token sequence [N,D]. "
-                        f"Got {out.shape} (tokens_kind={meta.get('tokens_kind')})."
-                    )
-
-                grid, (h, w), cls_removed = tokens_to_grid_dhw(out)
-                meta.update({"grid_hw": (h, w), "grid_kind": "patch_tokens", "cls_removed": bool(cls_removed)})
-
-                try:
-                    import xarray as xr
-                except Exception as e:
-                    raise ModelError("grid output requires xarray. Install: pip install xarray") from e
-
-                da = xr.DataArray(
-                    grid,
-                    dims=("d", "y", "x"),
-                    coords={"d": np.arange(grid.shape[0]), "y": np.arange(h), "x": np.arange(w)},
-                    name="embedding",
-                    attrs=meta,
-                )
-                return Embedding(data=da, meta=meta)
-
-            raise ModelError(f"Unknown output mode: {output.mode}")
+        raise ModelError(f"Unknown output mode: {output.mode}")
 
     def get_embeddings_batch(
         self,
@@ -479,7 +533,9 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
+        image_size = int(
+            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
+        )
         t = temporal_to_range(temporal)
 
         provider = _call_provider_getter(self._get_provider, backend)
@@ -517,9 +573,12 @@ class ScaleMAERGBEmbedder(EmbedderBase):
         if output.mode == "grid":
             try:
                 import xarray as xr  # type: ignore
+
                 xr_mod = xr
             except Exception as e:
-                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
+                raise ModelError(
+                    "grid output requires xarray. Install: pip install xarray"
+                ) from e
 
         n = len(spatials)
         for s0 in range(0, n, infer_bs):
@@ -529,7 +588,9 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             for i in range(s0, s1):
                 rgb_u8 = rgb_u8_all[i]
                 if rgb_u8 is None:
-                    raise ModelError(f"Missing prefetched patch at index={i} for scalemae_rgb.")
+                    raise ModelError(
+                        f"Missing prefetched patch at index={i} for scalemae_rgb."
+                    )
                 chunk_idx.append(i)
                 chunk_rgb.append(rgb_u8)
 
@@ -581,7 +642,12 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 if output.mode == "pooled":
                     if o.ndim == 2:
                         vec, cls_removed = pool_from_tokens(o, output.pooling)
-                        meta.update({"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)})
+                        meta.update(
+                            {
+                                "pooling": f"patch_{output.pooling}",
+                                "cls_removed": bool(cls_removed),
+                            }
+                        )
                         out[i] = Embedding(data=vec, meta=meta)
                     elif o.ndim == 1:
                         meta.update({"pooling": "model_pooled", "cls_removed": False})
@@ -597,12 +663,22 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                             f"Got {o.shape} (tokens_kind={meta.get('tokens_kind')})."
                         )
                     grid, (h, w), cls_removed = tokens_to_grid_dhw(o)
-                    meta.update({"grid_hw": (h, w), "grid_kind": "patch_tokens", "cls_removed": bool(cls_removed)})
+                    meta.update(
+                        {
+                            "grid_hw": (h, w),
+                            "grid_kind": "patch_tokens",
+                            "cls_removed": bool(cls_removed),
+                        }
+                    )
                     assert xr_mod is not None
                     da = xr_mod.DataArray(
                         grid,
                         dims=("d", "y", "x"),
-                        coords={"d": np.arange(grid.shape[0]), "y": np.arange(h), "x": np.arange(w)},
+                        coords={
+                            "d": np.arange(grid.shape[0]),
+                            "y": np.arange(h),
+                            "x": np.arange(w),
+                        },
                         name="embedding",
                         attrs=meta,
                     )
@@ -612,7 +688,9 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 raise ModelError(f"Unknown output mode: {output.mode}")
 
         if any(e is None for e in out):
-            raise ModelError("scalemae_rgb batch inference produced incomplete outputs.")
+            raise ModelError(
+                "scalemae_rgb batch inference produced incomplete outputs."
+            )
         return [e for e in out if e is not None]
 
     def get_embeddings_batch_from_inputs(
@@ -639,7 +717,9 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
+        image_size = int(
+            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
+        )
         t = temporal_to_range(temporal)
         model, wmeta = _load_scalemae(model_id=model_id, device=device)
         dev = wmeta.get("device", device)
@@ -661,9 +741,12 @@ class ScaleMAERGBEmbedder(EmbedderBase):
         if output.mode == "grid":
             try:
                 import xarray as xr  # type: ignore
+
                 xr_mod = xr
             except Exception as e:
-                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
+                raise ModelError(
+                    "grid output requires xarray. Install: pip install xarray"
+                ) from e
 
         n = len(spatials)
         for s0 in range(0, n, infer_bs):
@@ -704,7 +787,12 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 if output.mode == "pooled":
                     if o.ndim == 2:
                         vec, cls_removed = pool_from_tokens(o, output.pooling)
-                        meta.update({"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)})
+                        meta.update(
+                            {
+                                "pooling": f"patch_{output.pooling}",
+                                "cls_removed": bool(cls_removed),
+                            }
+                        )
                         out[i] = Embedding(data=vec, meta=meta)
                     elif o.ndim == 1:
                         meta.update({"pooling": "model_pooled", "cls_removed": False})
@@ -720,12 +808,22 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                             f"Got {o.shape} (tokens_kind={meta.get('tokens_kind')})."
                         )
                     grid, (h, w), cls_removed = tokens_to_grid_dhw(o)
-                    meta.update({"grid_hw": (h, w), "grid_kind": "patch_tokens", "cls_removed": bool(cls_removed)})
+                    meta.update(
+                        {
+                            "grid_hw": (h, w),
+                            "grid_kind": "patch_tokens",
+                            "cls_removed": bool(cls_removed),
+                        }
+                    )
                     assert xr_mod is not None
                     da = xr_mod.DataArray(
                         grid,
                         dims=("d", "y", "x"),
-                        coords={"d": np.arange(grid.shape[0]), "y": np.arange(h), "x": np.arange(w)},
+                        coords={
+                            "d": np.arange(grid.shape[0]),
+                            "y": np.arange(h),
+                            "x": np.arange(w),
+                        },
                         name="embedding",
                         attrs=meta,
                     )
@@ -735,5 +833,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 raise ModelError(f"Unknown output mode: {output.mode}")
 
         if any(e is None for e in out):
-            raise ModelError("scalemae_rgb prefetched batch inference produced incomplete outputs.")
+            raise ModelError(
+                "scalemae_rgb prefetched batch inference produced incomplete outputs."
+            )
         return [e for e in out if e is not None]

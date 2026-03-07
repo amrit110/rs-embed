@@ -6,9 +6,8 @@ backend names to concrete provider/access paths, particularly for
 precomputed models.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from rs_embed.api import (
     _resolve_embedding_api_backend,
@@ -103,14 +102,19 @@ class TestProviderFactory:
 
     def test_auto_delegates_to_default_provider(self):
         """auto → uses _default_provider_backend_for_api, not hard-coded gee."""
-        with patch("rs_embed.api._default_provider_backend_for_api", return_value="gee"):
+        with patch(
+            "rs_embed.api._default_provider_backend_for_api", return_value="gee"
+        ):
             with patch("rs_embed.api.has_provider", return_value=True):
                 factory = _provider_factory_for_backend("auto")
                 assert factory is not None
 
     def test_auto_uses_non_gee_default(self):
         """auto → picks the first available provider when gee is absent."""
-        with patch("rs_embed.api._default_provider_backend_for_api", return_value="planetary_computer"):
+        with patch(
+            "rs_embed.api._default_provider_backend_for_api",
+            return_value="planetary_computer",
+        ):
             with patch("rs_embed.api.has_provider", return_value=True):
                 factory = _provider_factory_for_backend("auto")
                 assert factory is not None

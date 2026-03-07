@@ -117,7 +117,7 @@ def run_with_retry(
             if attempt >= tries:
                 raise
             if backoff > 0:
-                time.sleep(backoff * (2 ** attempt))
+                time.sleep(backoff * (2**attempt))
     if last_err is not None:
         raise last_err
     raise RuntimeError("unreachable retry state")

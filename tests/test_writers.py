@@ -1,6 +1,5 @@
 """Tests for rs_embed.writers — format-specific persistence."""
 
-import json
 import os
 
 import numpy as np
@@ -8,7 +7,6 @@ import pytest
 import xarray as xr
 
 from rs_embed.writers import (
-    SUPPORTED_FORMATS,
     _infer_dims,
     _pick_engine,
     get_extension,

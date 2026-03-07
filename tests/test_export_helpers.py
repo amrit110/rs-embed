@@ -3,7 +3,7 @@ import pytest
 import xarray as xr
 
 from rs_embed.core import registry
-from rs_embed.core.specs import BBox, PointBuffer, TemporalSpec, SensorSpec, OutputSpec
+from rs_embed.core.specs import BBox, SensorSpec
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.export_helpers import (
     sanitize_key as _sanitize_key,

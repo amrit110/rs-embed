@@ -149,9 +149,15 @@ def build_one_point_payload(
                         input_chw, sensor=sspec, name=f"gee_input_{skey}"
                     )
 
-                if fail_on_bad_input and report is not None and (not bool(report.get("ok", True))):
+                if (
+                    fail_on_bad_input
+                    and report is not None
+                    and (not bool(report.get("ok", True)))
+                ):
                     issues = (report.get("report", {}) or {}).get("issues", [])
-                    raise RuntimeError(f"Input inspection failed for model={m}: {issues}")
+                    raise RuntimeError(
+                        f"Input inspection failed for model={m}: {issues}"
+                    )
 
                 if save_inputs and input_chw is not None:
                     if skey in local_input_meta:

@@ -84,7 +84,20 @@ _DEFAULT_MODALITY_CHANNELS: Dict[int, str] = {
     36: "gaofen2-nir",
 }
 
-_DEFAULT_S2_MODALITY_KEYS: Tuple[int, ...] = (6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18)
+_DEFAULT_S2_MODALITY_KEYS: Tuple[int, ...] = (
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    17,
+    18,
+)
 _DEFAULT_CKPT_FILENAME = "fomo_single_embedding_layer_weights.pt"
 _DEFAULT_CKPT_URL = (
     "https://www.dropbox.com/scl/fi/4ckmxlcbc0tcod8hknp7c/"
@@ -92,7 +105,6 @@ _DEFAULT_CKPT_URL = (
 )
 _DEFAULT_REPO_URL = "https://github.com/RolnickLab/FoMo-Bench.git"
 _DEFAULT_REPO_CACHE = "~/.cache/rs_embed/fomo"
-
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -161,10 +173,20 @@ def _resolve_fomo_ckpt_path() -> str:
         )
 
     cache_dir = os.environ.get("RS_EMBED_FOMO_CACHE_DIR", _DEFAULT_REPO_CACHE)
-    filename = os.environ.get("RS_EMBED_FOMO_CKPT_FILE", _DEFAULT_CKPT_FILENAME).strip() or _DEFAULT_CKPT_FILENAME
-    url = os.environ.get("RS_EMBED_FOMO_CKPT_URL", _DEFAULT_CKPT_URL).strip() or _DEFAULT_CKPT_URL
-    min_bytes = int(os.environ.get("RS_EMBED_FOMO_CKPT_MIN_BYTES", str(50 * 1024 * 1024)))
-    return _download_fomo_ckpt(url=url, cache_dir=cache_dir, filename=filename, min_bytes=min_bytes)
+    filename = (
+        os.environ.get("RS_EMBED_FOMO_CKPT_FILE", _DEFAULT_CKPT_FILENAME).strip()
+        or _DEFAULT_CKPT_FILENAME
+    )
+    url = (
+        os.environ.get("RS_EMBED_FOMO_CKPT_URL", _DEFAULT_CKPT_URL).strip()
+        or _DEFAULT_CKPT_URL
+    )
+    min_bytes = int(
+        os.environ.get("RS_EMBED_FOMO_CKPT_MIN_BYTES", str(50 * 1024 * 1024))
+    )
+    return _download_fomo_ckpt(
+        url=url, cache_dir=cache_dir, filename=filename, min_bytes=min_bytes
+    )
 
 
 @lru_cache(maxsize=4)
@@ -205,7 +227,9 @@ def _resolve_fomo_repo(
         if not os.path.isdir(p):
             raise ModelError(f"RS_EMBED_FOMO_REPO_PATH does not exist: {p}")
         if not os.path.isfile(mm):
-            raise ModelError(f"FoMo repo path is missing model_zoo/multimodal_mae.py: {p}")
+            raise ModelError(
+                f"FoMo repo path is missing model_zoo/multimodal_mae.py: {p}"
+            )
         return p
     if not auto_download:
         raise ModelError(
@@ -339,9 +363,13 @@ def _load_fomo_cached(
             p0 = p.detach()
             break
     if p0 is None:
-        raise ModelError("FoMo model has no parameters; cannot verify loaded checkpoint.")
+        raise ModelError(
+            "FoMo model has no parameters; cannot verify loaded checkpoint."
+        )
     if not torch.isfinite(p0).all():
-        raise ModelError("FoMo model parameters contain NaN/Inf; checkpoint load likely failed.")
+        raise ModelError(
+            "FoMo model parameters contain NaN/Inf; checkpoint load likely failed."
+        )
     p0f = p0.float()
 
     meta = {
@@ -409,7 +437,9 @@ def _resize_chw(x_chw: np.ndarray, *, out_hw: int) -> np.ndarray:
     if x_chw.ndim != 3:
         raise ModelError(f"Expected CHW array, got {x_chw.shape}")
     x = torch.from_numpy(x_chw.astype(np.float32, copy=False)).unsqueeze(0)
-    y = F.interpolate(x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False)
+    y = F.interpolate(
+        x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False
+    )
     return y[0].detach().cpu().numpy().astype(np.float32)
 
 
@@ -473,7 +503,9 @@ def _fomo_forward_tokens(
         out = model((x, keys), pool=False)
 
     if not hasattr(out, "ndim") or int(out.ndim) != 3:
-        raise ModelError(f"FoMo forward(pool=False) expected [B,N,D] tensor, got type={type(out)}")
+        raise ModelError(
+            f"FoMo forward(pool=False) expected [B,N,D] tensor, got type={type(out)}"
+        )
     if int(out.shape[0]) != 1:
         raise ModelError(f"FoMo embedder expects B=1 per call, got {tuple(out.shape)}")
 
@@ -485,7 +517,9 @@ def _fomo_forward_tokens(
     return tokens, meta
 
 
-def _tokens_to_grid(tokens_nd: np.ndarray, *, n_modalities: int, patch_size: int, image_size: int) -> Tuple[np.ndarray, Dict[str, Any]]:
+def _tokens_to_grid(
+    tokens_nd: np.ndarray, *, n_modalities: int, patch_size: int, image_size: int
+) -> Tuple[np.ndarray, Dict[str, Any]]:
     n_tokens, dim = int(tokens_nd.shape[0]), int(tokens_nd.shape[1])
     expected_gs = int(image_size) // int(patch_size) if int(patch_size) > 0 else 0
     expected_per_mod = expected_gs * expected_gs if expected_gs > 0 else 0
@@ -587,7 +621,11 @@ class FoMoEmbedder(EmbedderBase):
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
-        v = int(os.environ.get("RS_EMBED_FOMO_FETCH_WORKERS", str(FoMoEmbedder.DEFAULT_FETCH_WORKERS)))
+        v = int(
+            os.environ.get(
+                "RS_EMBED_FOMO_FETCH_WORKERS", str(FoMoEmbedder.DEFAULT_FETCH_WORKERS)
+            )
+        )
         return max(1, min(int(n_items), v))
 
     def get_embedding(
@@ -608,13 +646,19 @@ class FoMoEmbedder(EmbedderBase):
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
 
-        image_size = int(os.environ.get("RS_EMBED_FOMO_IMG", str(self.DEFAULT_IMAGE_SIZE)))
+        image_size = int(
+            os.environ.get("RS_EMBED_FOMO_IMG", str(self.DEFAULT_IMAGE_SIZE))
+        )
         patch_size = int(os.environ.get("RS_EMBED_FOMO_PATCH", str(self.DEFAULT_PATCH)))
         dim = int(os.environ.get("RS_EMBED_FOMO_DIM", str(self.DEFAULT_DIM)))
         depth = int(os.environ.get("RS_EMBED_FOMO_DEPTH", str(self.DEFAULT_DEPTH)))
         heads = int(os.environ.get("RS_EMBED_FOMO_HEADS", str(self.DEFAULT_HEADS)))
-        mlp_dim = int(os.environ.get("RS_EMBED_FOMO_MLP_DIM", str(self.DEFAULT_MLP_DIM)))
-        num_classes = int(os.environ.get("RS_EMBED_FOMO_NUM_CLASSES", str(self.DEFAULT_NUM_CLASSES)))
+        mlp_dim = int(
+            os.environ.get("RS_EMBED_FOMO_MLP_DIM", str(self.DEFAULT_MLP_DIM))
+        )
+        num_classes = int(
+            os.environ.get("RS_EMBED_FOMO_NUM_CLASSES", str(self.DEFAULT_NUM_CLASSES))
+        )
         norm_mode = os.environ.get("RS_EMBED_FOMO_NORM", "unit_scale").strip()
 
         repo_path = os.environ.get("RS_EMBED_FOMO_REPO_PATH")
@@ -637,8 +681,12 @@ class FoMoEmbedder(EmbedderBase):
         else:
             raw = np.asarray(input_chw, dtype=np.float32)
             if raw.ndim != 3 or int(raw.shape[0]) != len(_S2_SR_12_BANDS):
-                raise ModelError(f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}")
-            raw = np.clip(np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0).astype(np.float32)
+                raise ModelError(
+                    f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}"
+                )
+            raw = np.clip(
+                np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
+            ).astype(np.float32)
 
         x = _normalize_s2(raw, mode=norm_mode)
         if int(x.shape[-2]) != image_size or int(x.shape[-1]) != image_size:

@@ -47,7 +47,9 @@ def run_combined_prefetch_tasks(
 
     def _fetch_one(i: int, skey: str, sspec: SensorSpec):
         x = deps.run_with_retry(
-            lambda: deps.fetch_gee_patch_raw(provider, spatial=spatials[i], temporal=temporal, sensor=sspec),
+            lambda: deps.fetch_gee_patch_raw(
+                provider, spatial=spatials[i], temporal=temporal, sensor=sspec
+            ),
             retries=max_retries,
             backoff_s=retry_backoff_s,
         )
@@ -76,7 +78,11 @@ def run_combined_prefetch_tasks(
                     )
                     if fail_on_bad_input:
                         sspec_member = sensor_by_key[member_skey]
-                        rep = deps.inspect_input_raw(x_member, sensor=sspec_member, name=f"gee_input_{member_skey}")
+                        rep = deps.inspect_input_raw(
+                            x_member,
+                            sensor=sspec_member,
+                            name=f"gee_input_{member_skey}",
+                        )
                         if not bool(rep.get("ok", True)):
                             issues = (rep.get("report", {}) or {}).get("issues", [])
                             mlist = sorted(set(sensor_models.get(member_skey, [])))
@@ -114,18 +120,26 @@ def get_or_fetch_input(
         return hit
     pref_err = prefetch_errors.get((i, skey))
     if pref_err:
-        raise RuntimeError(f"Prefetch previously failed for index={i}, sensor={skey}: {pref_err}")
+        raise RuntimeError(
+            f"Prefetch previously failed for index={i}, sensor={skey}: {pref_err}"
+        )
     if provider is None:
-        raise RuntimeError(f"Missing provider for input fetch: index={i}, sensor={skey}")
+        raise RuntimeError(
+            f"Missing provider for input fetch: index={i}, sensor={skey}"
+        )
     x = deps.run_with_retry(
-        lambda: deps.fetch_gee_patch_raw(provider, spatial=spatials[i], temporal=temporal, sensor=sspec),
+        lambda: deps.fetch_gee_patch_raw(
+            provider, spatial=spatials[i], temporal=temporal, sensor=sspec
+        ),
         retries=max_retries,
         backoff_s=retry_backoff_s,
     )
     rep = deps.inspect_input_raw(x, sensor=sspec, name=f"gee_input_{skey}")
     if fail_on_bad_input and (not bool(rep.get("ok", True))):
         issues = (rep.get("report", {}) or {}).get("issues", [])
-        raise RuntimeError(f"Input inspection failed for index={i}, sensor={skey}: {issues}")
+        raise RuntimeError(
+            f"Input inspection failed for index={i}, sensor={skey}: {issues}"
+        )
     inputs_cache[(i, skey)] = x
     input_reports[(i, skey)] = rep
     return x
@@ -210,11 +224,18 @@ def run_pending_models(
                 and sspec is not None
                 and "precomputed" not in (model_type.get(m) or "")
             )
-            skey = deps.sensor_cache_key(sspec) if needs_provider_input and sspec is not None else None
+            skey = (
+                deps.sensor_cache_key(sspec)
+                if needs_provider_input and sspec is not None
+                else None
+            )
 
             if save_inputs and needs_provider_input and skey is not None:
                 if skey in input_refs_by_sensor:
-                    m_entry["inputs"] = {**input_refs_by_sensor[skey], "dedup_reused": True}
+                    m_entry["inputs"] = {
+                        **input_refs_by_sensor[skey],
+                        "dedup_reused": True,
+                    }
                 else:
                     xs = []
                     xs_indices: List[int] = []
@@ -228,7 +249,9 @@ def run_pending_models(
                         xs.append(np.asarray(x, dtype=np.float32))
                         xs_indices.append(int(i))
                     if missing and not continue_on_error:
-                        raise RuntimeError(f"Missing prefetched inputs for model={m}: {missing}")
+                        raise RuntimeError(
+                            f"Missing prefetched inputs for model={m}: {missing}"
+                        )
                     if not xs:
                         m_entry["inputs"] = None
                     else:
@@ -236,7 +259,11 @@ def run_pending_models(
                             arr = np.stack(xs, axis=0)
                             in_key = f"inputs_bchw__{deps.sanitize_key(m)}"
                             arrays[in_key] = arr
-                            ref = {"npz_key": in_key, "shape": list(arr.shape), "dtype": str(arr.dtype)}
+                            ref = {
+                                "npz_key": in_key,
+                                "shape": list(arr.shape),
+                                "dtype": str(arr.dtype),
+                            }
                             if len(xs_indices) != len(spatials):
                                 ref["indices"] = list(xs_indices)
                             input_refs_by_sensor[skey] = dict(ref)
@@ -301,7 +328,12 @@ def run_pending_models(
                     and skey is not None
                     and sspec is not None
                 )
-                can_batch = allow_batch and prefer_batch and deps.supports_batch_api(embedder) and not needs_provider_input
+                can_batch = (
+                    allow_batch
+                    and prefer_batch
+                    and deps.supports_batch_api(embedder)
+                    and not needs_provider_input
+                )
                 batch_attempted = False
                 batch_succeeded = False
 
@@ -325,20 +357,24 @@ def run_pending_models(
 
                         if batch_spatials:
                             for start in range(0, len(batch_spatials), infer_chunk):
-                                sub_spatials = batch_spatials[start:start + infer_chunk]
-                                sub_inputs = batch_inputs[start:start + infer_chunk]
-                                sub_indices = batch_indices[start:start + infer_chunk]
+                                sub_spatials = batch_spatials[
+                                    start : start + infer_chunk
+                                ]
+                                sub_inputs = batch_inputs[start : start + infer_chunk]
+                                sub_indices = batch_indices[start : start + infer_chunk]
 
                                 def _infer_batch_prefetched():
                                     with lock:
-                                        return embedder.get_embeddings_batch_from_inputs(
-                                            spatials=sub_spatials,
-                                            input_chws=sub_inputs,
-                                            temporal=temporal,
-                                            sensor=sspec,
-                                            output=output,
-                                            backend=m_backend,
-                                            device=device,
+                                        return (
+                                            embedder.get_embeddings_batch_from_inputs(
+                                                spatials=sub_spatials,
+                                                input_chws=sub_inputs,
+                                                temporal=temporal,
+                                                sensor=sspec,
+                                                output=output,
+                                                backend=m_backend,
+                                                device=device,
+                                            )
                                         )
 
                                 batch_out = deps.run_with_retry(
@@ -352,7 +388,9 @@ def run_pending_models(
                                         f"{len(sub_spatials)} prefetched inputs."
                                     )
                                 for j, emb in enumerate(batch_out):
-                                    emb = normalize_embedding_output(emb=emb, output=output)
+                                    emb = normalize_embedding_output(
+                                        emb=emb, output=output
+                                    )
                                     i = sub_indices[j]
                                     embs_by_idx[i] = deps.embedding_to_numpy(emb)
                                     metas_by_idx[i] = deps.jsonable(emb.meta)
@@ -374,7 +412,7 @@ def run_pending_models(
                     batch_attempted = True
                     try:
                         for start in range(0, n, infer_chunk):
-                            sub_spatials = spatials[start:start + infer_chunk]
+                            sub_spatials = spatials[start : start + infer_chunk]
 
                             def _infer_batch():
                                 with lock:
@@ -448,7 +486,10 @@ def run_pending_models(
                                 arrays[k] = e_arr[j]
                                 keys.append(k)
                                 index_map.append(i)
-                            m_entry["embeddings"] = {"npz_keys": keys, "indices": index_map}
+                            m_entry["embeddings"] = {
+                                "npz_keys": keys,
+                                "indices": index_map,
+                            }
                     except Exception:
                         keys = []
                         index_map = []
@@ -490,6 +531,8 @@ def run_pending_models(
             progress.update(1)
 
         manifest["models"].append(m_entry)
-        manifest = write_checkpoint_fn(stage=f"model:{deps.sanitize_key(m)}", final=False)
+        manifest = write_checkpoint_fn(
+            stage=f"model:{deps.sanitize_key(m)}", final=False
+        )
 
     return manifest

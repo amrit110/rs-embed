@@ -9,9 +9,8 @@ All embedders are fakes — the goal is to verify the orchestration logic,
 not real model inference.
 """
 
-from dataclasses import dataclass
 from threading import RLock
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 import pytest

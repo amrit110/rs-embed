@@ -6,6 +6,7 @@ import numpy as np
 from ..core.specs import SpatialSpec, TemporalSpec, SensorSpec, OutputSpec
 from ..core.embedding import Embedding
 
+
 class EmbedderBase:
     model_name: str = "base"
 
@@ -24,7 +25,7 @@ class EmbedderBase:
         device: str = "auto",
         input_chw: Optional[np.ndarray] = None,
     ) -> Embedding:
-        
+
         raise NotImplementedError
 
     def get_embeddings_batch(

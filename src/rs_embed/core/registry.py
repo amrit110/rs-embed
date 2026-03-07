@@ -10,14 +10,18 @@ from .errors import ModelError
 _REGISTRY: Dict[str, Type[Any]] = {}
 _REGISTRY_IMPORT_ERROR: Optional[BaseException] = None
 
+
 def register(name: str):
     """Decorator to register an embedder class by name."""
+
     def deco(cls: Type[Any]):
         model_id = canonical_model_id(name)
         _REGISTRY[model_id] = cls
         setattr(cls, "model_name", model_id)
         return cls
+
     return deco
+
 
 def _try_lazy_load_model(name: str) -> None:
     """Load only the module that owns `name`, then backfill registration if needed."""
@@ -49,6 +53,7 @@ def _try_lazy_load_model(name: str) -> None:
     setattr(cls, "model_name", model_id)
     _REGISTRY_IMPORT_ERROR = None
 
+
 def get_embedder_cls(name: str) -> Type[Any]:
     k = canonical_model_id(name)
     if k not in _REGISTRY:
@@ -64,10 +69,9 @@ def get_embedder_cls(name: str) -> Type[Any]:
                 f" Last embedder import error: "
                 f"{type(_REGISTRY_IMPORT_ERROR).__name__}: {_REGISTRY_IMPORT_ERROR}"
             )
-        raise ModelError(
-            msg
-        )
+        raise ModelError(msg)
     return _REGISTRY[k]
+
 
 def list_models():
     """Return sorted list of currently-loaded model IDs from the runtime registry.

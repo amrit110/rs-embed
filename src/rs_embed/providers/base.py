@@ -111,7 +111,9 @@ class ProviderBase:
         )
         arr = np.asarray(x, dtype=np.float32)
         if arr.ndim != 3:
-            raise ProviderError(f"Expected CHW array from provider fetch, got shape={getattr(arr, 'shape', None)}")
+            raise ProviderError(
+                f"Expected CHW array from provider fetch, got shape={getattr(arr, 'shape', None)}"
+            )
         if int(arr.shape[0]) != len(sensor.bands):
             raise ProviderError(
                 f"Provider fetch channel mismatch: got C={int(arr.shape[0])}, "

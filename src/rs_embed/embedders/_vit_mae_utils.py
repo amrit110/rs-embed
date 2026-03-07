@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
 from ..core.errors import ModelError
-from ..core.specs import TemporalSpec, SensorSpec, SpatialSpec, OutputSpec
+from ..core.specs import TemporalSpec, SensorSpec, SpatialSpec
 from ..providers import ProviderBase
-from .meta_utils import temporal_to_range, temporal_midpoint_str, build_meta
+from .meta_utils import temporal_to_range, build_meta
 from .runtime_utils import create_provider_for_backend, fetch_collection_patch_chw
 
 
@@ -76,6 +76,7 @@ def fetch_s2_rgb_u8_from_provider(
 
     # Optional: inspect on-the-fly provider input (shared by multiple embedders)
     from ..core.input_checks import maybe_inspect_chw, checks_should_raise
+
     report = maybe_inspect_chw(
         s2_chw,
         sensor=sensor,
@@ -85,13 +86,17 @@ def fetch_s2_rgb_u8_from_provider(
         fill_value=0.0,
         meta=None,
     )
-    if report is not None and (not report.get("ok", True)) and checks_should_raise(sensor):
-        raise ModelError("Provider input inspection failed: " + "; ".join(report.get("issues", [])))
+    if (
+        report is not None
+        and (not report.get("ok", True))
+        and checks_should_raise(sensor)
+    ):
+        raise ModelError(
+            "Provider input inspection failed: " + "; ".join(report.get("issues", []))
+        )
 
     rgb_u8 = _s2_rgb_u8_from_chw(s2_chw)
     return resize_rgb_u8(rgb_u8, out_size)
-
-
 
 
 # -------------------------
@@ -108,7 +113,9 @@ def infer_has_cls(n_tokens: int) -> bool:
     return h * h == p
 
 
-def split_cls_patch(tokens: np.ndarray) -> Tuple[Optional[np.ndarray], np.ndarray, bool]:
+def split_cls_patch(
+    tokens: np.ndarray,
+) -> Tuple[Optional[np.ndarray], np.ndarray, bool]:
     """
     tokens: [N,D]
     Returns: (cls_token [D] or None, patch_tokens [P,D], has_cls)
@@ -194,7 +201,9 @@ def rgb_u8_to_tensor_clipnorm(rgb_u8: np.ndarray, image_size: int):
 
     preprocess = transforms.Compose(
         [
-            transforms.Resize(image_size, interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.Resize(
+                image_size, interpolation=transforms.InterpolationMode.BICUBIC
+            ),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(

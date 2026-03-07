@@ -1,9 +1,7 @@
 """Tests for rs_embed.internal.api.manifest_helpers."""
 
 import json
-import os
 
-import pytest
 
 from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, TemporalSpec
 from rs_embed.internal.api.manifest_helpers import (
