@@ -373,6 +373,21 @@ def test_export_batch_empty_spatials():
         )
 
 
+def test_export_batch_rejects_non_list_spatials():
+    """_validate_spatials requires an actual list, not a tuple or single spec."""
+    from rs_embed.api import export_batch
+
+    with pytest.raises(ModelError, match="non-empty"):
+        export_batch(
+            spatials=(_SPATIAL,), temporal=_TEMPORAL, models=["mock_model"], out_dir="/tmp"
+        )
+
+    with pytest.raises(ModelError, match="non-empty"):
+        export_batch(
+            spatials=_SPATIAL, temporal=_TEMPORAL, models=["mock_model"], out_dir="/tmp"
+        )
+
+
 def test_export_batch_empty_models():
     from rs_embed.api import export_batch
 
@@ -745,6 +760,36 @@ def test_export_batch_assert_supported_passes_for_compatible_model(tmp_path):
         models=["mock_model"],
         out_dir=str(tmp_path),
         backend="local",
+        save_inputs=False,
+        save_embeddings=True,
+        save_manifest=False,
+        show_progress=False,
+    )
+    assert len(results) == 1
+    assert results[0]["status"] == "ok"
+
+
+def test_export_batch_backend_resolution_before_assert_supported(tmp_path):
+    """Backend is resolved per model BEFORE capability validation.
+
+    A precomputed model declaring backend=["auto"] should pass when the user
+    passes backend="gee", because _resolve_embedding_api_backend remaps "gee"
+    to "auto" for precomputed models.  Without the per-model resolution fix
+    (Finding 11), _assert_supported would see raw "gee" ∉ ["auto"] and raise.
+    """
+    from rs_embed.api import export_batch
+
+    registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
+
+    # _MockPrecomputedLocalEmbedder declares backend=["local", "auto"]
+    # User passes backend="gee" → _resolve_embedding_api_backend maps to "auto"
+    # → _assert_supported sees "auto" ∈ ["local", "auto"] → passes
+    results = export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=["mock_precomputed_local"],
+        out_dir=str(tmp_path),
+        backend="gee",
         save_inputs=False,
         save_embeddings=True,
         save_manifest=False,
