@@ -7,7 +7,6 @@ import numpy as np
 from ..core.errors import ModelError
 from ..core.registry import get_embedder_cls
 from ..embedders.catalog import canonical_model_id
-from ..embedders.runtime_utils import default_provider_backend_name
 from ..providers import has_provider
 
 
@@ -56,6 +55,8 @@ def _probe_model_describe(model_n: str) -> Dict[str, Any]:
 
 
 def _default_provider_backend_for_api() -> str:
+    from ..embedders.runtime_utils import default_provider_backend_name
+
     return default_provider_backend_name() or "gee"
 
 
