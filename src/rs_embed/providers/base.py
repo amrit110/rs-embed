@@ -171,6 +171,11 @@ class ProviderBase:
         -------
         np.ndarray
             Array with shape ``[C,H,W]``.
+
+        Raises
+        ------
+        ProviderError
+            If this provider does not support Sentinel-1 VV/VH fetch operations.
         """
         raise ProviderError(
             f"Provider '{self.name}' does not implement Sentinel-1 VV/VH fetch support."
@@ -216,6 +221,11 @@ class ProviderBase:
         -------
         np.ndarray
             Array with shape ``[T,C,H,W]``.
+
+        Raises
+        ------
+        ProviderError
+            If this provider does not support multi-frame collection fetch.
         """
         raise ProviderError(
             f"Provider '{self.name}' does not implement multi-frame collection fetch support."
@@ -252,6 +262,11 @@ class ProviderBase:
         -------
         tuple[np.ndarray, tuple[str, ...]]
             ``(array_chw, band_names)`` tuple.
+
+        Raises
+        ------
+        ProviderError
+            If the provider does not implement all-band collection patch fetch support.
         """
         raise ProviderError(
             f"Provider '{self.name}' does not implement all-band collection patch fetch support."

@@ -507,6 +507,8 @@ def get_embedding(
     ModelError
         If inputs/specs are invalid or requested model/backend configuration is
         unsupported.
+    SpecError
+        If spatial or temporal specifications fail validation.
 
     Notes
     -----
@@ -574,6 +576,8 @@ def get_embeddings_batch(
     ModelError
         If inputs/specs are invalid or requested model/backend configuration is
         unsupported.
+    SpecError
+        If spatial or temporal specifications fail validation.
     """
     _validate_spatials(spatials=spatials, temporal=temporal, output=output)
     ctx = _prepare_embedding_request_context(
@@ -708,6 +712,8 @@ def export_batch(
     ModelError
         If arguments are invalid or unsupported (for example empty inputs,
         unsupported format, or incompatible model/backend settings).
+    SpecError
+        If spatial or temporal specifications fail validation.
     """
     from .pipelines.exporter import BatchExporter
 

@@ -24,7 +24,11 @@ def validate_specs(
     Raises
     ------
     ModelError
-        If any spec is malformed or contains unsupported values.
+        If any spec is malformed or contains unsupported values at the
+        interface level (for example invalid types or unsupported output
+        configuration).
+    SpecError
+        If the underlying spatial or temporal spec validation fails.
     """
 
     if not hasattr(spatial, "validate"):
