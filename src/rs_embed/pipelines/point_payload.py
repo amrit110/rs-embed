@@ -22,6 +22,7 @@ from ..tools.serialization import (
     sha1,
     utc_ts,
 )
+from ..tools.manifest import summarize_status
 from ..tools.normalization import normalize_model_name
 from ..tools.runtime import (
     call_embedder_get_embedding,
@@ -247,15 +248,36 @@ def build_one_point_payload(
         manifest["models"].append(m_entry)
 
     n_failed = sum(1 for x in manifest["models"] if x.get("status") == "failed")
-    if n_failed == 0:
-        manifest["status"] = "ok"
-    elif n_failed < len(manifest["models"]):
-        manifest["status"] = "partial"
-    else:
-        manifest["status"] = "failed"
+    manifest["status"] = summarize_status(manifest["models"])
     manifest["summary"] = {
         "total_models": len(manifest["models"]),
         "failed_models": n_failed,
         "ok_models": len(manifest["models"]) - n_failed,
     }
     return arrays, manifest
+
+
+def write_one_payload(
+    *,
+    out_path: str,
+    arrays: Dict[str, np.ndarray],
+    manifest: Dict[str, Any],
+    save_manifest: bool,
+    fmt: str,
+    max_retries: int,
+    retry_backoff_s: float,
+) -> Dict[str, Any]:
+    """Persist one payload with retry and return writer metadata."""
+    from ..writers import write_arrays
+
+    return run_with_retry(
+        lambda: write_arrays(
+            fmt=fmt,
+            out_path=out_path,
+            arrays=arrays,
+            manifest=jsonable(manifest),
+            save_manifest=save_manifest,
+        ),
+        retries=max_retries,
+        backoff_s=retry_backoff_s,
+    )

@@ -22,13 +22,11 @@ from ..tools.serialization import (
 )
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import ExportConfig, ExportLayout, ExportTarget, ModelConfig
-from .export_flow import (
-    build_one_point_payload,
-    write_one_payload,
-)
+from .point_payload import build_one_point_payload, write_one_payload
 from ..tools.manifest import (
     point_failure_manifest,
     point_resume_manifest,
+    summarize_status,
 )
 from ..tools.progress import create_progress
 from ..writers import get_extension
@@ -679,33 +677,13 @@ class BatchExporter:
         # Recompute summary
         all_models = manifest.get("models") or []
         n_failed = sum(
-            1 for x in all_models if isinstance(x, dict) and x.get("status") == "failed"
+            1
+            for x in all_models
+            if isinstance(x, dict) and str(x.get("status", "")).lower() == "failed"
         )
-        if not all_models:
-            manifest["status"] = "ok"
-            manifest["summary"] = {
-                "total_models": 0,
-                "failed_models": 0,
-                "ok_models": 0,
-            }
-        elif n_failed == 0:
-            manifest["status"] = "ok"
-            manifest["summary"] = {
-                "total_models": len(all_models),
-                "failed_models": 0,
-                "ok_models": len(all_models),
-            }
-        elif n_failed < len(all_models):
-            manifest["status"] = "partial"
-            manifest["summary"] = {
-                "total_models": len(all_models),
-                "failed_models": n_failed,
-                "ok_models": len(all_models) - n_failed,
-            }
-        else:
-            manifest["status"] = "failed"
-            manifest["summary"] = {
-                "total_models": len(all_models),
-                "failed_models": n_failed,
-                "ok_models": 0,
-            }
+        manifest["status"] = summarize_status(all_models)
+        manifest["summary"] = {
+            "total_models": len(all_models),
+            "failed_models": n_failed,
+            "ok_models": len(all_models) - n_failed,
+        }
