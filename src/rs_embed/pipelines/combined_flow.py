@@ -276,7 +276,9 @@ def _pack_embedding_results(
     arrays: Dict[str, np.ndarray],
 ) -> None:
     """Convert ``{idx: TaskResult}`` into stacked arrays and manifest entries."""
-    ok_indices = [i for i in range(n) if i in results and results[i].status == Status.OK]
+    ok_indices = [
+        i for i in range(n) if i in results and results[i].status == Status.OK
+    ]
     errors_by_idx = {
         i: results[i].error
         for i in range(n)
@@ -287,7 +289,8 @@ def _pack_embedding_results(
     if ok_indices:
         try:
             e_arr = np.stack(
-                [results[i].embedding for i in ok_indices], axis=0  # type: ignore[arg-type]
+                [results[i].embedding for i in ok_indices],
+                axis=0,  # type: ignore[arg-type]
             )
             if len(ok_indices) == n:
                 e_key = f"embeddings__{sanitize_key(m)}"

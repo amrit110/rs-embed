@@ -84,8 +84,7 @@ class ParallelRunner:
         """Run *fn(item)* for each item, returning ``{index: result}``."""
         wrapped = self._retry_wrap(fn)
         fut_to_idx = {
-            self.executor.submit(wrapped, item): idx
-            for idx, item in enumerate(items)
+            self.executor.submit(wrapped, item): idx for idx, item in enumerate(items)
         }
         results: Dict[int, _T] = {}
         for fut in as_completed(fut_to_idx):

@@ -490,9 +490,7 @@ class BatchExporter:
                 out_file = os.path.join(out_dir, f"{names[i]}{self.ext}")
                 try:
                     per_item_cfg = (
-                        replace(cfg, save_embeddings=False)
-                        if use_batch
-                        else cfg
+                        replace(cfg, save_embeddings=False) if use_batch else cfg
                     )
                     arrays, manifest = build_one_point_payload(
                         point_index=i,
@@ -685,7 +683,11 @@ class BatchExporter:
         )
         if not all_models:
             manifest["status"] = "ok"
-            manifest["summary"] = {"total_models": 0, "failed_models": 0, "ok_models": 0}
+            manifest["summary"] = {
+                "total_models": 0,
+                "failed_models": 0,
+                "ok_models": 0,
+            }
         elif n_failed == 0:
             manifest["status"] = "ok"
             manifest["summary"] = {
