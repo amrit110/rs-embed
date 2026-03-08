@@ -18,6 +18,7 @@ import pytest
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.pipelines import combined_flow
+from rs_embed.pipelines import inference as inference_mod
 from rs_embed.pipelines.combined_flow import run_pending_models
 
 
@@ -44,25 +45,71 @@ def _patch_deps(
     if lock is None:
         lock = RLock()
 
+    # ── Patches on combined_flow (describe, input gathering, progress) ──
     monkeypatch.setattr(combined_flow, "create_progress", lambda **kw: _NoOpProgress())
-    monkeypatch.setattr(combined_flow, "drop_model_arrays", lambda arrays, m, sanitize_key=None: None)
+    monkeypatch.setattr(
+        combined_flow, "drop_model_arrays", lambda arrays, m, sanitize_key=None: None
+    )
     monkeypatch.setattr(combined_flow, "jsonable", lambda x: x)
-    monkeypatch.setattr(combined_flow, "sensor_key", lambda s: ("__none__",) if s is None else (s.collection,))
-    monkeypatch.setattr(combined_flow, "normalize_model_name", lambda m: m)
-    monkeypatch.setattr(combined_flow, "get_embedder_bundle_cached", lambda model, backend, device, sk: (embedder, lock))
-    monkeypatch.setattr(combined_flow, "sensor_cache_key", lambda s: s.collection if s else "__none__")
-    monkeypatch.setattr(combined_flow, "sanitize_key", lambda s: s.replace("/", "_").replace(" ", "_"))
-    monkeypatch.setattr(combined_flow, "run_with_retry", lambda fn, **kw: fn())
     monkeypatch.setattr(
         combined_flow,
+        "sensor_key",
+        lambda s: ("__none__",) if s is None else (s.collection,),
+    )
+    monkeypatch.setattr(combined_flow, "normalize_model_name", lambda m: m)
+    monkeypatch.setattr(
+        combined_flow,
+        "get_embedder_bundle_cached",
+        lambda model, backend, device, sk: (embedder, lock),
+    )
+    monkeypatch.setattr(
+        combined_flow, "sensor_cache_key", lambda s: s.collection if s else "__none__"
+    )
+    monkeypatch.setattr(
+        combined_flow, "sanitize_key", lambda s: s.replace("/", "_").replace(" ", "_")
+    )
+
+    # ── Patches on inference module (for InferenceEngine.infer_model) ──
+    monkeypatch.setattr(
+        inference_mod,
+        "get_embedder_bundle_cached",
+        lambda model, backend, device, sk: (embedder, lock),
+    )
+    monkeypatch.setattr(
+        inference_mod,
+        "sensor_key",
+        lambda s: ("__none__",) if s is None else (s.collection,),
+    )
+    monkeypatch.setattr(
+        inference_mod,
+        "sensor_cache_key",
+        lambda s: s.collection if s else "__none__",
+    )
+    monkeypatch.setattr(
+        inference_mod,
         "call_embedder_get_embedding",
         lambda **kw: kw["embedder"].get_embedding(
             **{k: v for k, v in kw.items() if k != "embedder"}
         ),
     )
-    monkeypatch.setattr(combined_flow, "supports_prefetched_batch_api", lambda e: supports_prefetched_batch)
-    monkeypatch.setattr(combined_flow, "supports_batch_api", lambda e: supports_batch)
-    monkeypatch.setattr(combined_flow, "embedding_to_numpy", lambda e: np.asarray(e.data, dtype=np.float32))
+    monkeypatch.setattr(
+        inference_mod,
+        "supports_prefetched_batch_api",
+        lambda e: supports_prefetched_batch,
+    )
+    monkeypatch.setattr(inference_mod, "supports_batch_api", lambda e: supports_batch)
+    monkeypatch.setattr(
+        inference_mod,
+        "embedding_to_numpy",
+        lambda e: np.asarray(e.data, dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        inference_mod,
+        "normalize_embedding_output",
+        lambda emb, output: emb,
+    )
+    monkeypatch.setattr(inference_mod, "run_with_retry", lambda fn, **kw: fn())
+    monkeypatch.setattr(inference_mod, "jsonable", lambda x: x)
 
 
 def _make_spatials(n: int) -> list:
@@ -134,9 +181,7 @@ def test_per_item_fallback(monkeypatch):
     spatials = _make_spatials(3)
     _patch_deps(monkeypatch, embedder)
 
-    kw = _base_kwargs(
-        models=["m1"], spatials=spatials, provider_enabled=False
-    )
+    kw = _base_kwargs(models=["m1"], spatials=spatials, provider_enabled=False)
     manifest = run_pending_models(**kw)
 
     assert _SingleEmbedder.calls == 3
@@ -181,9 +226,7 @@ def test_batch_no_input_succeeds(monkeypatch):
     spatials = _make_spatials(4)
     _patch_deps(monkeypatch, embedder, supports_batch=True)
 
-    kw = _base_kwargs(
-        models=["m1"], spatials=spatials, provider_enabled=False
-    )
+    kw = _base_kwargs(models=["m1"], spatials=spatials, provider_enabled=False)
     manifest = run_pending_models(**kw)
 
     assert _BatchEmbedder.batch_calls >= 1
@@ -223,9 +266,7 @@ def test_batch_fails_falls_back_to_single(monkeypatch):
     spatials = _make_spatials(3)
     _patch_deps(monkeypatch, embedder, supports_batch=True)
 
-    kw = _base_kwargs(
-        models=["m1"], spatials=spatials, provider_enabled=False
-    )
+    kw = _base_kwargs(models=["m1"], spatials=spatials, provider_enabled=False)
     manifest = run_pending_models(**kw)
 
     assert _FailingBatchEmbedder.batch_calls >= 1  # batch was attempted
@@ -273,9 +314,7 @@ def test_prefetched_batch_succeeds(monkeypatch):
     spatials = _make_spatials(3)
     _patch_deps(monkeypatch, embedder, supports_prefetched_batch=True)
 
-    kw = _base_kwargs(
-        models=["m1"], spatials=spatials, provider_enabled=True
-    )
+    kw = _base_kwargs(models=["m1"], spatials=spatials, provider_enabled=True)
     kw["resolved_sensor"] = {"m1": sensor}
     manifest = run_pending_models(**kw)
 
@@ -316,9 +355,7 @@ def test_prefetched_batch_fails_falls_back_to_single(monkeypatch):
     spatials = _make_spatials(2)
     _patch_deps(monkeypatch, embedder, supports_prefetched_batch=True)
 
-    kw = _base_kwargs(
-        models=["m1"], spatials=spatials, provider_enabled=True
-    )
+    kw = _base_kwargs(models=["m1"], spatials=spatials, provider_enabled=True)
     kw["resolved_sensor"] = {"m1": sensor}
     manifest = run_pending_models(**kw)
 

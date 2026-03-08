@@ -1,155 +1,23 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-from ..core.embedding import Embedding
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
-from ..tools.output import normalize_embedding_output
+from ..core.types import ExportConfig, Status, TaskResult
 from ..tools.runtime import (
-    call_embedder_get_embedding,
     get_embedder_bundle_cached,
-    run_with_retry,
     sensor_key,
-    supports_batch_api,
-    supports_prefetched_batch_api,
 )
 from ..tools.serialization import (
-    embedding_to_numpy,
     jsonable,
     sanitize_key,
     sensor_cache_key,
 )
-from ..tools.normalization import normalize_input_chw, normalize_model_name
+from ..tools.normalization import normalize_model_name
 from ..tools.checkpoint_utils import drop_model_arrays
 from ..tools.progress import create_progress
-from ..providers.gee_utils import fetch_gee_patch_raw, inspect_input_raw
-from ..providers.prefetch_plan import select_prefetched_channels
-
-
-def run_combined_prefetch_tasks(
-    *,
-    provider: Any,
-    tasks: List[Tuple[int, str, SensorSpec]],
-    spatials: List[SpatialSpec],
-    temporal: Optional[TemporalSpec],
-    max_retries: int,
-    retry_backoff_s: float,
-    num_workers: int,
-    continue_on_error: bool,
-    fail_on_bad_input: bool,
-    fetch_members: Dict[str, List[str]],
-    sensor_to_fetch: Dict[str, Tuple[str, Tuple[int, ...]]],
-    sensor_by_key: Dict[str, SensorSpec],
-    sensor_models: Dict[str, List[str]],
-    inputs_cache: Dict[Tuple[int, str], np.ndarray],
-    input_reports: Dict[Tuple[int, str], Dict[str, Any]],
-    prefetch_errors: Dict[Tuple[int, str], str],
-    progress: Any,
-) -> None:
-    if not tasks:
-        return
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    def _fetch_one(i: int, skey: str, sspec: SensorSpec):
-        x = run_with_retry(
-            lambda: fetch_gee_patch_raw(
-                provider, spatial=spatials[i], temporal=temporal, sensor=sspec
-            ),
-            retries=max_retries,
-            backoff_s=retry_backoff_s,
-        )
-        return i, skey, x
-
-    mw = max(1, int(num_workers))
-    with ThreadPoolExecutor(max_workers=mw) as ex:
-        fut_map = {ex.submit(_fetch_one, i, sk, ss): (i, sk) for (i, sk, ss) in tasks}
-        for fut in as_completed(fut_map):
-            i, skey = fut_map[fut]
-            try:
-                i, skey, x = fut.result()
-            except Exception as e:
-                if not continue_on_error:
-                    raise
-                err_s = repr(e)
-                for member_skey in fetch_members.get(skey, []):
-                    prefetch_errors[(i, member_skey)] = err_s
-            else:
-                for member_skey in fetch_members.get(skey, []):
-                    member_idx = sensor_to_fetch[member_skey][1]
-                    x_member = normalize_input_chw(
-                        select_prefetched_channels(x, member_idx),
-                        expected_channels=len(member_idx),
-                        name=f"gee_input_{member_skey}",
-                    )
-                    if fail_on_bad_input:
-                        sspec_member = sensor_by_key[member_skey]
-                        rep = inspect_input_raw(
-                            x_member,
-                            sensor=sspec_member,
-                            name=f"gee_input_{member_skey}",
-                        )
-                        if not bool(rep.get("ok", True)):
-                            issues = (rep.get("report", {}) or {}).get("issues", [])
-                            mlist = sorted(set(sensor_models.get(member_skey, [])))
-                            err = RuntimeError(
-                                f"Input inspection failed for index={i}, models={mlist}, sensor={member_skey}: {issues}"
-                            )
-                            if not continue_on_error:
-                                raise err
-                            prefetch_errors[(i, member_skey)] = repr(err)
-                            continue
-                        input_reports[(i, member_skey)] = rep
-                    inputs_cache[(i, member_skey)] = x_member
-            finally:
-                progress.update(1)
-
-
-def get_or_fetch_input(
-    *,
-    i: int,
-    skey: str,
-    sspec: SensorSpec,
-    provider: Any,
-    spatials: List[SpatialSpec],
-    temporal: Optional[TemporalSpec],
-    max_retries: int,
-    retry_backoff_s: float,
-    fail_on_bad_input: bool,
-    inputs_cache: Dict[Tuple[int, str], np.ndarray],
-    input_reports: Dict[Tuple[int, str], Dict[str, Any]],
-    prefetch_errors: Dict[Tuple[int, str], str],
-) -> np.ndarray:
-    hit = inputs_cache.get((i, skey))
-    if hit is not None:
-        return hit
-    pref_err = prefetch_errors.get((i, skey))
-    if pref_err:
-        raise RuntimeError(
-            f"Prefetch previously failed for index={i}, sensor={skey}: {pref_err}"
-        )
-    if provider is None:
-        raise RuntimeError(
-            f"Missing provider for input fetch: index={i}, sensor={skey}"
-        )
-    x = run_with_retry(
-        lambda: fetch_gee_patch_raw(
-            provider, spatial=spatials[i], temporal=temporal, sensor=sspec
-        ),
-        retries=max_retries,
-        backoff_s=retry_backoff_s,
-    )
-    rep = inspect_input_raw(x, sensor=sspec, name=f"gee_input_{skey}")
-    if fail_on_bad_input and (not bool(rep.get("ok", True))):
-        issues = (rep.get("report", {}) or {}).get("issues", [])
-        raise RuntimeError(
-            f"Input inspection failed for index={i}, sensor={skey}: {issues}"
-        )
-    inputs_cache[(i, skey)] = x
-    input_reports[(i, skey)] = rep
-    return x
 
 
 def run_pending_models(
@@ -179,7 +47,31 @@ def run_pending_models(
     get_or_fetch_input_fn: Callable[[int, str, SensorSpec], np.ndarray],
     write_checkpoint_fn: Callable[..., Dict[str, Any]],
     progress: Any,
+    inference_engine: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    """Run inference for each pending model, delegating to *inference_engine*.
+
+    If *inference_engine* is ``None`` a temporary one is built (keeps older
+    call-sites and tests working without changes).
+    """
+    if inference_engine is None:
+        from .inference import InferenceEngine
+
+        inference_engine = InferenceEngine(
+            device=device,
+            output=output,
+            config=ExportConfig(
+                save_inputs=save_inputs,
+                save_embeddings=save_embeddings,
+                continue_on_error=continue_on_error,
+                chunk_size=chunk_size,
+                infer_batch_size=infer_batch_size,
+                max_retries=max_retries,
+                retry_backoff_s=retry_backoff_s,
+                show_progress=show_progress,
+            ),
+        )
+
     _resolved_backend = resolved_backend or {}
     for m in pending_models:
         drop_model_arrays(arrays, m, sanitize_key=sanitize_key)
@@ -189,7 +81,6 @@ def run_pending_models(
             desc=f"infer[{m}]",
             unit="point",
         )
-        infer_done: set[int] = set()
         infer_progress_done = 0
         m_entry: Dict[str, Any] = {
             "model": m,
@@ -198,9 +89,12 @@ def run_pending_models(
         }
         sspec = resolved_sensor.get(m)
         try:
-            sensor_k = sensor_key(sspec)
             m_backend = _resolved_backend.get(m, backend)
-            embedder, lock = get_embedder_bundle_cached(
+            is_precomputed = "precomputed" in (model_type.get(m) or "")
+
+            # Resolve embedder just for describe()
+            sensor_k = sensor_key(sspec)
+            embedder, _lock = get_embedder_bundle_cached(
                 normalize_model_name(m), m_backend, device, sensor_k
             )
             try:
@@ -209,9 +103,7 @@ def run_pending_models(
                 m_entry["describe"] = {"error": repr(e)}
 
             needs_provider_input = (
-                provider_enabled
-                and sspec is not None
-                and "precomputed" not in (model_type.get(m) or "")
+                provider_enabled and sspec is not None and not is_precomputed
             )
             skey = (
                 sensor_cache_key(sspec)
@@ -219,286 +111,49 @@ def run_pending_models(
                 else None
             )
 
-            if save_inputs and needs_provider_input and skey is not None:
-                if skey in input_refs_by_sensor:
-                    m_entry["inputs"] = {
-                        **input_refs_by_sensor[skey],
-                        "dedup_reused": True,
-                    }
-                else:
-                    xs = []
-                    xs_indices: List[int] = []
-                    missing = []
-                    for i in range(len(spatials)):
-                        try:
-                            x = get_or_fetch_input_fn(i, skey, sspec)
-                        except Exception as e:
-                            missing.append((i, repr(e)))
-                            continue
-                        xs.append(np.asarray(x, dtype=np.float32))
-                        xs_indices.append(int(i))
-                    if missing and not continue_on_error:
-                        raise RuntimeError(
-                            f"Missing prefetched inputs for model={m}: {missing}"
-                        )
-                    if not xs:
-                        m_entry["inputs"] = None
-                    else:
-                        try:
-                            arr = np.stack(xs, axis=0)
-                            in_key = f"inputs_bchw__{sanitize_key(m)}"
-                            arrays[in_key] = arr
-                            ref = {
-                                "npz_key": in_key,
-                                "shape": list(arr.shape),
-                                "dtype": str(arr.dtype),
-                            }
-                            if len(xs_indices) != len(spatials):
-                                ref["indices"] = list(xs_indices)
-                            input_refs_by_sensor[skey] = dict(ref)
-                            m_entry["inputs"] = ref
-                        except Exception:
-                            keys = []
-                            for i in range(len(spatials)):
-                                try:
-                                    x = get_or_fetch_input_fn(i, skey, sspec)
-                                except Exception:
-                                    continue
-                                k = f"input_chw__{sanitize_key(m)}__{i:05d}"
-                                arrays[k] = np.asarray(x, dtype=np.float32)
-                                keys.append(k)
-                            ref = {"npz_keys": keys}
-                            input_refs_by_sensor[skey] = dict(ref)
-                            m_entry["inputs"] = ref
-            else:
-                m_entry["inputs"] = None
+            # ── Save inputs ─────────────────────────────────────
+            _gather_inputs(
+                m_entry=m_entry,
+                m=m,
+                sspec=sspec,
+                skey=skey,
+                spatials=spatials,
+                arrays=arrays,
+                save_inputs=save_inputs,
+                needs_provider_input=needs_provider_input,
+                continue_on_error=continue_on_error,
+                input_refs_by_sensor=input_refs_by_sensor,
+                get_or_fetch_input_fn=get_or_fetch_input_fn,
+            )
 
+            # ── Inference via engine ────────────────────────────
             if save_embeddings:
-                n = len(spatials)
-                infer_chunk = max(1, int(infer_batch_size))
-                embs_by_idx: List[Optional[np.ndarray]] = [None] * n
-                metas_by_idx: List[Optional[Dict[str, Any]]] = [None] * n
-                errors_by_idx: Dict[int, str] = {}
-                strategy = str(inference_strategy).strip().lower()
-                # Keep historical combined-export behavior: auto still attempts batched paths.
-                # Per-item layout now uses a stricter GPU-only auto preference in api.py.
-                prefer_batch = (strategy == "batch") or (strategy == "auto")
-                allow_batch = strategy != "single"
 
-                def _mark_infer_done(i: int) -> None:
+                def _progress_cb(i: int) -> None:
                     nonlocal infer_progress_done
-                    if i in infer_done:
-                        return
-                    infer_done.add(i)
                     infer_progress_done += 1
                     infer_progress.update(1)
 
-                def _infer_one(i: int) -> Embedding:
-                    inp = None
-                    if needs_provider_input and skey is not None and sspec is not None:
-                        inp = get_or_fetch_input_fn(i, skey, sspec)
-                    with lock:
-                        return call_embedder_get_embedding(
-                            embedder=embedder,
-                            spatial=spatials[i],
-                            temporal=temporal,
-                            sensor=sspec,
-                            output=output,
-                            backend=m_backend,
-                            device=device,
-                            input_chw=inp,
-                        )
-
-                can_batch_prefetched = (
-                    allow_batch
-                    and prefer_batch
-                    and supports_prefetched_batch_api(embedder)
-                    and needs_provider_input
-                    and skey is not None
-                    and sspec is not None
+                results = inference_engine.infer_model(
+                    model_name=m,
+                    model_backend=m_backend,
+                    sensor=sspec,
+                    is_precomputed=is_precomputed,
+                    provider_enabled=provider_enabled,
+                    spatials=spatials,
+                    temporal=temporal,
+                    inference_strategy=inference_strategy,
+                    get_input_fn=get_or_fetch_input_fn,
+                    progress_cb=_progress_cb,
                 )
-                can_batch = (
-                    allow_batch
-                    and prefer_batch
-                    and supports_batch_api(embedder)
-                    and not needs_provider_input
+
+                _pack_embedding_results(
+                    results=results,
+                    m_entry=m_entry,
+                    m=m,
+                    n=len(spatials),
+                    arrays=arrays,
                 )
-                batch_attempted = False
-                batch_succeeded = False
-
-                if can_batch_prefetched:
-                    batch_attempted = True
-                    try:
-                        batch_indices: List[int] = []
-                        batch_spatials: List[SpatialSpec] = []
-                        batch_inputs: List[np.ndarray] = []
-                        for i in range(n):
-                            try:
-                                inp = get_or_fetch_input_fn(i, skey, sspec)
-                            except Exception as e:
-                                if not continue_on_error:
-                                    raise
-                                errors_by_idx[i] = repr(e)
-                                continue
-                            batch_indices.append(i)
-                            batch_spatials.append(spatials[i])
-                            batch_inputs.append(np.asarray(inp, dtype=np.float32))
-
-                        if batch_spatials:
-                            for start in range(0, len(batch_spatials), infer_chunk):
-                                sub_spatials = batch_spatials[
-                                    start : start + infer_chunk
-                                ]
-                                sub_inputs = batch_inputs[start : start + infer_chunk]
-                                sub_indices = batch_indices[start : start + infer_chunk]
-
-                                def _infer_batch_prefetched():
-                                    with lock:
-                                        return (
-                                            embedder.get_embeddings_batch_from_inputs(
-                                                spatials=sub_spatials,
-                                                input_chws=sub_inputs,
-                                                temporal=temporal,
-                                                sensor=sspec,
-                                                output=output,
-                                                backend=m_backend,
-                                                device=device,
-                                            )
-                                        )
-
-                                batch_out = run_with_retry(
-                                    _infer_batch_prefetched,
-                                    retries=max_retries,
-                                    backoff_s=retry_backoff_s,
-                                )
-                                if len(batch_out) != len(sub_spatials):
-                                    raise RuntimeError(
-                                        f"Model {m} returned {len(batch_out)} embeddings for "
-                                        f"{len(sub_spatials)} prefetched inputs."
-                                    )
-                                for j, emb in enumerate(batch_out):
-                                    emb = normalize_embedding_output(
-                                        emb=emb, output=output
-                                    )
-                                    i = sub_indices[j]
-                                    embs_by_idx[i] = embedding_to_numpy(emb)
-                                    metas_by_idx[i] = jsonable(emb.meta)
-                                    errors_by_idx.pop(i, None)
-                                    _mark_infer_done(i)
-
-                        batch_succeeded = True
-                        if len(batch_indices) < n:
-                            batch_set = set(batch_indices)
-                            for i in range(n):
-                                if i not in batch_set:
-                                    _mark_infer_done(i)
-                    except Exception:
-                        # Fall back to per-item inference when batched path fails.
-                        # This keeps combined export robust to model-specific batch quirks.
-                        batch_succeeded = False
-
-                if (not batch_attempted) and can_batch:
-                    batch_attempted = True
-                    try:
-                        for start in range(0, n, infer_chunk):
-                            sub_spatials = spatials[start : start + infer_chunk]
-
-                            def _infer_batch():
-                                with lock:
-                                    return embedder.get_embeddings_batch(
-                                        spatials=sub_spatials,
-                                        temporal=temporal,
-                                        sensor=sspec,
-                                        output=output,
-                                        backend=m_backend,
-                                        device=device,
-                                    )
-
-                            batch_out = run_with_retry(
-                                _infer_batch,
-                                retries=max_retries,
-                                backoff_s=retry_backoff_s,
-                            )
-                            if len(batch_out) != len(sub_spatials):
-                                raise RuntimeError(
-                                    f"Model {m} returned {len(batch_out)} embeddings for {len(sub_spatials)} inputs."
-                                )
-                            for j, emb in enumerate(batch_out):
-                                emb = normalize_embedding_output(emb=emb, output=output)
-                                i = start + j
-                                embs_by_idx[i] = embedding_to_numpy(emb)
-                                metas_by_idx[i] = jsonable(emb.meta)
-                                errors_by_idx.pop(i, None)
-                                _mark_infer_done(i)
-                        batch_succeeded = True
-                    except Exception:
-                        # Fall back to per-item inference when batched path fails.
-                        batch_succeeded = False
-
-                if not batch_succeeded:
-                    for i in range(n):
-                        if i in infer_done:
-                            continue
-                        try:
-                            emb = run_with_retry(
-                                lambda i=i: _infer_one(i),
-                                retries=max_retries,
-                                backoff_s=retry_backoff_s,
-                            )
-                            embs_by_idx[i] = embedding_to_numpy(emb)
-                            metas_by_idx[i] = jsonable(emb.meta)
-                            errors_by_idx.pop(i, None)
-                        except Exception as e:
-                            if not continue_on_error:
-                                raise
-                            errors_by_idx[i] = repr(e)
-                        finally:
-                            _mark_infer_done(i)
-
-                ok_indices = [i for i, e in enumerate(embs_by_idx) if e is not None]
-                if ok_indices:
-                    try:
-                        e_arr = np.stack([embs_by_idx[i] for i in ok_indices], axis=0)  # type: ignore[list-item]
-                        if len(ok_indices) == n:
-                            e_key = f"embeddings__{sanitize_key(m)}"
-                            arrays[e_key] = e_arr
-                            m_entry["embeddings"] = {
-                                "npz_key": e_key,
-                                "shape": list(e_arr.shape),
-                                "dtype": str(e_arr.dtype),
-                            }
-                        else:
-                            keys = []
-                            index_map = []
-                            for j, i in enumerate(ok_indices):
-                                k = f"embedding__{sanitize_key(m)}__{i:05d}"
-                                arrays[k] = e_arr[j]
-                                keys.append(k)
-                                index_map.append(i)
-                            m_entry["embeddings"] = {
-                                "npz_keys": keys,
-                                "indices": index_map,
-                            }
-                    except Exception:
-                        keys = []
-                        index_map = []
-                        for i in ok_indices:
-                            k = f"embedding__{sanitize_key(m)}__{i:05d}"
-                            arrays[k] = embs_by_idx[i]  # type: ignore[index]
-                            keys.append(k)
-                            index_map.append(i)
-                        m_entry["embeddings"] = {"npz_keys": keys, "indices": index_map}
-                else:
-                    m_entry["embeddings"] = None
-
-                m_entry["metas"] = metas_by_idx
-                if errors_by_idx:
-                    m_entry["failed_indices"] = sorted(errors_by_idx.keys())
-                    m_entry["errors_by_index"] = errors_by_idx
-                    if ok_indices:
-                        m_entry["status"] = "partial"
-                    else:
-                        m_entry["status"] = "failed"
             else:
                 m_entry["embeddings"] = None
                 m_entry["metas"] = None
@@ -520,8 +175,140 @@ def run_pending_models(
             progress.update(1)
 
         manifest["models"].append(m_entry)
-        manifest = write_checkpoint_fn(
-            stage=f"model:{sanitize_key(m)}", final=False
-        )
+        manifest = write_checkpoint_fn(stage=f"model:{sanitize_key(m)}", final=False)
 
     return manifest
+
+
+# ── Private helpers ────────────────────────────────────────────────
+
+
+def _gather_inputs(
+    *,
+    m_entry: Dict[str, Any],
+    m: str,
+    sspec: Optional[SensorSpec],
+    skey: Optional[str],
+    spatials: List[SpatialSpec],
+    arrays: Dict[str, np.ndarray],
+    save_inputs: bool,
+    needs_provider_input: bool,
+    continue_on_error: bool,
+    input_refs_by_sensor: Dict[str, Dict[str, Any]],
+    get_or_fetch_input_fn: Callable[[int, str, SensorSpec], np.ndarray],
+) -> None:
+    """Collect and store provider inputs for *m*, updating *m_entry* in place."""
+    if not (save_inputs and needs_provider_input and skey is not None):
+        m_entry["inputs"] = None
+        return
+
+    if skey in input_refs_by_sensor:
+        m_entry["inputs"] = {**input_refs_by_sensor[skey], "dedup_reused": True}
+        return
+
+    xs: List[np.ndarray] = []
+    xs_indices: List[int] = []
+    missing: List[tuple] = []
+    for i in range(len(spatials)):
+        try:
+            x = get_or_fetch_input_fn(i, skey, sspec)
+        except Exception as e:
+            missing.append((i, repr(e)))
+            continue
+        xs.append(np.asarray(x, dtype=np.float32))
+        xs_indices.append(int(i))
+
+    if missing and not continue_on_error:
+        raise RuntimeError(f"Missing prefetched inputs for model={m}: {missing}")
+
+    if not xs:
+        m_entry["inputs"] = None
+        return
+
+    try:
+        arr = np.stack(xs, axis=0)
+        in_key = f"inputs_bchw__{sanitize_key(m)}"
+        arrays[in_key] = arr
+        ref: Dict[str, Any] = {
+            "npz_key": in_key,
+            "shape": list(arr.shape),
+            "dtype": str(arr.dtype),
+        }
+        if len(xs_indices) != len(spatials):
+            ref["indices"] = list(xs_indices)
+        input_refs_by_sensor[skey] = dict(ref)
+        m_entry["inputs"] = ref
+    except Exception:
+        keys = []
+        for i in range(len(spatials)):
+            try:
+                x = get_or_fetch_input_fn(i, skey, sspec)
+            except Exception:
+                continue
+            k = f"input_chw__{sanitize_key(m)}__{i:05d}"
+            arrays[k] = np.asarray(x, dtype=np.float32)
+            keys.append(k)
+        ref = {"npz_keys": keys}
+        input_refs_by_sensor[skey] = dict(ref)
+        m_entry["inputs"] = ref
+
+
+def _pack_embedding_results(
+    *,
+    results: Dict[int, TaskResult],
+    m_entry: Dict[str, Any],
+    m: str,
+    n: int,
+    arrays: Dict[str, np.ndarray],
+) -> None:
+    """Convert ``{idx: TaskResult}`` into stacked arrays and manifest entries."""
+    ok_indices = [i for i in range(n) if i in results and results[i].status == Status.OK]
+    errors_by_idx = {
+        i: results[i].error
+        for i in range(n)
+        if i in results and results[i].status == Status.FAILED
+    }
+    metas_by_idx = [results[i].meta if i in results else None for i in range(n)]
+
+    if ok_indices:
+        try:
+            e_arr = np.stack(
+                [results[i].embedding for i in ok_indices], axis=0  # type: ignore[arg-type]
+            )
+            if len(ok_indices) == n:
+                e_key = f"embeddings__{sanitize_key(m)}"
+                arrays[e_key] = e_arr
+                m_entry["embeddings"] = {
+                    "npz_key": e_key,
+                    "shape": list(e_arr.shape),
+                    "dtype": str(e_arr.dtype),
+                }
+            else:
+                keys = []
+                index_map = []
+                for j, i in enumerate(ok_indices):
+                    k = f"embedding__{sanitize_key(m)}__{i:05d}"
+                    arrays[k] = e_arr[j]
+                    keys.append(k)
+                    index_map.append(i)
+                m_entry["embeddings"] = {"npz_keys": keys, "indices": index_map}
+        except Exception:
+            keys = []
+            index_map = []
+            for i in ok_indices:
+                k = f"embedding__{sanitize_key(m)}__{i:05d}"
+                arrays[k] = results[i].embedding  # type: ignore[assignment]
+                keys.append(k)
+                index_map.append(i)
+            m_entry["embeddings"] = {"npz_keys": keys, "indices": index_map}
+    else:
+        m_entry["embeddings"] = None
+
+    m_entry["metas"] = metas_by_idx
+    if errors_by_idx:
+        m_entry["failed_indices"] = sorted(errors_by_idx.keys())
+        m_entry["errors_by_index"] = errors_by_idx
+        if ok_indices:
+            m_entry["status"] = "partial"
+        else:
+            m_entry["status"] = "failed"

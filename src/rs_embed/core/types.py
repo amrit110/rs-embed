@@ -48,12 +48,17 @@ class TaskResult:
     error: Optional[str] = None
 
     @classmethod
-    def ok(cls, embedding: np.ndarray, meta: Optional[Dict[str, Any]] = None) -> TaskResult:
+    def ok(
+        cls, embedding: np.ndarray, meta: Optional[Dict[str, Any]] = None
+    ) -> TaskResult:
         return cls(status=Status.OK, embedding=embedding, meta=meta)
 
     @classmethod
     def failed(cls, error: Exception | str) -> TaskResult:
-        return cls(status=Status.FAILED, error=repr(error) if isinstance(error, Exception) else str(error))
+        return cls(
+            status=Status.FAILED,
+            error=repr(error) if isinstance(error, Exception) else str(error),
+        )
 
 
 # ── Model configuration ───────────────────────────────────────────

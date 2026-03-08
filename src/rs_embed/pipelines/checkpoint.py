@@ -61,6 +61,7 @@ class CheckpointManager:
         out_file: str,
     ) -> Dict[str, Any]:
         from ..tools.manifest import point_resume_manifest
+
         return point_resume_manifest(
             point_index=point_index,
             spatial=spatial,
@@ -84,6 +85,7 @@ class CheckpointManager:
         error: Exception,
     ) -> Dict[str, Any]:
         from ..tools.manifest import point_failure_manifest
+
         return point_failure_manifest(
             point_index=point_index,
             spatial=spatial,
@@ -145,7 +147,10 @@ class CheckpointManager:
                             for item in old_models:
                                 if not isinstance(item, dict) or item.get("model") != m:
                                     continue
-                                if str(item.get("status", "")).lower() in ("ok", "partial"):
+                                if str(item.get("status", "")).lower() in (
+                                    "ok",
+                                    "partial",
+                                ):
                                     kept.append(item)
                                     completed_models.add(m)
                                 break
@@ -214,9 +219,11 @@ class CheckpointManager:
         cache: Dict[Tuple[int, str], np.ndarray] = {}
         prefetch_meta = manifest.get("prefetch")
         if isinstance(prefetch_meta, dict):
-            cache.update(restore_prefetch_checkpoint_cache(
-                arrays=arrays, prefetch_meta=prefetch_meta
-            ))
+            cache.update(
+                restore_prefetch_checkpoint_cache(
+                    arrays=arrays, prefetch_meta=prefetch_meta
+                )
+            )
         return cache
 
     @staticmethod
@@ -281,6 +288,3 @@ class CheckpointManager:
             "partial_models": n_partial,
             "ok_models": len(entries) - n_failed - n_partial,
         }
-
-
-

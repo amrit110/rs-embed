@@ -11,7 +11,6 @@ from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.specs import SpatialSpec, TemporalSpec, SensorSpec, OutputSpec
 from ..providers import ProviderBase
-from ..ops.pooling import pool_chw_to_vec
 from .base import EmbedderBase
 from .meta_utils import build_meta, temporal_midpoint_str
 from .runtime_utils import (
@@ -98,7 +97,12 @@ class GSEAnnualEmbedder(EmbedderBase):
         )
 
         if output.mode == "pooled":
-            vec = pool_chw_to_vec(emb_chw, method=output.pooling)
+            if output.pooling == "mean":
+                vec = emb_chw.mean(axis=(-2, -1)).astype(np.float32)
+            elif output.pooling == "max":
+                vec = emb_chw.max(axis=(-2, -1)).astype(np.float32)
+            else:
+                raise ModelError(f"Unknown pooling='{output.pooling}' (expected 'mean' or 'max').")
             return Embedding(data=vec, meta={**meta, "pooling": output.pooling})
 
         # grid: return xarray with dims (band,y,x)

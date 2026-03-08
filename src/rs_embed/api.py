@@ -217,7 +217,9 @@ def _resolve_export_batch_target(
     )
     if len(point_names) != n_spatials:
         raise ModelError("names must have the same length as spatials.")
-    return ExportTarget(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names)
+    return ExportTarget(
+        layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names
+    )
 
 
 # ---------------------------------------------------------------------------

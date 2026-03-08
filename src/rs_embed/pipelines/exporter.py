@@ -105,9 +105,7 @@ class BatchExporter:
         self.ext = get_extension(config.format)
 
         # Compose engine sub-systems
-        self.inference = InferenceEngine(
-            device=device, output=output, config=config
-        )
+        self.inference = InferenceEngine(device=device, output=output, config=config)
         self.checkpoint = CheckpointManager(target=target, config=config)
 
     # ── public entry point ─────────────────────────────────────────
@@ -204,8 +202,7 @@ class BatchExporter:
         # Chunk pipeline
         csize = cfg.effective_chunk_size
         chunk_groups = [
-            pending_idxs[s : s + csize]
-            for s in range(0, len(pending_idxs), csize)
+            pending_idxs[s : s + csize] for s in range(0, len(pending_idxs), csize)
         ]
 
         prefetch_pipeline_ex: Optional[ThreadPoolExecutor] = None
@@ -236,9 +233,7 @@ class BatchExporter:
 
                 # Batch inference (GPU path)
                 chunk_embed_results: Dict[Tuple[int, str], Any] = {}
-                use_batch = bool(
-                    cfg.save_embeddings and self.inference.prefer_batch
-                )
+                use_batch = bool(cfg.save_embeddings and self.inference.prefer_batch)
                 if use_batch:
                     chunk_embed_results = self.inference.infer_chunk(
                         idxs=idxs,
@@ -359,25 +354,15 @@ class BatchExporter:
         )
 
         # Run pending models
-        from .combined_flow import (
-            get_or_fetch_input,
-            run_pending_models,
-        )
+        from .combined_flow import run_pending_models
 
         def _get_or_fetch(i: int, skey: str, sspec: SensorSpec) -> np.ndarray:
-            return get_or_fetch_input(
-                i=i,
+            return prefetch.get_or_fetch(
+                idx=i,
                 skey=skey,
                 sspec=sspec,
-                provider=provider,
-                spatials=self.spatials,
+                spatial=self.spatials[i],
                 temporal=self.temporal,
-                max_retries=cfg.max_retries,
-                retry_backoff_s=cfg.retry_backoff_s,
-                fail_on_bad_input=cfg.fail_on_bad_input,
-                inputs_cache=prefetch.cache,
-                input_reports=prefetch.input_reports,
-                prefetch_errors=prefetch.errors,
             )
 
         def _write_ckpt(*, stage: str, final: bool = False) -> Dict[str, Any]:
@@ -416,6 +401,7 @@ class BatchExporter:
             get_or_fetch_input_fn=_get_or_fetch,
             write_checkpoint_fn=_write_ckpt,
             progress=progress,
+            inference_engine=self.inference,
         )
 
         # Drop prefetch checkpoint arrays before final write
@@ -450,9 +436,7 @@ class BatchExporter:
         )
         return provider
 
-    def _prefetch_chunk(
-        self, prefetch: PrefetchManager, idxs: List[int]
-    ) -> None:
+    def _prefetch_chunk(self, prefetch: PrefetchManager, idxs: List[int]) -> None:
         """Prefetch a chunk of inputs (for use in pipelined prefetch)."""
         prefetch.fetch_chunk(idxs, self.spatials, self.temporal)
 
@@ -528,9 +512,7 @@ class BatchExporter:
                         max_retries=cfg.max_retries,
                         retry_backoff_s=cfg.retry_backoff_s,
                         provider_factory=self.provider_factory,
-                        model_progress_cb=(
-                            None if use_batch else model_progress_cb
-                        ),
+                        model_progress_cb=(None if use_batch else model_progress_cb),
                     )
                     if use_batch:
                         _inject_precomputed_embeddings(

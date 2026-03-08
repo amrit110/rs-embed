@@ -215,9 +215,7 @@ class Model:
             return None
         if self._sensor is None:
             if self._input_prep_resolved.mode == "tile":
-                raise ModelError(
-                    "input_prep.mode='tile' requires a sensor spec."
-                )
+                raise ModelError("input_prep.mode='tile' requires a sensor spec.")
             return None
         if not embedder_accepts_input_chw(type(self._embedder)):
             if self._input_prep_resolved.mode == "tile":

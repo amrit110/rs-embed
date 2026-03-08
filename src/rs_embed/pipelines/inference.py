@@ -7,7 +7,7 @@ Absorbs ``_infer_chunk_embeddings_for_per_item`` (api.py, 200 lines),
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -124,6 +124,7 @@ class InferenceEngine:
             needs_provider_input = skey is not None
 
             from ..tools.normalization import normalize_model_name
+
             embedder, lock = get_embedder_bundle_cached(
                 normalize_model_name(mc.name), mc.backend, self.device, sensor_k
             )
@@ -190,7 +191,9 @@ class InferenceEngine:
                         try:
                             inp = _get_input(i)
                             assert inp is not None
-                            ready.append((i, spatials[i], np.asarray(inp, dtype=np.float32)))
+                            ready.append(
+                                (i, spatials[i], np.asarray(inp, dtype=np.float32))
+                            )
                         except Exception as e:
                             if not cfg.continue_on_error:
                                 raise
@@ -224,9 +227,12 @@ class InferenceEngine:
                                 f"for {len(sub_idx)} prefetched inputs."
                             )
                         for j, emb in enumerate(batch_out):
-                            emb_n = normalize_embedding_output(emb=emb, output=self.output)
+                            emb_n = normalize_embedding_output(
+                                emb=emb, output=self.output
+                            )
                             out[(sub_idx[j], mc.name)] = TaskResult.ok(
-                                embedding_to_numpy(emb_n), jsonable(getattr(emb_n, "meta", None))
+                                embedding_to_numpy(emb_n),
+                                jsonable(getattr(emb_n, "meta", None)),
                             )
                             _mark_done(mc.name)
                     batch_succeeded = True
@@ -257,9 +263,12 @@ class InferenceEngine:
                                 f"for {len(sub_idx)} inputs."
                             )
                         for j, emb in enumerate(batch_out):
-                            emb_n = normalize_embedding_output(emb=emb, output=self.output)
+                            emb_n = normalize_embedding_output(
+                                emb=emb, output=self.output
+                            )
                             out[(sub_idx[j], mc.name)] = TaskResult.ok(
-                                embedding_to_numpy(emb_n), jsonable(getattr(emb_n, "meta", None))
+                                embedding_to_numpy(emb_n),
+                                jsonable(getattr(emb_n, "meta", None)),
                             )
                             _mark_done(mc.name)
                     batch_succeeded = True
@@ -274,7 +283,8 @@ class InferenceEngine:
                     try:
                         emb = _single(i)
                         out[(i, mc.name)] = TaskResult.ok(
-                            embedding_to_numpy(emb), jsonable(getattr(emb, "meta", None))
+                            embedding_to_numpy(emb),
+                            jsonable(getattr(emb, "meta", None)),
                         )
                     except Exception as e:
                         if not cfg.continue_on_error:
@@ -290,6 +300,7 @@ class InferenceEngine:
     def resolve_embedder(model_config: ModelConfig, device: str) -> Tuple[Any, Any]:
         """Return ``(embedder, lock)`` for the given model config."""
         from ..tools.normalization import normalize_model_name
+
         sensor_k = sensor_key(model_config.sensor)
         return get_embedder_bundle_cached(
             normalize_model_name(model_config.name),
@@ -297,6 +308,228 @@ class InferenceEngine:
             device,
             sensor_k,
         )
+
+    # ── combined-export: infer all spatials for one model ──────────
+
+    def infer_model(
+        self,
+        *,
+        model_name: str,
+        model_backend: str,
+        sensor: Optional[SensorSpec],
+        is_precomputed: bool,
+        provider_enabled: bool,
+        spatials: List[SpatialSpec],
+        temporal: Optional[TemporalSpec],
+        inference_strategy: str,
+        get_input_fn: Callable[[int, str, SensorSpec], np.ndarray],
+        progress_cb: Optional[Callable[[int], None]] = None,
+    ) -> Dict[int, TaskResult]:
+        """Infer embeddings for ALL spatial indices for a single model.
+
+        Used by combined export.  Returns ``{spatial_idx: TaskResult}``.
+
+        Parameters
+        ----------
+        get_input_fn
+            ``fn(idx, sensor_cache_key, sensor_spec) -> np.ndarray`` that
+            retrieves the (possibly cached) provider input for a point.
+        progress_cb
+            Called with spatial index after each point finishes inference.
+        """
+        from ..tools.normalization import normalize_model_name
+
+        cfg = self.config
+        n = len(spatials)
+        infer_bs = cfg.effective_infer_batch_size
+        out: Dict[int, TaskResult] = {}
+        done: set[int] = set()
+
+        sensor_k = sensor_key(sensor)
+        skey = (
+            sensor_cache_key(sensor)
+            if provider_enabled and sensor is not None and not is_precomputed
+            else None
+        )
+        needs_provider_input = skey is not None
+
+        embedder, lock = get_embedder_bundle_cached(
+            normalize_model_name(model_name), model_backend, self.device, sensor_k
+        )
+
+        strategy = str(inference_strategy).strip().lower()
+        prefer_batch = (strategy == "batch") or (strategy == "auto")
+        allow_batch = strategy != "single"
+
+        def _mark_done(i: int) -> None:
+            if i in done:
+                return
+            done.add(i)
+            if progress_cb is not None:
+                progress_cb(i)
+
+        def _infer_one(i: int) -> Embedding:
+            inp = None
+            if needs_provider_input and skey is not None and sensor is not None:
+                inp = get_input_fn(i, skey, sensor)
+            with lock:
+                return call_embedder_get_embedding(
+                    embedder=embedder,
+                    spatial=spatials[i],
+                    temporal=temporal,
+                    sensor=sensor,
+                    output=self.output,
+                    backend=model_backend,
+                    device=self.device,
+                    input_chw=inp,
+                )
+
+        can_batch_prefetched = (
+            allow_batch
+            and prefer_batch
+            and supports_prefetched_batch_api(embedder)
+            and needs_provider_input
+            and skey is not None
+            and sensor is not None
+        )
+        can_batch = (
+            allow_batch
+            and prefer_batch
+            and supports_batch_api(embedder)
+            and not needs_provider_input
+        )
+        batch_attempted = False
+        batch_succeeded = False
+
+        # Tier 1: batch with prefetched inputs
+        if can_batch_prefetched:
+            batch_attempted = True
+            try:
+                batch_indices: List[int] = []
+                batch_spatials: List[SpatialSpec] = []
+                batch_inputs: List[np.ndarray] = []
+                for i in range(n):
+                    try:
+                        assert skey is not None and sensor is not None
+                        inp = get_input_fn(i, skey, sensor)
+                    except Exception as e:
+                        if not cfg.continue_on_error:
+                            raise
+                        out[i] = TaskResult.failed(e)
+                        continue
+                    batch_indices.append(i)
+                    batch_spatials.append(spatials[i])
+                    batch_inputs.append(np.asarray(inp, dtype=np.float32))
+
+                if batch_spatials:
+                    for start in range(0, len(batch_spatials), infer_bs):
+                        sub_spatials = batch_spatials[start : start + infer_bs]
+                        sub_inputs = batch_inputs[start : start + infer_bs]
+                        sub_indices = batch_indices[start : start + infer_bs]
+
+                        def _infer_prefetched(_sp=sub_spatials, _inp=sub_inputs):
+                            with lock:
+                                return embedder.get_embeddings_batch_from_inputs(
+                                    spatials=_sp,
+                                    input_chws=_inp,
+                                    temporal=temporal,
+                                    sensor=sensor,
+                                    output=self.output,
+                                    backend=model_backend,
+                                    device=self.device,
+                                )
+
+                        batch_out = run_with_retry(
+                            _infer_prefetched,
+                            retries=cfg.max_retries,
+                            backoff_s=cfg.retry_backoff_s,
+                        )
+                        if len(batch_out) != len(sub_spatials):
+                            raise RuntimeError(
+                                f"Model {model_name} returned {len(batch_out)} "
+                                f"embeddings for {len(sub_spatials)} prefetched inputs."
+                            )
+                        for j, emb in enumerate(batch_out):
+                            emb = normalize_embedding_output(
+                                emb=emb, output=self.output
+                            )
+                            out[sub_indices[j]] = TaskResult.ok(
+                                embedding_to_numpy(emb),
+                                jsonable(emb.meta),
+                            )
+                            _mark_done(sub_indices[j])
+
+                batch_succeeded = True
+                # Mark non-batch items done (they had errors)
+                for i in range(n):
+                    if i not in done:
+                        _mark_done(i)
+            except Exception:
+                batch_succeeded = False
+
+        # Tier 2: batch without inputs
+        if not batch_attempted and can_batch:
+            batch_attempted = True
+            try:
+                for start in range(0, n, infer_bs):
+                    sub_spatials = spatials[start : start + infer_bs]
+
+                    def _infer_batch(_sp=sub_spatials):
+                        with lock:
+                            return embedder.get_embeddings_batch(
+                                spatials=_sp,
+                                temporal=temporal,
+                                sensor=sensor,
+                                output=self.output,
+                                backend=model_backend,
+                                device=self.device,
+                            )
+
+                    batch_out = run_with_retry(
+                        _infer_batch,
+                        retries=cfg.max_retries,
+                        backoff_s=cfg.retry_backoff_s,
+                    )
+                    if len(batch_out) != len(sub_spatials):
+                        raise RuntimeError(
+                            f"Model {model_name} returned {len(batch_out)} "
+                            f"embeddings for {len(sub_spatials)} inputs."
+                        )
+                    for j, emb in enumerate(batch_out):
+                        emb = normalize_embedding_output(emb=emb, output=self.output)
+                        i = start + j
+                        out[i] = TaskResult.ok(
+                            embedding_to_numpy(emb),
+                            jsonable(emb.meta),
+                        )
+                        _mark_done(i)
+                batch_succeeded = True
+            except Exception:
+                batch_succeeded = False
+
+        # Tier 3: single-item fallback
+        if not batch_succeeded:
+            for i in range(n):
+                if i in done:
+                    continue
+                try:
+                    emb = run_with_retry(
+                        lambda i=i: _infer_one(i),
+                        retries=cfg.max_retries,
+                        backoff_s=cfg.retry_backoff_s,
+                    )
+                    out[i] = TaskResult.ok(
+                        embedding_to_numpy(emb),
+                        jsonable(getattr(emb, "meta", None)),
+                    )
+                except Exception as e:
+                    if not cfg.continue_on_error:
+                        raise
+                    out[i] = TaskResult.failed(e)
+                finally:
+                    _mark_done(i)
+
+        return out
 
 
 # ── module-level helpers ───────────────────────────────────────────

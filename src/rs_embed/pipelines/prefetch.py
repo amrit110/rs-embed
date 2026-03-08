@@ -132,7 +132,9 @@ class PrefetchManager:
         cfg = self.config
         provider = self.provider
 
-        def _fetch_one(i: int, skey: str, sspec: SensorSpec) -> Tuple[int, str, np.ndarray]:
+        def _fetch_one(
+            i: int, skey: str, sspec: SensorSpec
+        ) -> Tuple[int, str, np.ndarray]:
             x = run_with_retry(
                 lambda: fetch_gee_patch_raw(
                     provider, spatial=spatials[i], temporal=temporal, sensor=sspec
@@ -171,7 +173,9 @@ class PrefetchManager:
                     if cfg.fail_on_bad_input:
                         sspec_member = self.sensor_by_key[member_skey]
                         rep = inspect_input_raw(
-                            x_member, sensor=sspec_member, name=f"gee_input_{member_skey}"
+                            x_member,
+                            sensor=sspec_member,
+                            name=f"gee_input_{member_skey}",
                         )
                         if not bool(rep.get("ok", True)):
                             issues = (rep.get("report", {}) or {}).get("issues", [])
@@ -198,8 +202,51 @@ class PrefetchManager:
             return hit
         err = self.errors.get((idx, sensor_key))
         if err:
-            raise RuntimeError(f"Prefetch failed for index={idx}, sensor={sensor_key}: {err}")
-        raise RuntimeError(f"Missing prefetched input for index={idx}, sensor={sensor_key}")
+            raise RuntimeError(
+                f"Prefetch failed for index={idx}, sensor={sensor_key}: {err}"
+            )
+        raise RuntimeError(
+            f"Missing prefetched input for index={idx}, sensor={sensor_key}"
+        )
+
+    def get_or_fetch(
+        self,
+        idx: int,
+        skey: str,
+        sspec: SensorSpec,
+        spatial: SpatialSpec,
+        temporal: Optional[TemporalSpec],
+    ) -> np.ndarray:
+        """Return cached input, or fetch on demand if not cached."""
+        hit = self.cache.get((idx, skey))
+        if hit is not None:
+            return hit
+        err = self.errors.get((idx, skey))
+        if err:
+            raise RuntimeError(
+                f"Prefetch previously failed for index={idx}, sensor={skey}: {err}"
+            )
+        if self.provider is None:
+            raise RuntimeError(
+                f"Missing provider for input fetch: index={idx}, sensor={skey}"
+            )
+        cfg = self.config
+        x = run_with_retry(
+            lambda: fetch_gee_patch_raw(
+                self.provider, spatial=spatial, temporal=temporal, sensor=sspec
+            ),
+            retries=cfg.max_retries,
+            backoff_s=cfg.retry_backoff_s,
+        )
+        rep = inspect_input_raw(x, sensor=sspec, name=f"gee_input_{skey}")
+        if cfg.fail_on_bad_input and (not bool(rep.get("ok", True))):
+            issues = (rep.get("report", {}) or {}).get("issues", [])
+            raise RuntimeError(
+                f"Input inspection failed for index={idx}, sensor={skey}: {issues}"
+            )
+        self.cache[(idx, skey)] = x
+        self.input_reports[(idx, skey)] = rep
+        return x
 
     def has_error(self, idx: int, sensor_key: str) -> Optional[str]:
         return self.errors.get((idx, sensor_key))
