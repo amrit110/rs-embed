@@ -1,3 +1,9 @@
+"""Thin export-flow helpers.
+
+This module intentionally stays small: a re-export for payload building and a
+single write helper with retry semantics used by the exporter.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
@@ -19,6 +25,7 @@ def write_one_payload(
     max_retries: int,
     retry_backoff_s: float,
 ) -> Dict[str, Any]:
+    """Persist one payload with retry and return writer metadata."""
     from ..writers import write_arrays
 
     return run_with_retry(

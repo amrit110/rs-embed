@@ -1,4 +1,4 @@
-"""Retry utilities and parallel execution runner."""
+"""Retry and threaded execution utilities shared by pipeline managers."""
 
 from __future__ import annotations
 

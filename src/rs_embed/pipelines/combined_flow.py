@@ -1,3 +1,10 @@
+"""Combined-layout helper flow for :class:`BatchExporter`.
+
+This module keeps combined-export model execution helpers separate from the
+``BatchExporter`` class body for readability. It is intentionally internal and
+called from ``BatchExporter._run_combined``.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
@@ -53,6 +60,13 @@ def run_pending_models(
 
     If *inference_engine* is ``None`` a temporary one is built (keeps older
     call-sites and tests working without changes).
+
+    Callback contracts
+    ------------------
+    ``get_or_fetch_input_fn`` must return a CHW ndarray for
+    ``(point_index, sensor_key, sensor_spec)``.
+    ``write_checkpoint_fn`` must accept ``stage=...`` and return an updated
+    combined manifest dict.
     """
     if inference_engine is None:
         from .inference import InferenceEngine

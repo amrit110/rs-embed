@@ -1,3 +1,10 @@
+"""Per-point payload assembly helpers.
+
+This module builds arrays and manifest entries for one spatial point in
+per-item export layout. It resolves provider input through a cache-first
+fallback chain and records model-level success/failure metadata.
+"""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -45,6 +52,14 @@ def build_one_point_payload(
     provider_factory: Optional[Callable[[], Any]] = None,
     model_progress_cb: Optional[Callable[[str], None]] = None,
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
+    """Build arrays + manifest payload for one point across all models.
+
+    Input resolution order for provider-backed models:
+    1. local per-point cache,
+    2. prefetch cache,
+    3. prefetch error map (if continuing on error),
+    4. synchronous fetch via ``provider_factory`` fallback.
+    """
     save_inputs = config.save_inputs
     save_embeddings = config.save_embeddings
     fail_on_bad_input = config.fail_on_bad_input
