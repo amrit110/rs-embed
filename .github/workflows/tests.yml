@@ -25,9 +25,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Installs the package in editable mode along with dev, torch, and model dependencies
-          # We exclude 'gee' here assuming you don't have GEE credentials in CI yet
-          pip install -e ".[dev,torch,models]"
+          # Install optional deps that are exercised by the full test suite.
+          # We still exclude 'gee' because CI does not provide GEE credentials.
+          pip install -e ".[dev,torch,models,netcdf]"
+          pip install matplotlib terratorch
 
       - name: Run tests
         run: |
