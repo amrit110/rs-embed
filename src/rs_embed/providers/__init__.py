@@ -1,3 +1,18 @@
+"""
+Data Source Adapters.
+
+This module handles fetching raw imagery from external services
+(Google Earth Engine, Sentinel Hub, local files, etc.).
+
+To add a new data source:
+
+1. Inherit from ``rs_embed.providers.base.ProviderBase``.
+2. Implement ``fetch_array_chw()`` to return a standardised NumPy array
+   shaped ``(C, H, W)``.
+3. Handle authentication and networking internally.
+
+Built-in providers are lazy-loaded so optional dependencies stay optional.
+"""
 from __future__ import annotations
 
 import importlib
