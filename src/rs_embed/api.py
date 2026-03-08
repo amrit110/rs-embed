@@ -1,25 +1,33 @@
-"""Public API entry points for rs-embed.
+"""Public Facade and Entry Point.
 
-This module is the boundary between user-facing functions and the internal
-pipeline stack:
+This module is the single boundary between callers and the internal pipeline
+stack.  It should contain **no** heavy execution logic — only configuration
+and delegation.
 
-- API layer: argument normalization and user-friendly defaults.
-- Pipeline layer: batch orchestration (prefetch -> inference -> write).
-- Tools/providers/embedders: low-level execution details.
+Responsibilities
+----------------
+1. **Validation** — ensure all input Specs (Spatial, Temporal, Output) are
+   valid before any processing begins.
+2. **Normalisation** — convert user-friendly strings (e.g. ``"sentinel-2"``,
+   ``"cuda"``) into strict internal objects.
+3. **Context Resolution** — route each request to the correct backend
+   (Provider vs. Precomputed) and device.
+4. **Delegation** — instantiate the appropriate Pipeline or Embedder and
+   hand off execution.
 
 Flow summary
 ------------
-1. Validate and normalize user inputs/specs.
-2. Resolve request context (model/backend/device/sensor/input prep).
-3. Execute single/batch embedding, or delegate batch export to
-    :class:`BatchExporter`.
+1. Validate and normalise user inputs / specs.
+2. Resolve request context (model / backend / device / sensor / input prep).
+3. Execute single / batch embedding, or delegate batch export to
+   :class:`BatchExporter`.
 
 Backward compatibility
 ----------------------
 Some tests and downstream integrations monkeypatch symbols on ``rs_embed.api``.
 For batch export, those hook symbols are mirrored into pipeline module globals
-via ``_sync_export_pipeline_hooks`` so monkeypatch behavior remains stable after
-the pipeline refactor.
+via ``_sync_export_pipeline_hooks`` so monkeypatch behaviour remains stable
+after the pipeline refactor.
 """
 
 from __future__ import annotations

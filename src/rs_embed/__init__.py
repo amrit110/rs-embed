@@ -1,3 +1,12 @@
+"""rs-embed — location embeddings from remote-sensing imagery.
+
+This top-level package re-exports the public API surface so that users can
+write ``from rs_embed import Model, BBox`` without reaching into subpackages.
+
+See :mod:`rs_embed.api` for the function-based API and :class:`rs_embed.Model`
+for the class-based (stateful) interface.
+"""
+
 from .core.specs import (
     BBox,
     PointBuffer,

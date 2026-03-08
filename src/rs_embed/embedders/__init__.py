@@ -1,3 +1,21 @@
+"""
+Model Implementations (Plugins).
+
+This module contains the specific inference logic for each supported AI model.
+
+To add a new model:
+
+1. Create a new file (e.g., ``my_model.py``).
+2. Inherit from ``rs_embed.embedders.base.EmbedderBase``.
+3. Implement ``get_embedding()``.
+
+Rules
+-----
+- Models should be self-contained.
+- Only inference logic belongs here — no training code.
+- Lazy-loading: embedder classes are imported on first access via
+  ``__getattr__`` so unused models incur no startup cost.
+"""
 from __future__ import annotations
 
 import importlib

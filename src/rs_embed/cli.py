@@ -1,3 +1,13 @@
+"""Command-Line Interface.
+
+Provides ``python -m rs_embed`` (via :mod:`rs_embed.__main__`) with the
+following subcommands:
+
+- ``inspect-gee`` — download a patch from Google Earth Engine and print an
+  input-inspection report (no model run).
+- ``export-npz``  — export raw inputs and/or embeddings for one or more
+  models into ``.npz`` + JSON manifest files.
+"""
 from __future__ import annotations
 
 import argparse
