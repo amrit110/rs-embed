@@ -27,51 +27,6 @@ def _to_dhw(arr):
     return arr.astype(np.float32)
 
 
-def _infer_should_flipud_from_meta(meta):
-    """
-    Infer whether image rows should be flipped to enforce north-up display.
-
-    Returns:
-      (should_flip: bool, reason: str)
-    """
-    if not isinstance(meta, dict):
-        return False, "meta is not a dict"
-
-    # If OutputSpec-level normalization has already been applied upstream,
-    # do not auto-flip again in visualization.
-    policy = str(meta.get("grid_orientation_policy", "")).strip().lower()
-    if policy == "north_up":
-        return False, "grid_orientation_policy=north_up (already normalized upstream)"
-    if policy == "native":
-        y_axis = str(meta.get("y_axis_direction", "")).strip().lower()
-        if y_axis in {"south_to_north", "bottom_to_top"}:
-            return True, f"grid_orientation_policy=native, y_axis_direction={y_axis}"
-        if y_axis in {"north_to_south", "top_to_bottom"}:
-            return False, f"grid_orientation_policy=native, y_axis_direction={y_axis}"
-
-    # Highest-confidence signal: affine transform y-scale sign.
-    # For north-up rasters, transform.e is typically negative.
-    transform = meta.get("global_transform")
-    if transform is not None and hasattr(transform, "e"):
-        try:
-            e = float(transform.e)
-            if e > 0:
-                return True, f"global_transform.e={e:.6g} (>0, south-up)"
-            if e < 0:
-                return False, f"global_transform.e={e:.6g} (<0, north-up)"
-        except Exception:
-            pass
-
-    # Optional explicit metadata (if embedders add it in the future).
-    y_axis = str(meta.get("y_axis_direction", "")).strip().lower()
-    if y_axis in {"south_to_north", "bottom_to_top"}:
-        return True, f"y_axis_direction={y_axis}"
-    if y_axis in {"north_to_south", "top_to_bottom"}:
-        return False, f"y_axis_direction={y_axis}"
-
-    return False, "no orientation metadata; keep as-is"
-
-
 def _robust_scale01(x, lo=2.0, hi=98.0, eps=1e-8):
     """Scale array to [0,1] with percentile clipping."""
     x = np.asarray(x, dtype=np.float32)
@@ -191,8 +146,10 @@ def transform_pca_rgb(
 
 def plot_embedding_pseudocolor(
     emb,
+    emb2=None,
     *,
     title=None,
+    title2=None,
     pca=None,
     n_samples=100_000,
     seed=0,
@@ -200,64 +157,74 @@ def plot_embedding_pseudocolor(
     robust_hi=98.0,
     figsize=(6, 5),
     show_colorbars=False,
-    flipud=None,
-    print_orientation=False,
 ):
     """
-    Plot PCA pseudocolor image.
-    If pca is None, fit PCA on this embedding.
+    Plot one or two PCA pseudocolor images.
 
-    Args:
-      flipud:
-        - None (default): auto-detect from emb.meta (north-up alignment).
-        - True/False: force behavior.
-      print_orientation:
-        Print orientation decision for debugging.
+    If `emb2` is provided, the two images are rendered side by side.
+    When `pca` is provided, it is reused for all plots; otherwise each plot
+    fits its own PCA independently.
 
-    Returns fitted pca for reuse across images.
+    Returns fitted PCA for reuse across images. For two plots, returns a list.
     """
-    meta = getattr(emb, "meta", {})
-    if title is None:
-        title = meta.get("model", "embedding PCA")
+    embeddings = [emb] if emb2 is None else [emb, emb2]
+    default_titles = [
+        getattr(item, "meta", {}).get("model", "embedding PCA") for item in embeddings
+    ]
+    titles = default_titles.copy()
+    if title is not None:
+        titles[0] = title
+    if emb2 is not None and title2 is not None:
+        titles[1] = title2
 
     if pca is None:
-        pca = fit_pca_rgb(emb, n_samples=n_samples, seed=seed)
+        pcas = [fit_pca_rgb(item, n_samples=n_samples, seed=seed) for item in embeddings]
+    elif isinstance(pca, (list, tuple)):
+        if len(pca) != len(embeddings):
+            raise ValueError("Length of pca must match number of embeddings.")
+        pcas = list(pca)
+    else:
+        pcas = [pca] * len(embeddings)
 
-    rgb = transform_pca_rgb(emb, pca, robust_lo=robust_lo, robust_hi=robust_hi)
-    auto_flipud, flip_reason = _infer_should_flipud_from_meta(meta)
-    do_flipud = auto_flipud if flipud is None else bool(flipud)
-    if do_flipud:
-        rgb = np.flipud(rgb)
+    rgbs = [
+        transform_pca_rgb(item, item_pca, robust_lo=robust_lo, robust_hi=robust_hi)
+        for item, item_pca in zip(embeddings, pcas)
+    ]
 
-    if print_orientation:
-        mode = "auto" if flipud is None else "manual"
-        print(f"[{title}] flipud={do_flipud} ({mode}: {flip_reason})")
+    width_scale = len(embeddings)
+    fig, axes = plt.subplots(
+        1,
+        len(embeddings),
+        figsize=(figsize[0] * width_scale, figsize[1]),
+        squeeze=False,
+    )
+    for ax, rgb, item_title in zip(axes[0], rgbs, titles):
+        ax.imshow(rgb)
+        ax.set_title(item_title)
+        ax.axis("off")
 
-    plt.figure(figsize=figsize)
-    plt.imshow(rgb)
-    plt.title(title)
-    plt.axis("off")
+    fig.tight_layout()
+    output_stem = "_vs_".join(item_title.replace(" ", "_") for item_title in titles)
+    fig.savefig(f"{output_stem}_pca.png")
     plt.show()
 
     if show_colorbars:
-        # Optional: also show the three PCA channels as grayscale for debugging
-        data = getattr(emb, "data", emb)
-        dhw = _to_dhw(data)
-        D, H, W = dhw.shape
-        X = dhw.reshape(D, H * W).T
-        Xc = X - pca["mean"]
-        Y = Xc @ pca["components"].T
-        for k in range(3):
-            img = _robust_scale01(Y[:, k], lo=robust_lo, hi=robust_hi).reshape(H, W)
-            if do_flipud:
-                img = np.flipud(img)
-            plt.figure(figsize=figsize)
-            plt.imshow(img)
-            plt.title(f"{title} | PC{k + 1}")
-            plt.axis("off")
-            plt.show()
-    plt.savefig(f"{title.replace(' ', '_')}_pca.png")
-    return pca
+        for item, item_pca, item_title in zip(embeddings, pcas, titles):
+            data = getattr(item, "data", item)
+            dhw = _to_dhw(data)
+            D, H, W = dhw.shape
+            X = dhw.reshape(D, H * W).T
+            Xc = X - item_pca["mean"]
+            Y = Xc @ item_pca["components"].T
+            for k in range(3):
+                img = _robust_scale01(Y[:, k], lo=robust_lo, hi=robust_hi).reshape(H, W)
+                plt.figure(figsize=figsize)
+                plt.imshow(img)
+                plt.title(f"{item_title} | PC{k + 1}")
+                plt.axis("off")
+                plt.show()
+
+    return pcas[0] if len(pcas) == 1 else pcas
 
 
 def percentile_stretch(
