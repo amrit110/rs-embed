@@ -10,7 +10,7 @@ Related pages:
 
 ---
 
-## inspect_provider_patch (recommended)
+## inspect_provider_patch (recommended) { #inspect_provider_patch }
 
 ```python
 inspect_provider_patch(
@@ -30,7 +30,7 @@ Use this when you want the same inspection flow but with a non-GEE provider back
 
 ---
 
-## inspect_gee_patch
+## inspect_gee_patch { #inspect_gee_patch }
 
 ```python
 inspect_gee_patch(

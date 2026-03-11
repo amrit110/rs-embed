@@ -1,4 +1,4 @@
-# THOR 1.0 Base (`thor_1_0_base`)
+# THOR 1.0 Base (`thor`)
 
 > TerraTorch-backed THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `thor_1_0_base` |
+| Model ID | `thor` |
+| Aliases | `thor_1_0_base` |
 | Family / Backbone | THOR via TerraTorch + `thor_terratorch_ext` (`thor_v1_base`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
@@ -122,7 +123,7 @@ Notes:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "thor_1_0_base",
+    "thor",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
@@ -175,4 +176,3 @@ Keep fixed and record:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_thor.py`
 - Token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
-

@@ -1,4 +1,4 @@
-# ScaleMAE RGB (`scalemae_rgb`)
+# ScaleMAE RGB (`scalemae`)
 
 > Sentinel-2 RGB on-the-fly adapter for ScaleMAE (`rshf.scalemae.ScaleMAE`), with explicit scale conditioning via `sensor.scale_m -> input_res_m`.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `scalemae_rgb` |
+| Model ID | `scalemae` |
+| Aliases | `scalemae_rgb` |
 | Family / Backbone | ScaleMAE via `rshf.scalemae.ScaleMAE` |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
@@ -122,7 +123,7 @@ Non-env but critical:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "scalemae_rgb",
+    "scalemae",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
@@ -144,7 +145,7 @@ emb = get_embedding(
 
 ## Common Failure Modes / Debugging
 
-- backend mismatch (`scalemae_rgb` is provider-only)
+- backend mismatch (`scalemae` is provider-only)
 - wrong `input_chw` shape / band order (`CHW`, 3 channels, `(B4,B3,B2)`)
 - missing `rshf.scalemae.ScaleMAE`
 - wrapper signature mismatch in older/newer `rshf` versions (adapter has fallbacks, but still possible)
@@ -177,4 +178,3 @@ Keep fixed and record:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_scalemae.py`
 - Shared RGB/token helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
-

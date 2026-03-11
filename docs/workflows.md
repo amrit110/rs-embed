@@ -41,7 +41,7 @@ emb = get_embedding(
     device="auto",
 )
 ```
-1. Model ID (see [Model Overview](models.md) / [Model Reference](models_reference.md)).
+1. Model ID (see [Model Overview](models.md) / [Advanced Model Reference](models_reference.md)).
 2. ROI centered at a point with a square buffer (meters).
 3. Date range is a window, not a guaranteed single scene.
 4. `pooled()` is the best default for comparison/classification workflows.

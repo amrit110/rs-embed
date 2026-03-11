@@ -10,7 +10,7 @@ Related pages:
 
 ---
 
-## export_batch (primary / recommended)
+## export_batch (primary / recommended) { #export_batch }
 
 ```python
 export_batch(
@@ -162,7 +162,7 @@ export_batch(
 
 ---
 
-## export_npz (compatibility / convenience wrapper)
+## export_npz (compatibility / convenience wrapper) { #export_npz }
 
 ```python
 export_npz(

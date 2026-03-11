@@ -14,8 +14,9 @@
 
 === ":material-view-grid-outline: Choose a Model"
 
-    - Go to [Model Overview](models.md) for the comparison matrix, preprocessing notes, and temporal behavior
-    - Open [Model Reference](models_reference.md) when you need advanced details and exact assumptions
+    - Go to [Model Overview](models.md) to shortlist candidates
+    - Open [Advanced Model Reference](models_reference.md) to compare preprocessing, temporal semantics, and side inputs
+    - Use **Reference -> Model Details** in the nav when you need one model's exact contract and examples
 
 === ":material-api: Exact Signatures"
 
@@ -80,10 +81,12 @@ RS-Embed aims to fix this.
 ### Guides
 
 - [Workflows](workflows.md): task-oriented usage patterns
-- [Model Overview](models.md): model capabilities, preprocessing, env knobs
+- [Model Overview](models.md): shortlist models by task and input type
 
 ### Reference
 
+- [Advanced Model Reference](models_reference.md): cross-model comparison tables for preprocessing, temporal packaging, and env knobs
+- Model Details (nav section): per-model contracts, caveats, and examples
 - [API Reference](api.md): exact signatures and parameter details
 - [Limitations](limitations.md): current constraints and known edge cases
 

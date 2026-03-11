@@ -1,4 +1,4 @@
-# SatMAE RGB (`satmae_rgb`)
+# SatMAE RGB (`satmae`)
 
 > Sentinel-2 RGB on-the-fly adapter for SatMAE (`rshf.satmae.SatMAE`), returning pooled vectors or ViT patch-token grids from `forward_encoder(mask_ratio=0.0)`.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `satmae_rgb` |
+| Model ID | `satmae` |
+| Aliases | `satmae_rgb` |
 | Family / Backbone | SatMAE via `rshf.satmae.SatMAE` |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
@@ -24,7 +25,7 @@
 
 - strong RGB-only SatMAE baseline on Sentinel-2
 - MAE-style token-grid analysis (`OutputSpec.grid()`)
-- comparisons with other RGB ViT adapters (`remoteclip_s2rgb`, `scalemae_rgb`, `wildsat`)
+- comparisons with other RGB ViT adapters (`remoteclip`, `scalemae`, `wildsat`)
 
 ### Be careful when
 
@@ -110,7 +111,7 @@ Notes:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "satmae_rgb",
+    "satmae",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
@@ -130,7 +131,7 @@ emb = get_embedding(
 
 ## Common Failure Modes / Debugging
 
-- backend mismatch (`satmae_rgb` is provider-only)
+- backend mismatch (`satmae` is provider-only)
 - wrong `input_chw` shape or band order (must be `CHW`, `C=3`, `(B4,B3,B2)`)
 - missing `rshf` / incompatible `rshf` version (no `SatMAE` wrapper or `forward_encoder`)
 - `grid` requests failing if token output shape is unexpected
@@ -160,4 +161,3 @@ Keep fixed and record:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_satmae.py`
 - Shared RGB/token helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
-

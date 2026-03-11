@@ -1,4 +1,4 @@
-# TerraFM-B (`terrafm_b`)
+# TerraFM-B (`terrafm`)
 
 > TerraFM-B adapter supporting both provider and tensor backends, with two input modalities (`s2` 12-band Sentinel-2 SR or `s1` VV/VH Sentinel-1) and model-native feature-map grids.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `terrafm_b` |
+| Model ID | `terrafm` |
+| Aliases | `terrafm_b` |
 | Family / Backbone | TerraFM-B from Hugging Face (`MBZUAI/TerraFM`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
@@ -144,10 +145,11 @@ sensor = SensorSpec(
     bands=("B1","B2","B3","B4","B5","B6","B7","B8","B8A","B9","B11","B12"),
     scale_m=10,
 )
-sensor.modality = "s2"  # current adapter reads modality from sensor attrs
+# SensorSpec is frozen, so TerraFM side attrs must currently be attached this way.
+object.__setattr__(sensor, "modality", "s2")
 
 emb = get_embedding(
-    "terrafm_b",
+    "terrafm",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     sensor=sensor,
@@ -156,13 +158,36 @@ emb = get_embedding(
 )
 ```
 
-### S1 provider path example (conceptual)
+### Minimal provider-backed S1 example
 
 ```python
-# sensor.modality = "s1"
-# sensor.orbit = "ASCENDING"  # optional
-# sensor.use_float_linear = True
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec, SensorSpec
+
+sensor = SensorSpec(
+    collection="COPERNICUS/S1_GRD_FLOAT",
+    bands=("VV", "VH"),
+    scale_m=10,
+    composite="median",
+)
+object.__setattr__(sensor, "modality", "s1")
+object.__setattr__(sensor, "use_float_linear", True)
+# object.__setattr__(sensor, "orbit", "ASCENDING")  # optional
+
+emb = get_embedding(
+    "terrafm",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    sensor=sensor,
+    output=OutputSpec.pooled(),
+    backend="gee",
+)
 ```
+
+Notes:
+
+- The `object.__setattr__(...)` pattern shown here reflects the current experimental/testing-stage adapter interface. A cleaner public API for modality switching is planned for a future update.
+- Setting `modality="s1"` is what switches TerraFM onto the S1 path; changing only `collection` / `bands` is not enough.
+- `use_float_linear=True` matches `COPERNICUS/S1_GRD_FLOAT`; set it to `False` for `COPERNICUS/S1_GRD`.
 
 ---
 

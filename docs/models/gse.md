@@ -1,4 +1,4 @@
-# Google Satellite Embedding Annual (`gse_annual`)
+# Google Satellite Embedding Annual (`gse`)
 
 > Provider-backed precomputed annual embedding adapter for `GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`, supporting pooled vectors or provider-sampled embedding grids.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `gse_annual` |
+| Model ID | `gse` |
+| Aliases | `gse_annual` |
 | Family / Source | Google Satellite Embedding annual product (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`) |
 | Adapter type | `precomputed` |
 | Typical backend | provider backend (`gee`) |
@@ -103,7 +104,7 @@ Primary non-env sampling knob:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "gse_annual",
+    "gse",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.year(2021),
     output=OutputSpec.pooled(),
@@ -152,4 +153,3 @@ Keep fixed and record:
 
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/precomputed_gse_annual.py`
-

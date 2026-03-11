@@ -6,9 +6,11 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2602.23678-b31b1b.svg)](https://arxiv.org/abs/2602.23678)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://cybergis.github.io/rs-embed/)
+![Python](https://img.shields.io/badge/python-3.12-blue?logo=python)
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=cybergis.rs-embed)
 ![License](https://img.shields.io/github/license/cybergis/rs-embed)
 ![Last Commit](https://img.shields.io/github/last-commit/cybergis/rs-embed)
+!
 
 
 [Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](./examples/playground.ipynb)  · [UseCase](./examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
@@ -55,7 +57,7 @@ temporal = TemporalSpec.range(
 )
 
 emb = get_embedding(
-    "prithvi",       # alpha earth
+    "prithvi",       
     spatial=spatial,
     temporal=temporal,
     output=OutputSpec.grid(),
@@ -104,8 +106,8 @@ This is a convenience index with basic model info only (for quick scanning / lin
 | Model ID |  Primary Input  | Publication | Link |
 |---|---|---|---|
 | `satmae` |  S2 RGB | [NeurIPS 2022](https://arxiv.org/abs/2207.08051) |[link](https://github.com/sustainlab-group/SatMAE)|
-| `satmaepp` | S2 RGB | [SatMAE++](https://arxiv.org/abs/2403.05419) | [link](https://github.com/techmn/satmae_pp) |
-| `satmaepp_s2_10b` | S2 SR 10-band | [SatMAE++](https://arxiv.org/abs/2403.05419) | [link](https://github.com/techmn/satmae_pp) |
+| `satmaepp` | S2 RGB | [CVPR 2024](https://arxiv.org/abs/2403.05419) | [link](https://github.com/techmn/satmae_pp) |
+| `satmaepp_s2_10b` | S2 SR 10-band | [CVPR 2024](https://arxiv.org/abs/2403.05419) | [link](https://github.com/techmn/satmae_pp) |
 | `prithvi` | S2 6-band | [arXiv 2023](https://arxiv.org/abs/2310.18660) | [link](https://huggingface.co/ibm-nasa-geospatial) |
 | `scalemae` | S2 RGB (+ scale) | [ICCV 2023](https://arxiv.org/abs/2212.14532) | [link](https://github.com/bair-climate-initiative/scale-mae) |
 | `remoteclip` |  S2 RGB | [TGRS 2024](https://arxiv.org/abs/2306.11029) |[link](https://github.com/ChenDelong1999/RemoteCLIP) |

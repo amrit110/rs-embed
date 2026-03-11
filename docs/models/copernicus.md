@@ -1,4 +1,4 @@
-# Copernicus Embed (`copernicus_embed`)
+# Copernicus Embed (`copernicus`)
 
 > Precomputed embedding adapter using `torchgeo.datasets.CopernicusEmbed`, with bbox slicing and optional bbox expansion to improve tile overlap on small ROIs.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `copernicus_embed` |
+| Model ID | `copernicus` |
+| Aliases | `copernicus_embed` |
 | Family / Source | TorchGeo `CopernicusEmbed` dataset |
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
@@ -30,7 +31,7 @@
 
 - requesting years other than `2021` (unsupported in current adapter)
 - assuming exact ROI slicing without expansion (adapter expands bbox by default)
-- using non-auto backends (`copernicus_embed` currently expects `backend="auto"`)
+- using non-auto backends (`copernicus` currently expects `backend="auto"`)
 
 ---
 
@@ -119,7 +120,7 @@ Current fixed adapter behavior (not env-configurable in v0.1):
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "copernicus_embed",
+    "copernicus",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=5000),
     temporal=TemporalSpec.year(2021),
     output=OutputSpec.pooled(),

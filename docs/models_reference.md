@@ -1,10 +1,12 @@
 # Supported Models (Advanced Reference)
 
-This page preserves the **detailed model comparison matrices** and preprocessing notes.
+This page is for **cross-model comparison after you already have a shortlist**.
 
 If you are choosing a model for the first time, start with:
 
 - [Supported Models (Overview)](models.md)
+
+If you need the exact contract for one specific model, use the per-model detail pages in **Reference -> Model Details**.
 
 If you are authoring a new per-model doc page, use:
 
@@ -12,33 +14,35 @@ If you are authoring a new per-model doc page, use:
 
 ---
 
-This page is best used after you already narrowed down candidate models and want to compare:
+Use this page to compare:
 
 1. preprocessing assumptions
 2. temporal packaging
 3. side-input requirements
 4. environment-variable tuning knobs
 
+Jump to:
+
+- [Precomputed Embeddings](#precomputed-embeddings)
+- [Quick Comparison](#quick-comparison)
+- [Temporal Handling](#temporal-handling)
+- [Multi-frame Semantics](#multi-frame-semantics)
+- [Modality and Extra Inputs Matrix](#modality-and-extra-inputs-matrix)
+- [Preprocessing and Temporal Env Vars](#preprocessing-and-temporal-env-vars)
+
 ---
 
 ## How To Use This Page
 
-### Quick chooser by goal
-
-| Goal | Start with | Why |
-|---|---|---|
-| Fast baseline / simple pipeline | `tessera`, `gse`, `copernicus` | Precomputed embeddings, fewer runtime dependencies |
-| General on-the-fly RGB experiments | `remoteclip`, `satmae`, `satmaepp`, `scalemae` | Simple S2 RGB input paths |
-| Time-series modeling | `agrifm`, `anysat`, `galileo` | Native multi-frame temporal packaging |
-| Multispectral / strict spectral semantics | `satmaepp_s2_10b`, `dofa`, `terramind`, `thor`, `satvision` | Strong channel/schema assumptions |
-| S1/S2 modality experiments | `terrafm` | Supports S2 or S1 paths (per call) |
-
-### Readability tips
+### Reading tips
 
 - Start with **Quick Comparison** if you are deciding between models
 - Read **Temporal Handling** and **Multi-frame Semantics** before comparing temporal models
 - Read **Modality and Extra Inputs Matrix** if you need fair cross-model benchmarking
 - Read **Environment Variables...** only when tuning preprocessing or reproducing training pipelines
+
+Canonical model IDs in this page use the short public names from `MODEL_SPECS`, such as `remoteclip`, `prithvi`, `terrafm`, and `thor`.
+Some linked detail-page filenames still retain older names for compatibility.
 
 ## Precomputed Embeddings
 
@@ -59,26 +63,9 @@ Source of truth:
 - `src/rs_embed/embedders/_vit_mae_utils.py`
 - `src/rs_embed/embedders/runtime_utils.py`
 
-Documented on-the-fly IDs:
-
-- `remoteclip`
-- `satmae`
-- `satmaepp`
-- `satmaepp_s2_10b`
-- `scalemae`
-- `anysat`
-- `galileo`
-- `wildsat`
-- `prithvi`
-- `terrafm`
-- `terramind`
-- `dofa`
-- `fomo`
-- `thor`
-- `agrifm`
-- `satvision`
-
 ### Quick Comparison
+
+Use this table for a first-pass side-by-side comparison of input assumptions and preprocessing behavior.
 
 | Model ID | Architecture / Backbone | Input | Default Preprocessing | Resize / Crop / Pad | Output Structure | Training Alignment |
 |---|---|---|---|---|---|---|
@@ -101,12 +88,16 @@ Documented on-the-fly IDs:
 
 ### Temporal Handling 
 
+Read this section before comparing any model that accepts `TemporalSpec.range(...)`.
+
 - For most on-the-fly adapters, `TemporalSpec.range(start, end)` means: filter imagery in `[start, end)`, then build one composite patch for model input (`median` by default, or `mosaic` if configured via `SensorSpec.composite`).
 - In these adapters, `meta.input_time` is typically the midpoint of the temporal window and is mainly metadata (or an auxiliary time signal for models that require it), not a guaranteed single-scene acquisition date.
 - Multi-frame adapters: `agrifm`, `anysat`, and `galileo` fetch TCHW sequences by splitting the requested range into sub-windows and compositing each sub-window into one frame.
 - Current single-composite adapters include: `remoteclip`, `satmae`, `satmaepp`, `satmaepp_s2_10b`, `scalemae`, `wildsat`, `prithvi`, `terrafm`, `terramind`, `dofa`, `fomo`, `thor`, and `satvision`.
 
 ### Multi-frame Semantics
+
+This section only matters for adapters that construct multi-frame inputs from one requested time window.
 
 Shared behavior for current multi-frame adapters (`agrifm`, `anysat`, `galileo`):
 
@@ -125,6 +116,8 @@ Per-model temporal packaging:
 | `galileo` | `RS_EMBED_GALILEO_FRAMES` (`8`) | `months` (per-frame month, `1..12`) | By default from frame bin midpoints; `RS_EMBED_GALILEO_MONTH` can force a constant month for all frames. |
 
 ### Modality and Extra Inputs Matrix
+
+Use this table to avoid unfair comparisons between plain image encoders and adapters that require side inputs.
 
 Interpretation:
 
@@ -159,7 +152,9 @@ Practically multi-input models:
 - `dofa`: image + wavelength vector
 - `scalemae`: image + `input_res_m`
 
-### Environment Variables That Directly Change Preprocessing/Temporal Packaging
+### Preprocessing and Temporal Env Vars
+
+This table only lists env vars that materially change model input construction or temporal packaging.
 
 | Model ID | Main preprocessing env keys |
 |---|---|

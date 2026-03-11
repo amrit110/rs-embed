@@ -44,6 +44,9 @@ extra_javascript:
 extra_css:
   - stylesheets/extra.css
 
+not_in_nav: |
+  /models/dynamicvis.md
+
 nav:
   - Home: index.md
   - Learn:
@@ -52,29 +55,29 @@ nav:
   - Guides:
     - Workflows: workflows.md
     - Model Overview: models.md
-    - Model Reference: models_reference.md
-    - Model Examples:
+  - Reference:
+    - Advanced Model Reference: models_reference.md
+    - Model Details:
       - Precomputed:
-        - gse: models/gse_annual.md
-        - copernicus: models/copernicus_embed.md
+        - gse: models/gse.md
+        - copernicus: models/copernicus.md
         - tessera: models/tessera.md
       - On-the-fly:
-        - remoteclip: models/remoteclip_s2rgb.md
-        - satmae: models/satmae_rgb.md
+        - remoteclip: models/remoteclip.md
+        - satmae: models/satmae.md
         - satmaepp family: models/satmaepp.md
-        - scalemae: models/scalemae_rgb.md
+        - scalemae: models/scalemae.md
         - wildsat: models/wildsat.md
-        - prithvi: models/prithvi_eo_v2_s2_6b.md
+        - prithvi: models/prithvi.md
         - terramind: models/terramind.md
         - dofa: models/dofa.md
         - fomo: models/fomo.md
-        - thor: models/thor_1_0_base.md
-        - satvision: models/satvision_toa.md
-        - terrafm: models/terrafm_b.md
+        - thor: models/thor.md
+        - satvision: models/satvision.md
+        - terrafm: models/terrafm.md
         - anysat: models/anysat.md
         - galileo: models/galileo.md
         - agrifm: models/agrifm.md
-  - Reference:
     - Overview: api.md
     - Specs & Data Structures: api_specs.md
     - Embedding API: api_embedding.md

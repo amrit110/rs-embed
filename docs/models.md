@@ -2,10 +2,14 @@
 
 This page is the **model selection entry point**.
 
-Use it to quickly narrow down candidates, then jump to:
+Use it to answer one question quickly:
 
-- [Supported Models (Advanced Reference)](models_reference.md) for detailed matrices (preprocessing / temporal semantics / env vars)
-- [Model Detail Template](model_detail_template.md) to create a per-model documentation page
+- Which models should I shortlist for this task?
+
+Once you have a shortlist:
+
+- use [Supported Models (Advanced Reference)](models_reference.md) for side-by-side comparison
+- use the per-model detail pages linked below for exact contracts, examples, and caveats
 
 ---
 
@@ -15,7 +19,10 @@ Recommended flow:
 
 1. Pick a shortlist from the overview tables below
 2. Validate temporal + input assumptions in [Advanced Reference](models_reference.md)
-3. For production/benchmark runs, confirm model-specific caveats and env vars before exporting
+3. Open the linked detail page for your final candidate before production or benchmarking
+
+Canonical model IDs use the short public names shown on this page, such as `remoteclip`, `prithvi`, `terrafm`, and `thor`.
+Some detail-page filenames still use older names for compatibility, but the canonical IDs above are the names users should copy into code.
 
 ---
 
@@ -29,36 +36,6 @@ Recommended flow:
 | Multispectral / strict spectral semantics | `satmaepp_s2_10b`, `dofa`, `terramind`, `thor`, `satvision` | Strong channel/schema assumptions |
 | Mixed-modality experiments (S1/S2) | `terrafm` | Supports S2 or S1 path (per call) |
 
----
-
-## Available Detail Pages (Current)
-
-Canonical model IDs are the short names shown below. Legacy IDs (for example `remoteclip_s2rgb`, `prithvi_eo_v2_s2_6b`, `thor_1_0_base`) are still accepted as aliases in the API/CLI.
-
-- [`remoteclip`](models/remoteclip_s2rgb.md)
-- [`prithvi`](models/prithvi_eo_v2_s2_6b.md)
-- [`anysat`](models/anysat.md)
-- [`galileo`](models/galileo.md)
-- [`terramind`](models/terramind.md)
-- [`dofa`](models/dofa.md)
-- [`satvision`](models/satvision_toa.md)
-- [`thor`](models/thor_1_0_base.md)
-- [`agrifm`](models/agrifm.md)
-- [`satmae`](models/satmae_rgb.md)
-- [`satmaepp`](models/satmaepp.md)
-- [`satmaepp_s2_10b`](models/satmaepp.md)
-- [`scalemae`](models/scalemae_rgb.md)
-- [`wildsat`](models/wildsat.md)
-- [`fomo`](models/fomo.md)
-- [`terrafm`](models/terrafm_b.md)
-- [`tessera`](models/tessera.md)
-- [`gse`](models/gse_annual.md)
-- [`copernicus`](models/copernicus_embed.md)
-
-More model detail pages can be added using the [Model Detail Template](model_detail_template.md).
-
----
-
 ## Model Catalog Snapshot
 
 ### Precomputed Embeddings
@@ -66,26 +43,26 @@ More model detail pages can be added using the [Model Detail Template](model_det
 | Model ID | Type | Primary Input / Source | Outputs | Temporal mode | Notes | Detail |
 |---|---|---|---|---|---|---|
 | `tessera` | Precomputed | GeoTessera embedding tiles | `pooled`, `grid` | yearly coverage product | Fast baseline, source-fixed precomputed workflow | [detail](models/tessera.md) |
-| `gse` | Precomputed | Google Satellite Embedding (annual) | `pooled`, `grid` | `TemporalSpec.year(...)` | Annual product via provider path | [detail](models/gse_annual.md) |
-| `copernicus` | Precomputed | Copernicus embeddings | `pooled`, `grid` | limited (2021) | Coarse resolution product | [detail](models/copernicus_embed.md) |
+| `gse` | Precomputed | Google Satellite Embedding (annual) | `pooled`, `grid` | `TemporalSpec.year(...)` | Annual product via provider path | [detail](models/gse.md) |
+| `copernicus` | Precomputed | Copernicus embeddings | `pooled`, `grid` | limited (2021) | Coarse resolution product | [detail](models/copernicus.md) |
 
 ### On-the-fly Foundation Models
 
 | Model ID | Primary Input | Temporal style | Outputs | Notable requirements | Detail |
 |---|---|---|---|---|---|
-| `remoteclip` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | provider backend; RGB preprocessing | [detail](models/remoteclip_s2rgb.md) |
-| `satmae` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | RGB path; ViT token/grid behavior | [detail](models/satmae_rgb.md) |
+| `remoteclip` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | provider backend; RGB preprocessing | [detail](models/remoteclip.md) |
+| `satmae` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | RGB path; ViT token/grid behavior | [detail](models/satmae.md) |
 | `satmaepp` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | SatMAE++ fMoW-style eval preprocessing; channel order control | [detail](models/satmaepp.md) |
 | `satmaepp_s2_10b` | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) | single composite window | `pooled`, `grid` | strict 10-band order; grouped-channel token handling | [detail](models/satmaepp.md) |
-| `scalemae` | S2 RGB + scale | single composite window | `pooled`, `grid` | requires `sensor.scale_m` / `input_res_m` | [detail](models/scalemae_rgb.md) |
+| `scalemae` | S2 RGB + scale | single composite window | `pooled`, `grid` | requires `sensor.scale_m` / `input_res_m` | [detail](models/scalemae.md) |
 | `wildsat` | S2 RGB | single composite window | `pooled`, `grid` | normalization options | [detail](models/wildsat.md) |
-| `prithvi` | S2 6-band | single composite window | `pooled`, `grid` | required temporal + location side inputs | [detail](models/prithvi_eo_v2_s2_6b.md) |
-| `terrafm` | S2 12-band or S1 VV/VH | single composite window | `pooled`, `grid` | choose modality per call | [detail](models/terrafm_b.md) |
+| `prithvi` | S2 6-band | single composite window | `pooled`, `grid` | required temporal + location side inputs | [detail](models/prithvi.md) |
+| `terrafm` | S2 12-band or S1 VV/VH | single composite window | `pooled`, `grid` | choose modality per call | [detail](models/terrafm.md) |
 | `terramind` | S2 SR 12-band | single composite window | `pooled`, `grid` | strict normalization/channel semantics | [detail](models/terramind.md) |
 | `dofa` | Multispectral + wavelengths | single composite window | `pooled`, `grid` | wavelength vector required/inferred | [detail](models/dofa.md) |
 | `fomo` | S2 12-band | single composite window | `pooled`, `grid` | normalization mode choices | [detail](models/fomo.md) |
-| `thor` | S2 SR 10-band | single composite window | `pooled`, `grid` | strict stats-based normalization | [detail](models/thor_1_0_base.md) |
-| `satvision` | TOA 14-channel | single composite window | `pooled`, `grid` | strict channel order + calibration | [detail](models/satvision_toa.md) |
+| `thor` | S2 SR 10-band | single composite window | `pooled`, `grid` | strict stats-based normalization | [detail](models/thor.md) |
+| `satvision` | TOA 14-channel | single composite window | `pooled`, `grid` | strict channel order + calibration | [detail](models/satvision.md) |
 | `anysat` | S2 10-band time series | multi-frame | `pooled`, `grid` | frame dates (`s2_dates`) side input | [detail](models/anysat.md) |
 | `galileo` | S2 10-band time series | multi-frame | `pooled`, `grid` | month tokens + grouped tensors | [detail](models/galileo.md) |
 | `agrifm` | S2 10-band time series | multi-frame | `pooled`, `grid` | fixed `T` frame stack behavior | [detail](models/agrifm.md) |
@@ -103,7 +80,7 @@ Read the details in [Supported Models (Advanced Reference)](models_reference.md)
 
 ---
 
-## Per-model Detail Pages (Template-first)
+## Adding Model Pages
 
 This repo now includes a reusable template page for documenting each model consistently:
 

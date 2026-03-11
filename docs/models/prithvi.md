@@ -1,4 +1,4 @@
-# Prithvi-EO v2 (`prithvi_eo_v2_s2_6b`)
+# Prithvi-EO v2 (`prithvi`)
 
 > TerraTorch-backed Prithvi adapter for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `prithvi_eo_v2_s2_6b` |
+| Model ID | `prithvi` |
+| Aliases | `prithvi_eo_v2_s2_6b` |
 | Family / Backbone | Prithvi-EO v2 via TerraTorch `BACKBONE_REGISTRY` |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee` via public API) |
@@ -113,7 +114,7 @@ Default `SensorSpec` if omitted:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "prithvi_eo_v2_s2_6b",
+    "prithvi",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),

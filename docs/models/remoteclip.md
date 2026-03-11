@@ -1,4 +1,4 @@
-# RemoteCLIP (`remoteclip_s2rgb`)
+# RemoteCLIP (`remoteclip`)
 
 > Sentinel-2 RGB on-the-fly embedding via `rshf.remoteclip.RemoteCLIP`, with pooled vector or ViT token-grid outputs.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `remoteclip_s2rgb` |
+| Model ID | `remoteclip` |
+| Aliases | `remoteclip_s2rgb` |
 | Family / Backbone | RemoteCLIP (CLIP-style ViT via `rshf.remoteclip.RemoteCLIP`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (public API usually `backend="gee"`) |
@@ -113,7 +114,7 @@ Checkpoint override (not env-based in this adapter):
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "remoteclip_s2rgb",
+    "remoteclip",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
@@ -127,7 +128,7 @@ emb = get_embedding(
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec, SensorSpec
 
 emb = get_embedding(
-    "remoteclip_s2rgb",
+    "remoteclip",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     sensor=SensorSpec(

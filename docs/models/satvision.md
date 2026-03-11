@@ -1,4 +1,4 @@
-# SatVision-TOA (`satvision_toa`)
+# SatVision-TOA (`satvision`)
 
 > Provider-backed SatVision-TOA adapter for 14-channel TOA inputs (default MODIS band order), with channel-aware reflectance/emissive normalization and token/grid outputs.
 
@@ -6,7 +6,8 @@
 
 | Field | Value |
 |---|---|
-| Model ID | `satvision_toa` |
+| Model ID | `satvision` |
+| Aliases | `satvision_toa` |
 | Family / Backbone | SatVision-TOA checkpoint (HF/local checkpoint loader) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
@@ -145,7 +146,7 @@ Important:
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
 
 emb = get_embedding(
-    "satvision_toa",
+    "satvision",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=5000),
     temporal=TemporalSpec.range("2022-07-01", "2022-07-31"),
     output=OutputSpec.pooled(),
@@ -167,7 +168,7 @@ emb = get_embedding(
 
 ## Common Failure Modes / Debugging
 
-- backend is not provider-compatible (`satvision_toa` is provider-only)
+- backend is not provider-compatible (`satvision` is provider-only)
 - `sensor.bands` count does not match `RS_EMBED_SATVISION_TOA_IN_CHANS`
 - calibration list lengths mismatch (`EMISSIVE_IDXS` vs `EMISSIVE_MINS/MAXS`)
 - wrong channel order for the chosen checkpoint (results look unstable even if shapes pass)
@@ -199,4 +200,3 @@ Keep fixed and record:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_satvision_toa.py`
 - Token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
-
