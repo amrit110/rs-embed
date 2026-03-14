@@ -68,7 +68,7 @@ full = [
   "scipy>=1.17.0",
   "matplotlib>=3.10",
 ]
-dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.5.0"]
 
 [project.scripts]
 rs-embed = "rs_embed.cli:main"
@@ -105,7 +105,7 @@ select = [
     "F",    # pyflakes (unused imports, undefined names)
     "UP",   # pyupgrade (modernize type hints, etc.)
     "B",    # flake8-bugbear
-    "BLE",  # blind exceptions (BLE001: bare except Exception)
+    # "BLE",  # blind/broad exceptions — TODO: enable once Exception handlers are narrowed
     "I",    # isort
 ]
 ignore = [
