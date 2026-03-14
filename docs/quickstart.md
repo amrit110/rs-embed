@@ -159,7 +159,13 @@ Use `modality` only on models that document supported modality values in their m
 - manifests for downstream bookkeeping
 
 ```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
+from rs_embed import (
+    export_batch,
+    ExportConfig,
+    ExportTarget,
+    PointBuffer,
+    TemporalSpec,
+)
 
 spatials = [
     PointBuffer(121.5, 31.2, 2048),
@@ -168,24 +174,24 @@ spatials = [
 
 export_batch(
     spatials=spatials,
-    names=["p1", "p2"],
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     models=["remoteclip", "prithvi"],
-    out="exports",
-    layout="per_item",
+    target=ExportTarget.per_item("exports", names=["p1", "p2"]),
     backend="gee",
     device="auto",
-    save_inputs=True,
-    save_embeddings=True,
-    chunk_size=32,
-    num_workers=8,
-    resume=True,
-    show_progress=True,
+    config=ExportConfig(
+        save_inputs=True,
+        save_embeddings=True,
+        chunk_size=32,
+        num_workers=8,
+        resume=True,
+        show_progress=True,
+    ),
 )
 ```
 
-`out + layout` is the recommended output-target style for new code.
-Legacy `out_dir` / `out_path` arguments remain supported for backward compatibility.
+`target=ExportTarget(...)` plus `config=ExportConfig(...)` is the recommended export style for new code.
+Legacy `out + layout` and `out_dir` / `out_path` arguments remain supported for backward compatibility.
 
 ## Working with Providers / Backends
 
@@ -208,7 +214,8 @@ If the behavior of a model input looks wrong, inspect the raw patch first:
 
 ## Export Formats
 
-`export_batch(format=...)` is designed to be extensible.
+`export_batch(config=ExportConfig(format=...))` is the recommended way to choose export format in new code.
+Legacy `export_batch(format=...)` remains supported.
 
 - Current formats: `npz`, `netcdf`
 - Planned: parquet / zarr / hdf5 (depending on your roadmap)
@@ -216,14 +223,13 @@ If the behavior of a model input looks wrong, inspect the raw patch first:
 For a single ROI `.npz`, you can still use `export_batch(...)` directly:
 
 ```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
+from rs_embed import export_batch, ExportTarget, PointBuffer, TemporalSpec
 
 export_batch(
     spatials=[PointBuffer(121.5, 31.2, 2048)],
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     models=["remoteclip"],
-    out="exports/one_point",
-    layout="combined",  # writes exports/one_point.npz
+    target=ExportTarget.combined("exports/one_point"),  # writes exports/one_point.npz
 )
 ```
 

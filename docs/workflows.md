@@ -86,10 +86,11 @@ Choose this when:
 ## Dataset Export (Recommended)
 
 Use `export_batch(...)` for reproducible data pipelines and downstream experiments.
-For new code, prefer the `out + layout` target style so the same API pattern works for single-ROI and multi-ROI exports.
+For new code, prefer `target=ExportTarget(...)` plus `config=ExportConfig(...)`
+so the same API pattern works for simple and advanced exports without growing the top-level signature.
 
 ```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
+from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
 
 spatials = [
     PointBuffer(121.5, 31.2, 2048),
@@ -98,22 +99,19 @@ spatials = [
 
 export_batch(
     spatials=spatials,
-    names=["p1", "p2"],  # (1)!
-    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),  # (2)!
-    models=["remoteclip", "prithvi"],  # (3)!
-    out="exports",  # (4)!
-    layout="per_item",  # (5)!
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=["remoteclip", "prithvi"],
+    target=ExportTarget.per_item("exports", names=["p1", "p2"]),
     backend="gee",
-    save_inputs=True,
-    save_embeddings=True,
-    resume=True,
+    config=ExportConfig(save_inputs=True, save_embeddings=True, resume=True),
 )
 ```
-1. Stable ROI names make exports/manifests easier to track.
-2. Apply one temporal policy consistently across all items for fair comparisons.
-3. Mix multiple models in one export job when building benchmark datasets.
-4. Root output directory for manifests, inputs, and embeddings.
-5. `per_item` keeps each ROI grouped together; useful for inspection and resume.
+
+- Stable ROI names make exports/manifests easier to track.
+- Apply one temporal policy consistently across all items for fair comparisons.
+- Mix multiple models in one export job when building benchmark datasets.
+- `per_item` keeps each ROI grouped together; useful for inspection and resume.
+- Move runtime knobs into `ExportConfig(...)` instead of adding more top-level keywords.
 
 Choose this when:
 

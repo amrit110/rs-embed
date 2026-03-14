@@ -11,6 +11,7 @@ from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import PointBuffer, TemporalSpec, OutputSpec, SensorSpec
+from rs_embed.core.types import ExportConfig, ExportModelRequest, ExportTarget
 from rs_embed.embedders.base import EmbedderBase
 
 
@@ -604,6 +605,52 @@ def test_export_batch_decoupled_layout_combined(tmp_path):
     assert (tmp_path / "combined_out.npz").exists()
 
 
+def test_export_batch_object_style_target_and_config(tmp_path):
+    from rs_embed.api import export_batch
+
+    export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=["mock_model"],
+        target=ExportTarget.per_item(str(tmp_path), names=["sample"]),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+            show_progress=False,
+        ),
+        backend="local",
+    )
+    assert (tmp_path / "sample.npz").exists()
+
+
+def test_export_batch_rejects_mixing_target_and_legacy_output_args(tmp_path):
+    from rs_embed.api import export_batch
+
+    with pytest.raises(ModelError, match="target=ExportTarget"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget.combined(str(tmp_path / "combined")),
+            out_path=str(tmp_path / "legacy"),
+        )
+
+
+def test_export_batch_rejects_mixing_config_and_legacy_config_args(tmp_path):
+    from rs_embed.api import export_batch
+
+    with pytest.raises(ModelError, match="config=ExportConfig"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget.combined(str(tmp_path / "combined")),
+            config=ExportConfig(show_progress=False),
+            save_inputs=False,
+        )
+
+
 def test_public_list_models_uses_catalog_not_runtime_registry():
     from rs_embed import list_models
 
@@ -676,6 +723,47 @@ def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
     assert sensor is not None
     assert sensor.modality == "s1"
     assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
+
+
+def test_export_batch_export_model_request_applies_per_model_overrides(
+    monkeypatch, tmp_path
+):
+    from rs_embed.api import export_batch
+
+    registry.register("mock_multi")(_MockMultimodalEmbedder)
+    captured = {}
+
+    def _fake_run(self):
+        captured["sensor"] = self.models[0].sensor
+        return {"status": "ok"}
+
+    monkeypatch.setattr("rs_embed.pipelines.exporter.BatchExporter.run", _fake_run)
+
+    result = export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=[
+            ExportModelRequest(
+                "mock_multi",
+                modality="s1",
+                sensor=SensorSpec(
+                    collection="COPERNICUS/S1_GRD_FLOAT",
+                    bands=("VV", "VH"),
+                    scale_m=20,
+                ),
+            )
+        ],
+        target=ExportTarget.combined(str(tmp_path / "combined")),
+        backend="gee",
+        config=ExportConfig(show_progress=False),
+    )
+
+    assert result == {"status": "ok"}
+    sensor = captured["sensor"]
+    assert sensor is not None
+    assert sensor.modality == "s1"
+    assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
+    assert sensor.scale_m == 20
 
 
 # ══════════════════════════════════════════════════════════════════════

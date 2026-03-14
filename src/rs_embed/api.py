@@ -26,23 +26,18 @@ Flow summary
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional
 
 from .tools.normalization import (
+    _resolve_embedding_api_backend,  # noqa: F401
     normalize_backend_name as _normalize_backend_name,
     normalize_device_name as _normalize_device_name,
     normalize_model_name as _normalize_model_name,
     # Re-exported so `from rs_embed.api import ...` in tests/downstream still works.
     _default_provider_backend_for_api,  # noqa: F401
     _probe_model_describe,  # noqa: F401
-    _resolve_embedding_api_backend,
-)
-from .tools.checkpoint_utils import (
-    is_incomplete_combined_manifest as _is_incomplete_combined_manifest,
 )
 from .tools.runtime import (
-    _EmbeddingRequestContext,
     _prepare_embedding_request_context,
     provider_factory_for_backend,
     run_embedding_request as _run_embedding_request_shared,
@@ -50,18 +45,21 @@ from .tools.runtime import (
 from .core.validation import (
     assert_supported as _assert_supported,
     validate_specs as _validate_specs,
-)
-from .tools.manifest import (
-    combined_resume_manifest as _combined_resume_manifest,
-    load_json_dict as _load_json_dict,
+    validate_spatial_list as _validate_spatial_list,
 )
 from .tools.model_defaults import (
     resolve_sensor_for_model as _resolve_sensor_for_model,
 )
 from .tools.progress import create_progress as _create_progress
+from .tools.export_requests import (
+    maybe_return_completed_combined_resume as _maybe_return_completed_combined_resume,
+    normalize_export_config as _normalize_export_config,
+    normalize_export_format as _normalize_export_format,
+    normalize_export_target as _normalize_export_target,
+    resolve_export_model_configs as _resolve_export_model_configs,
+)
 from .core.embedding import Embedding
 from .core.errors import ModelError
-from .core.registry import get_embedder_cls
 from .core.specs import (
     InputPrepSpec,
     OutputSpec,
@@ -69,101 +67,12 @@ from .core.specs import (
     SpatialSpec,
     TemporalSpec,
 )
-from .core.types import ExportConfig, ExportLayout, ExportTarget, ModelConfig
+from .core.types import (
+    ExportConfig,
+    ExportModelRequest,
+    ExportTarget,
+)
 from .embedders.catalog import MODEL_ALIASES, MODEL_SPECS
-
-
-# ---------------------------------------------------------------------------
-# Internal: export target resolution
-# ---------------------------------------------------------------------------
-
-
-def _normalize_export_layout(layout: str) -> ExportLayout:
-    layout_n = str(layout).strip().lower().replace("-", "_")
-    if layout_n in {"combined", "single_file", "file"}:
-        return ExportLayout.COMBINED
-    if layout_n in {"per_item", "dir", "directory"}:
-        return ExportLayout.PER_ITEM
-    raise ModelError(
-        f"Unsupported export layout: {layout!r}. Supported: 'combined', 'per_item'."
-    )
-
-
-def _resolve_export_batch_target(
-    *,
-    n_spatials: int,
-    ext: str,
-    out: Optional[str],
-    layout: Optional[str],
-    out_dir: Optional[str],
-    out_path: Optional[str],
-    names: Optional[List[str]],
-) -> ExportTarget:
-    if (out is not None) or (layout is not None):
-        if out is None or layout is None:
-            raise ModelError(
-                "Provide both out and layout when using the decoupled output API."
-            )
-        if out_dir is not None or out_path is not None:
-            raise ModelError("Use either out+layout or out_dir/out_path, not both.")
-        layout_enum = _normalize_export_layout(layout)
-        if layout_enum == ExportLayout.COMBINED:
-            out_path = out
-        else:
-            out_dir = out
-
-    if out_dir is None and out_path is None:
-        raise ModelError("export_batch requires out_dir or out_path.")
-    if out_dir is not None and out_path is not None:
-        raise ModelError("Provide only one of out_dir or out_path.")
-
-    if out_path is not None:
-        out_file = out_path if out_path.endswith(ext) else (out_path + ext)
-        return ExportTarget(layout=ExportLayout.COMBINED, out_file=out_file)
-
-    assert out_dir is not None
-    point_names = (
-        names if names is not None else [f"p{i:05d}" for i in range(n_spatials)]
-    )
-    if len(point_names) != n_spatials:
-        raise ModelError("names must have the same length as spatials.")
-    return ExportTarget(
-        layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names
-    )
-
-
-# ---------------------------------------------------------------------------
-# Internal: embedding request helpers (for get_embedding / get_embeddings_batch)
-# ---------------------------------------------------------------------------
-
-
-def _validate_spatials(
-    *,
-    spatials: List[SpatialSpec],
-    temporal: Optional[TemporalSpec],
-    output: OutputSpec,
-) -> None:
-    if not isinstance(spatials, list) or len(spatials) == 0:
-        raise ModelError("spatials must be a non-empty List[SpatialSpec].")
-    for spatial in spatials:
-        _validate_specs(spatial=spatial, temporal=temporal, output=output)
-
-
-def _run_embedding_request(
-    *,
-    spatials: List[SpatialSpec],
-    temporal: Optional[TemporalSpec],
-    sensor: Optional[SensorSpec],
-    output: OutputSpec,
-    ctx: _EmbeddingRequestContext,
-) -> List[Embedding]:
-    return _run_embedding_request_shared(
-        spatials=spatials,
-        temporal=temporal,
-        sensor=sensor,
-        output=output,
-        ctx=ctx,
-    )
 
 
 # -----------------------------------------------------------------------------
@@ -226,12 +135,6 @@ def get_embedding(
     input_prep : InputPrepSpec or str or None
         Optional API-side input preprocessing policy.
 
-    Note on Batching
-    ----------------
-    ``chunk_size`` controls how many spatial points are held in memory/I/O
-    buffers at once. ``infer_batch_size`` controls how many inputs are sent
-    into model inference at once. They are independent controls.
-
     Returns
     -------
     Embedding
@@ -250,7 +153,7 @@ def get_embedding(
     This function reuses a cached embedder instance when possible to avoid
     repeatedly loading model weights / initializing providers.
     """
-    _validate_spatials(spatials=[spatial], temporal=temporal, output=output)
+    _validate_specs(spatial=spatial, temporal=temporal, output=output)
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
         sensor=sensor,
@@ -266,7 +169,7 @@ def get_embedding(
         device=device,
         input_prep=input_prep,
     )
-    return _run_embedding_request(
+    return _run_embedding_request_shared(
         spatials=[spatial],
         temporal=temporal,
         sensor=sensor_eff,
@@ -324,7 +227,7 @@ def get_embeddings_batch(
     SpecError
         If spatial or temporal specifications fail validation.
     """
-    _validate_spatials(spatials=spatials, temporal=temporal, output=output)
+    _validate_spatial_list(spatials=spatials, temporal=temporal, output=output)
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
         sensor=sensor,
@@ -340,7 +243,7 @@ def get_embeddings_batch(
         device=device,
         input_prep=input_prep,
     )
-    return _run_embedding_request(
+    return _run_embedding_request_shared(
         spatials=spatials,
         temporal=temporal,
         sensor=sensor_eff,
@@ -358,7 +261,9 @@ def export_batch(
     *,
     spatials: List[SpatialSpec],
     temporal: Optional[TemporalSpec],
-    models: List[str],
+    models: List[str | ExportModelRequest],
+    target: Optional[ExportTarget] = None,
+    config: Optional[ExportConfig] = None,
     out: Optional[str] = None,
     layout: Optional[str] = None,
     out_dir: Optional[str] = None,
@@ -399,10 +304,14 @@ def export_batch(
         Spatial requests to export.
     temporal : TemporalSpec or None
         Optional temporal filter applied to all spatial requests.
-    models : list[str]
-        Model identifiers to run.
+    models : list[str | ExportModelRequest]
+        Model identifiers or per-model request objects.
+    target : ExportTarget or None
+        Preferred output target object for new code.
+    config : ExportConfig or None
+        Preferred export runtime configuration object for new code.
     out : str or None
-        Convenience output path hint. Combined layout when file-like, per-item
+        Legacy output path hint. Combined layout when file-like, per-item
         layout when directory-like.
     layout : str or None
         Explicit layout override (``"combined"`` or ``"per_item"``).
@@ -411,7 +320,7 @@ def export_batch(
     out_path : str or None
         File path for combined exports.
     names : list[str] or None
-        Optional names aligned with ``spatials`` for per-item outputs.
+        Legacy names aligned with ``spatials`` for per-item outputs.
     backend : str
         Backend/provider selector.
     device : str
@@ -427,40 +336,11 @@ def export_batch(
         Per-model sensor overrides keyed by model name.
     per_model_modalities : dict[str, str] or None
         Optional per-model modality overrides keyed by model name.
-    format : str
-        Output serialization format.
-    save_inputs : bool
-        Whether to persist fetched/model input arrays.
-    save_embeddings : bool
-        Whether to persist embeddings.
-    save_manifest : bool
-        Whether to write export manifest metadata.
-    fail_on_bad_input : bool
-        If ``True``, treat invalid inputs as hard failures.
-    chunk_size : int
-        Number of spatial points processed per chunk for memory/I/O scheduling.
-        This controls how much data is held in prefetch and writer buffers.
-    infer_batch_size : int or None
-        Optional explicit model inference micro-batch size used for model calls.
-        This controls compute batching and is independent from ``chunk_size``.
-    num_workers : int
-        Number of preprocessing/inference workers.
-    continue_on_error : bool
-        If ``True``, continue processing after per-item failures.
-    max_retries : int
-        Retry count for retryable operations.
-    retry_backoff_s : float
-        Backoff delay in seconds between retries.
-    async_write : bool
-        If ``True``, enable asynchronous output writing.
-    writer_workers : int
-        Number of writer workers when ``async_write`` is enabled.
-    resume : bool
-        If ``True``, attempt to resume from prior export state.
-    show_progress : bool
-        Whether to display progress bars.
-    input_prep : InputPrepSpec or str or None
-        Optional API-side input preprocessing policy.
+    format / save_* / fail_on_bad_input / chunk_size / infer_batch_size /
+    num_workers / continue_on_error / max_retries / retry_backoff_s /
+    async_write / writer_workers / resume / show_progress / input_prep
+        Legacy config-style keyword arguments. New code should prefer
+        ``config=ExportConfig(...)``.
 
     Returns
     -------
@@ -479,98 +359,13 @@ def export_batch(
 
     if not isinstance(spatials, list) or len(spatials) == 0:
         raise ModelError("spatials must be a non-empty List[SpatialSpec].")
-    if not isinstance(models, list) or len(models) == 0:
-        raise ModelError("models must be a non-empty List[str].")
 
     backend_n = _normalize_backend_name(backend)
     device_n = _normalize_device_name(device)
-    fmt = format.lower().strip()
 
-    from .writers import SUPPORTED_FORMATS, get_extension
-
-    if fmt not in SUPPORTED_FORMATS:
-        raise ModelError(
-            f"Unsupported export format: {format!r}. Supported: {SUPPORTED_FORMATS}."
-        )
-    ext = get_extension(fmt)
-
-    target = _resolve_export_batch_target(
-        n_spatials=len(spatials),
-        ext=ext,
-        out=out,
-        layout=layout,
-        out_dir=out_dir,
-        out_path=out_path,
-        names=names,
-    )
-
-    _validate_spatials(spatials=spatials, temporal=temporal, output=output)
-
-    # Early resume check for combined layout
-    if target.layout == ExportLayout.COMBINED and bool(resume) and target.out_file:
-        if os.path.exists(target.out_file):
-            json_path = os.path.splitext(target.out_file)[0] + ".json"
-            resume_manifest = _load_json_dict(json_path)
-            if not _is_incomplete_combined_manifest(resume_manifest):
-                return _combined_resume_manifest(
-                    spatials=spatials,
-                    temporal=temporal,
-                    output=output,
-                    backend=backend_n,
-                    device=device_n,
-                    out_file=target.out_file,
-                )
-
-    per_model_sensors = per_model_sensors or {}
-    per_model_modalities = per_model_modalities or {}
-
-    # Resolve per-model config
-    model_configs: List[ModelConfig] = []
-    resolved_backend: Dict[str, str] = {}
-    for m in models:
-        m_n = _normalize_model_name(m)
-        eff_backend = _resolve_embedding_api_backend(m_n, backend_n)
-        resolved_backend[m] = eff_backend
-        cls = get_embedder_cls(m_n)
-        try:
-            emb_check = cls()
-            _assert_supported(
-                emb_check, backend=eff_backend, output=output, temporal=temporal
-            )
-            desc = emb_check.describe() or {}
-        except ModelError:
-            raise
-        except Exception:
-            desc = {}
-        m_type = str(desc.get("type", "")).lower()
-        modality_eff = per_model_modalities.get(m, modality)
-        if m in per_model_sensors:
-            s = _resolve_sensor_for_model(
-                m_n,
-                sensor=per_model_sensors[m],
-                modality=modality_eff,
-                default_when_missing=True,
-            )
-        elif sensor is not None:
-            s = _resolve_sensor_for_model(
-                m_n,
-                sensor=sensor,
-                modality=modality_eff,
-                default_when_missing=True,
-            )
-        else:
-            s = _resolve_sensor_for_model(
-                m_n,
-                sensor=None,
-                modality=modality_eff,
-                default_when_missing=True,
-            )
-        model_configs.append(
-            ModelConfig(name=m, backend=eff_backend, sensor=s, model_type=m_type)
-        )
-
-    config = ExportConfig(
-        format=fmt,
+    export_config = _normalize_export_config(
+        config=config,
+        format=format,
         save_inputs=save_inputs,
         save_embeddings=save_embeddings,
         save_manifest=save_manifest,
@@ -587,14 +382,51 @@ def export_batch(
         show_progress=show_progress,
         input_prep=input_prep,
     )
+    _fmt, ext = _normalize_export_format(export_config.format)
+
+    export_target = _normalize_export_target(
+        n_spatials=len(spatials),
+        ext=ext,
+        target=target,
+        out=out,
+        layout=layout,
+        out_dir=out_dir,
+        out_path=out_path,
+        names=names,
+    )
+
+    _validate_spatial_list(spatials=spatials, temporal=temporal, output=output)
+
+    resume_manifest = _maybe_return_completed_combined_resume(
+        target=export_target,
+        config=export_config,
+        spatials=spatials,
+        temporal=temporal,
+        output=output,
+        backend=backend_n,
+        device=device_n,
+    )
+    if resume_manifest is not None:
+        return resume_manifest
+
+    model_configs, resolved_backend = _resolve_export_model_configs(
+        models=models,
+        backend_n=backend_n,
+        temporal=temporal,
+        output=output,
+        sensor=sensor,
+        modality=modality,
+        per_model_sensors=per_model_sensors,
+        per_model_modalities=per_model_modalities,
+    )
 
     exporter = BatchExporter(
         spatials=spatials,
         temporal=temporal,
         models=model_configs,
-        target=target,
+        target=export_target,
         output=output,
-        config=config,
+        config=export_config,
         backend=backend_n,
         resolved_backend=resolved_backend,
         device=device_n,

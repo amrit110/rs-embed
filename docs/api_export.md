@@ -17,11 +17,13 @@ export_batch(
     *,
     spatials: List[SpatialSpec],
     temporal: Optional[TemporalSpec],
-    models: List[str],
-    out: Optional[str] = None,
-    layout: Optional[str] = None,
+    models: List[str | ExportModelRequest],
+    target: Optional[ExportTarget] = None,
+    config: Optional[ExportConfig] = None,
     out_dir: Optional[str] = None,
     out_path: Optional[str] = None,
+    out: Optional[str] = None,
+    layout: Optional[str] = None,
     names: Optional[List[str]] = None,
     backend: str = "auto",
     device: str = "auto",
@@ -51,25 +53,33 @@ export_batch(
 
 **Recommended export entry point**: export `inputs + embeddings + manifest` for **single or multiple ROIs × one or multiple models** in one go.
 
-For new code, prefer learning `export_batch(...)` first and use `out + layout` to choose output organization.
-`out_dir` / `out_path` remain supported as backward-compatible aliases for the same two layouts.
+For new code, prefer the object-style export request:
 
-- Decoupled output target API: `out + layout` (recommended for new code)
-- `out_dir` mode: one file per point (legacy-compatible parameter style; good for massive numbers of points)
-- `out_path` mode: merge into a single output file (legacy-compatible parameter style; good for fewer points and portability)
+- `target=ExportTarget(...)`: choose output layout/location
+- `config=ExportConfig(...)`: choose runtime and write behavior
+- `models=[..., ExportModelRequest(...)]`: add per-model overrides only when needed
+
+Legacy `out + layout`, `out_dir` / `out_path`, and the many config-like keyword arguments remain supported for backward compatibility.
 
 **Parameters**
 
 - `spatials`: non-empty list
 - `temporal`: can be `None` (some models don’t require time)
-- `models`: non-empty list of model IDs
-- `out` + `layout` / `out_dir` / `out_path`: output target selection. For new code, provide both `out` and `layout` (`"per_item"` or `"combined"`). For legacy-compatible usage, choose exactly one of `out_dir` or `out_path`. Do not mix `out + layout` with `out_dir` / `out_path`.
-- `names`: used only in `out_dir` mode, for output filenames (length must equal `spatials`)
+- `models`: non-empty list of model IDs or `ExportModelRequest(...)` objects
+- `target`: preferred output target object for new code. Use `ExportTarget.per_item(...)` or `ExportTarget.combined(...)`
+- `config`: preferred runtime config object for new code. Use `ExportConfig(...)`
 - `backend`: recommended to pass `backend="auto"` unless you need an explicit provider override (for example `"gee"`)
 - `sensor`: a shared `SensorSpec` for all models (if models are on-the-fly)
 - `modality`: optional shared modality override for models that expose public modality switching
-- `per_model_sensors`: override `SensorSpec` per model; keys are model strings
-- `per_model_modalities`: override `modality` per model; keys are model strings
+- `per_model_sensors` / `per_model_modalities`: legacy per-model overrides keyed by model string
+
+`ExportTarget(...)`
+
+- `ExportTarget.per_item("exports", names=[...])`: one file per ROI
+- `ExportTarget.combined("exports/run")`: one merged output file
+
+`ExportConfig(...)`
+
 - `format`: `"npz"` or `"netcdf"`
 - `save_inputs`: whether to save model input patches (CHW numpy)
 - `save_embeddings`: whether to save embedding arrays
@@ -81,57 +91,90 @@ For new code, prefer learning `export_batch(...)` first and use `out + layout` t
 - `continue_on_error`: keep exporting remaining points/models even if one item fails
 - `max_retries`: retry count for provider fetch/write operations
 - `retry_backoff_s`: sleep seconds between retries
-- `async_write`: write output files asynchronously in `out_dir` mode
+- `async_write`: write output files asynchronously in per-item mode
 - `writer_workers`: writer thread count when `async_write=True`
 - `resume`: skip already-exported outputs and continue from remaining items
 - `show_progress`: show progress during batch export (overall progress + per-model inference progress)
 - `input_prep`: large-ROI input policy (`"resize"` default, `"tile"`, `"auto"`, or `InputPrepSpec(...)`)
 
+`ExportModelRequest(...)`
+
+- `ExportModelRequest("remoteclip")`: plain model entry
+- `ExportModelRequest("terrafm", modality="s1", sensor=s1_sensor)`: per-model overrides without global dicts
+
 Modality contract:
 
-- `export_batch(...)` accepts a global `modality` and optional `per_model_modalities`.
+- `export_batch(...)` accepts a global `modality` and optional per-model overrides via `ExportModelRequest(...)` or legacy `per_model_modalities`.
 - Only models that explicitly expose a given modality can use it.
 - Unsupported modality selections raise a `ModelError` during per-model config resolution.
 
 **Automatic inference behavior**
 
-- In **per-item output mode** (`out_dir` / `layout="per_item"`), `device="cpu"` (or auto-resolved CPU) defaults to per-item inference.
-- In **per-item output mode** (`out_dir` / `layout="per_item"`), `device="cuda"` / `mps` / other accelerators (or auto-resolved GPU) prefers batched inference when the embedder implements batch APIs.
-- In **combined output mode** (`out_path` / `layout="combined"`), rs-embed keeps the historical behavior of attempting batched model APIs (with fallback to single-item inference if batched execution fails)
+- In **per-item output mode** (`target=ExportTarget.per_item(...)`, `out_dir`, or `layout="per_item"`), `device="cpu"` (or auto-resolved CPU) defaults to per-item inference.
+- In **per-item output mode** (`target=ExportTarget.per_item(...)`, `out_dir`, or `layout="per_item"`), `device="cuda"` / `mps` / other accelerators (or auto-resolved GPU) prefers batched inference when the embedder implements batch APIs.
+- In **combined output mode** (`target=ExportTarget.combined(...)`, `out_path`, or `layout="combined"`), rs-embed keeps the historical behavior of attempting batched model APIs (with fallback to single-item inference if batched execution fails)
 - Model-level scheduling remains serial (one model at a time)
 
 **Returns**
 
-- `layout="per_item"` / `out_dir` mode: `List[dict]` (manifest for each point)
-- `layout="combined"` / `out_path` mode: `dict` (combined manifest)
+- `target=ExportTarget.per_item(...)` / `layout="per_item"` / `out_dir` mode: `List[dict]` (manifest for each point)
+- `target=ExportTarget.combined(...)` / `layout="combined"` / `out_path` mode: `dict` (combined manifest)
 
-**Example: recommended (`out + layout`)**
+**Example: recommended object-style export**
 
 ```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
+from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
 
 export_batch(
     spatials=[PointBuffer(121.5, 31.2, 2048)],
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     models=["remoteclip"],
-    out="exports/combined_run",
-    layout="combined",  # writes exports/combined_run.npz
+    target=ExportTarget.combined("exports/combined_run"),
+    config=ExportConfig(save_inputs=True, resume=True),
 )
 ```
 
 **Example: per-model modality selection**
 
 ```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
+from rs_embed import (
+    export_batch,
+    ExportModelRequest,
+    ExportTarget,
+    PointBuffer,
+    TemporalSpec,
+)
 
 export_batch(
     spatials=[PointBuffer(121.5, 31.2, 2048)],
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    models=["terrafm"],
-    out="exports/terrafm_s1_run",
-    layout="combined",
+    models=[ExportModelRequest("terrafm", modality="s1")],
+    target=ExportTarget.combined("exports/terrafm_s1_run"),
     backend="gee",
-    modality="s1",
+)
+```
+
+**Example: recommended per-item export**
+
+```python
+from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
+
+spatials = [
+    PointBuffer(121.5, 31.2, 2048),
+    PointBuffer(120.5, 30.2, 2048),
+]
+export_batch(
+    spatials=spatials,
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=["remoteclip", "prithvi"],
+    target=ExportTarget.per_item("exports", names=["p1", "p2"]),
+    config=ExportConfig(
+        input_prep="tile",
+        save_inputs=True,
+        save_embeddings=True,
+        chunk_size=32,
+        num_workers=8,
+    ),
 )
 ```
 
@@ -225,4 +268,4 @@ Use `export_batch(...)` directly when you need:
 
 - multiple spatials
 - non-`npz` formats (for example `netcdf`)
-- output layout control (`out + layout` / `out_dir` / `out_path`)
+- output layout control (`target=ExportTarget(...)` / `out + layout` / `out_dir` / `out_path`)

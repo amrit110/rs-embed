@@ -290,6 +290,34 @@ Current tiled design (API layer):
 
 ---
 
+### ExportTarget / ExportConfig / ExportModelRequest
+
+`export_batch(...)` now uses small public request objects so large export jobs do not need dozens of top-level keywords.
+
+```python
+ExportTarget.combined("exports/run")
+ExportTarget.per_item("exports/items", names=["p1", "p2"])
+
+ExportConfig(
+    save_inputs=True,
+    save_embeddings=True,
+    chunk_size=32,
+    num_workers=8,
+    resume=True,
+)
+
+ExportModelRequest("remoteclip")
+ExportModelRequest("terrafm", modality="s1", sensor=my_s1_sensor)
+```
+
+- `ExportTarget`: where outputs should be written
+- `ExportConfig`: how the export should run
+- `ExportModelRequest`: optional per-model overrides when one export job mixes different model-specific settings
+
+Legacy `out + layout`, `out_dir` / `out_path`, and per-model dict overrides are still accepted for backward compatibility.
+
+---
+
 ### Embedding
 
 `get_embedding` / `get_embeddings_batch` return an `Embedding`:

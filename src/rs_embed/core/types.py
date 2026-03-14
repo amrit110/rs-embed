@@ -7,7 +7,7 @@ the raw dicts and string constants scattered through the old functional code.
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -141,6 +141,30 @@ class ModelConfig:
         return "precomputed" in self.model_type.lower()
 
 
+# ── Public export request objects ──────────────────────────────────
+
+
+@dataclass(frozen=True)
+class ExportModelRequest:
+    """Public per-model export request.
+
+    This is the user-facing counterpart to ``ModelConfig``.
+
+    Attributes
+    ----------
+    name : str
+        Model identifier or alias.
+    sensor : SensorSpec or None
+        Optional per-model sensor override for provider-backed models.
+    modality : str or None
+        Optional per-model modality selector.
+    """
+
+    name: str
+    sensor: Optional[SensorSpec] = None
+    modality: Optional[str] = None
+
+
 # ── Export target ──────────────────────────────────────────────────
 
 
@@ -164,6 +188,18 @@ class ExportTarget:
     out_file: Optional[str] = None
     out_dir: Optional[str] = None
     names: Optional[List[str]] = None
+
+    @classmethod
+    def combined(cls, out_file: str) -> "ExportTarget":
+        """Build a combined-file export target."""
+        return cls(layout=ExportLayout.COMBINED, out_file=out_file)
+
+    @classmethod
+    def per_item(
+        cls, out_dir: str, *, names: Optional[List[str]] = None
+    ) -> "ExportTarget":
+        """Build a per-item export target."""
+        return cls(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=names)
 
 
 # ── Export configuration ───────────────────────────────────────────

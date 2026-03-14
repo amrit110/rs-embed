@@ -15,7 +15,13 @@ from .core.specs import (
     OutputSpec,
     InputPrepSpec,
 )
-from .core.types import ExportConfig, ExportLayout, ExportTarget, ModelConfig
+from .core.types import (
+    ExportConfig,
+    ExportLayout,
+    ExportModelRequest,
+    ExportTarget,
+    ModelConfig,
+)
 from .api import export_batch, get_embedding, get_embeddings_batch, list_models
 from .model import Model
 from .pipelines.exporter import BatchExporter
@@ -33,6 +39,7 @@ __all__ = [
     # Types
     "ExportConfig",
     "ExportLayout",
+    "ExportModelRequest",
     "ExportTarget",
     "ModelConfig",
     # Embedding API (class-based)

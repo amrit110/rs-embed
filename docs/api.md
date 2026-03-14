@@ -23,6 +23,8 @@ If you are looking for task-oriented usage first:
 from rs_embed import (
     # Specs
     BBox, PointBuffer, TemporalSpec, SensorSpec, OutputSpec, InputPrepSpec,
+    # Export request objects
+    ExportTarget, ExportConfig, ExportModelRequest,
     # Core APIs
     get_embedding, get_embeddings_batch, export_batch, export_npz, list_models,
     # Utilities
@@ -100,4 +102,4 @@ The current version is still early stage (`0.1.x`):
 
 - `BBox/PointBuffer` currently require `crs="EPSG:4326"`
 - Precomputed models should use `backend="auto"`; on-the-fly models mainly use provider backends (typically `"gee"` or explicit provider names)
-- `export_batch(format=...)` currently supports `"npz"` and `"netcdf"`; it may be extended to parquet/zarr/hdf5, etc.
+- `ExportConfig(format=...)` is the recommended way to choose export format; supported values are currently `"npz"` and `"netcdf"` and may be extended to parquet/zarr/hdf5, etc.

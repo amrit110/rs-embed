@@ -49,6 +49,8 @@ def _show_batch(tag: str, embeddings: Iterable) -> None:
 
 def run_auto_demo(*, run_export: bool, out_dir: Path) -> None:
     from rs_embed import (
+        ExportConfig,
+        ExportTarget,
         PointBuffer,
         TemporalSpec,
         OutputSpec,
@@ -96,25 +98,27 @@ def run_auto_demo(*, run_export: bool, out_dir: Path) -> None:
         auto_out = out_dir / "auto_export"
         auto_out.mkdir(parents=True, exist_ok=True)
         manifests = export_batch(
-            out=str(auto_out),
-            layout="per_item",
-            names=["p1", "p2"],
             spatials=spatials,
             temporal=temporal,
             models=["tessera"],
+            target=ExportTarget.per_item(str(auto_out), names=["p1", "p2"]),
             output=OutputSpec.pooled(),
             backend="auto",
-            save_inputs=False,
-            save_embeddings=True,
-            save_manifest=True,
-            resume=True,
-            show_progress=True,
+            config=ExportConfig(
+                save_inputs=False,
+                save_embeddings=True,
+                save_manifest=True,
+                resume=True,
+                show_progress=True,
+            ),
         )
         print(f"\n[export/auto] wrote {len(manifests)} items to: {auto_out}")
 
 
 def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
     from rs_embed import (
+        ExportConfig,
+        ExportTarget,
         PointBuffer,
         SensorSpec,
         TemporalSpec,
@@ -199,22 +203,22 @@ def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
         gee_out = out_dir / "gee_export"
         gee_out.mkdir(parents=True, exist_ok=True)
         manifests = export_batch(
-            out=str(gee_out),
-            layout="per_item",
-            names=["p1", "p2"],
             spatials=spatials,
             temporal=temporal,
             models=["remoteclip"],
+            target=ExportTarget.per_item(str(gee_out), names=["p1", "p2"]),
             output=OutputSpec.pooled(),
             backend="gee",
             device=device,
-            save_inputs=True,
-            save_embeddings=True,
-            save_manifest=True,
-            chunk_size=8,
-            num_workers=4,
-            resume=True,
-            show_progress=True,
+            config=ExportConfig(
+                save_inputs=True,
+                save_embeddings=True,
+                save_manifest=True,
+                chunk_size=8,
+                num_workers=4,
+                resume=True,
+                show_progress=True,
+            ),
         )
         print(f"\n[export/gee] wrote {len(manifests)} items to: {gee_out}")
 

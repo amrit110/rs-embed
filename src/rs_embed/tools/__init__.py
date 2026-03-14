@@ -11,6 +11,7 @@ Categories
 - **Serialization** (``serialization``) — JSON / NPZ saving and hashing.
 - **Temporal** (``temporal``) — date parsing and time-range helpers.
 - **Normalization** (``normalization``) — value scaling and string normalisation.
+- **Export Requests** (``export_requests``) — export API argument normalization and request assembly.
 - **Checkpoints** (``checkpoint_utils``) — resume-friendly progress tracking.
 - **Manifests** (``manifest``) — metadata bookkeeping for export runs.
 - **Output** (``output``) — path and directory helpers for saved artefacts.

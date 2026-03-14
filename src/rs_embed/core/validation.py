@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from .errors import ModelError
 from .specs import OutputSpec, SpatialSpec, TemporalSpec
@@ -48,6 +48,19 @@ def validate_specs(
         raise ModelError(
             f"Unknown grid orientation policy: {getattr(output, 'grid_orientation', None)}"
         )
+
+
+def validate_spatial_list(
+    *,
+    spatials: List[SpatialSpec],
+    temporal: Optional[TemporalSpec],
+    output: OutputSpec,
+) -> None:
+    """Validate a non-empty list of spatial specs against shared settings."""
+    if not isinstance(spatials, list) or len(spatials) == 0:
+        raise ModelError("spatials must be a non-empty List[SpatialSpec].")
+    for spatial in spatials:
+        validate_specs(spatial=spatial, temporal=temporal, output=output)
 
 
 def assert_supported(

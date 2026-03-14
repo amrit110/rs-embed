@@ -6,7 +6,7 @@ This module defines the immutable "Nouns" of the system:
 - **Specs**: Data contracts (``SpatialSpec``, ``SensorSpec``, ``OutputSpec``,
   ``TemporalSpec``, ``InputPrepSpec``).
 - **Types**: Return types (``Embedding``) and configuration hints
-  (``ExportConfig``, ``ModelConfig``).
+  (``ExportConfig``, ``ExportTarget``, ``ExportModelRequest``, ``ModelConfig``).
 - **Errors**: Custom exception hierarchy (``SpecError``, ``ProviderError``).
 
 Rules
