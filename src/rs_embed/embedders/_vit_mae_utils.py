@@ -86,14 +86,8 @@ def fetch_s2_rgb_u8_from_provider(
         fill_value=0.0,
         meta=None,
     )
-    if (
-        report is not None
-        and (not report.get("ok", True))
-        and checks_should_raise(sensor)
-    ):
-        raise ModelError(
-            "Provider input inspection failed: " + "; ".join(report.get("issues", []))
-        )
+    if report is not None and (not report.get("ok", True)) and checks_should_raise(sensor):
+        raise ModelError("Provider input inspection failed: " + "; ".join(report.get("issues", [])))
 
     rgb_u8 = _s2_rgb_u8_from_chw(s2_chw)
     return resize_rgb_u8(rgb_u8, out_size)
@@ -201,9 +195,7 @@ def rgb_u8_to_tensor_clipnorm(rgb_u8: np.ndarray, image_size: int):
 
     preprocess = transforms.Compose(
         [
-            transforms.Resize(
-                image_size, interpolation=transforms.InterpolationMode.BICUBIC
-            ),
+            transforms.Resize(image_size, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(

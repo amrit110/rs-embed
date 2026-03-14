@@ -12,7 +12,7 @@ def _probe_model_desc(model_id: str) -> dict:
     cls = get_embedder_cls(model_id)
     try:
         desc = cls().describe() or {}
-    except Exception:
+    except Exception as _e:
         desc = {}
     return desc if isinstance(desc, dict) else {}
 
@@ -101,7 +101,9 @@ def modality_profiles_for_model(model_id: str) -> Dict[str, SensorSpec]:
             collection = str(
                 s1.get(
                     "collection",
-                    "COPERNICUS/S1_GRD_FLOAT" if defaults.get("use_float_linear", True) else "COPERNICUS/S1_GRD",
+                    "COPERNICUS/S1_GRD_FLOAT"
+                    if defaults.get("use_float_linear", True)
+                    else "COPERNICUS/S1_GRD",
                 )
             )
             profiles["s1"] = _mk_sensor(
@@ -121,15 +123,11 @@ def supports_modality_for_model(model_id: str, modality: str) -> bool:
     if modality_n in profiles:
         return True
     desc = _probe_model_desc(model_id)
-    default_modality = _normalize_modality_name(
-        (desc.get("defaults") or {}).get("modality")
-    )
+    default_modality = _normalize_modality_name((desc.get("defaults") or {}).get("modality"))
     return modality_n == default_modality
 
 
-def default_sensor_for_model(
-    model_id: str, modality: Optional[str] = None
-) -> Optional[SensorSpec]:
+def default_sensor_for_model(model_id: str, modality: Optional[str] = None) -> Optional[SensorSpec]:
     desc = _probe_model_desc(model_id)
 
     typ = str(desc.get("type", "")).lower()
@@ -215,9 +213,7 @@ def resolve_sensor_for_model(
     if requested_modality is not None and not supports_modality_for_model(
         model_id, requested_modality
     ):
-        raise ModelError(
-            f"Model '{model_id}' does not expose modality={requested_modality!r}."
-        )
+        raise ModelError(f"Model '{model_id}' does not expose modality={requested_modality!r}.")
 
     if sensor is not None:
         if requested_modality is None or sensor.modality == requested_modality:

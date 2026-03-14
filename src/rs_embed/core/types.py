@@ -66,9 +66,7 @@ class TaskResult:
     error: Optional[str] = None
 
     @classmethod
-    def ok(
-        cls, embedding: np.ndarray, meta: Optional[Dict[str, Any]] = None
-    ) -> TaskResult:
+    def ok(cls, embedding: np.ndarray, meta: Optional[Dict[str, Any]] = None) -> TaskResult:
         """Create a successful task result.
 
         Parameters
@@ -195,9 +193,7 @@ class ExportTarget:
         return cls(layout=ExportLayout.COMBINED, out_file=out_file)
 
     @classmethod
-    def per_item(
-        cls, out_dir: str, *, names: Optional[List[str]] = None
-    ) -> "ExportTarget":
+    def per_item(cls, out_dir: str, *, names: Optional[List[str]] = None) -> "ExportTarget":
         """Build a per-item export target."""
         return cls(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=names)
 

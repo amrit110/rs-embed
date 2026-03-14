@@ -192,7 +192,7 @@ class Model:
         try:
             desc = self._embedder.describe()
             return desc if isinstance(desc, dict) else {}
-        except Exception:
+        except Exception as _e:
             return {}
 
     # ── static catalog ─────────────────────────────────────────────

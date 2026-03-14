@@ -62,7 +62,7 @@ def _download_url_to_path(url: str, dst_path: str) -> str:
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-        except Exception:
+        except Exception as _e:
             pass
     return dst_path
 
@@ -160,9 +160,7 @@ def _resolve_wildsat_ckpt_path() -> str:
         )
 
     min_bytes = int(
-        os.environ.get(
-            "RS_EMBED_WILDSAT_CKPT_MIN_BYTES", str(_WILDSAT_DEFAULT_MIN_BYTES)
-        )
+        os.environ.get("RS_EMBED_WILDSAT_CKPT_MIN_BYTES", str(_WILDSAT_DEFAULT_MIN_BYTES))
     )
     cache_dir = os.environ.get("RS_EMBED_WILDSAT_CACHE_DIR", _WILDSAT_DEFAULT_CACHE_DIR)
 
@@ -234,7 +232,7 @@ def _namespace_like_to_dict(x: Any) -> Dict[str, Any]:
         return dict(x)
     try:
         return dict(vars(x))
-    except Exception:
+    except Exception as _e:
         return {}
 
 
@@ -242,9 +240,7 @@ def _extract_satellite_state_dict(
     ckpt_obj: Any,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if not isinstance(ckpt_obj, dict):
-        raise ModelError(
-            f"WildSAT checkpoint must be a dict-like object, got {type(ckpt_obj)}"
-        )
+        raise ModelError(f"WildSAT checkpoint must be a dict-like object, got {type(ckpt_obj)}")
 
     opt_meta = _namespace_like_to_dict(ckpt_obj.get("opt"))
 
@@ -333,9 +329,7 @@ def _build_backbone(arch: str):
     raise ModelError(f"Unsupported WildSAT arch='{arch}'")
 
 
-def _build_branch_head_from_state_dict(
-    state_dict: Dict[str, Any], *, prefer_branch: int = 3
-):
+def _build_branch_head_from_state_dict(state_dict: Dict[str, Any], *, prefer_branch: int = 3):
     ensure_torch()
     import torch
     import torch.nn as nn
@@ -371,9 +365,7 @@ def _build_branch_head_from_state_dict(
         return None, {"image_head_available": False}
 
     branch = (
-        int(prefer_branch)
-        if int(prefer_branch) in branches
-        else int(sorted(branches.keys())[-1])
+        int(prefer_branch) if int(prefer_branch) in branches else int(sorted(branches.keys())[-1])
     )
     params_by_layer = branches[branch]
 
@@ -445,9 +437,7 @@ def _load_wildsat_cached(
 
     obj = torch.load(p, map_location="cpu", weights_only=False)
     sat_sd, opt_meta = _extract_satellite_state_dict(obj)
-    arch = _resolve_wildsat_arch(
-        arch_hint=arch_hint, opt_meta=opt_meta, state_dict=sat_sd
-    )
+    arch = _resolve_wildsat_arch(arch_hint=arch_hint, opt_meta=opt_meta, state_dict=sat_sd)
 
     backbone = _build_backbone(arch)
 
@@ -457,9 +447,7 @@ def _load_wildsat_cached(
         if k.startswith("backbone.") and hasattr(v, "shape")
     }
     if not backbone_sd:
-        raise ModelError(
-            "WildSAT checkpoint has no backbone parameters after normalization."
-        )
+        raise ModelError("WildSAT checkpoint has no backbone parameters after normalization.")
 
     msg = backbone.load_state_dict(backbone_sd, strict=False)
     loaded_count = len(backbone_sd)
@@ -475,12 +463,12 @@ def _load_wildsat_cached(
 
     try:
         backbone = backbone.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
     if image_head is not None:
         try:
             image_head = image_head.to(dev).eval()
-        except Exception:
+        except Exception as _e:
             pass
 
     p0 = None
@@ -489,9 +477,7 @@ def _load_wildsat_cached(
             p0 = p0cand.detach()
             break
     if p0 is None:
-        raise ModelError(
-            "WildSAT backbone has no parameters; cannot verify checkpoint load."
-        )
+        raise ModelError("WildSAT backbone has no parameters; cannot verify checkpoint load.")
     if not torch.isfinite(p0).all():
         raise ModelError(
             "WildSAT backbone parameters contain NaN/Inf; checkpoint load likely failed."
@@ -535,9 +521,7 @@ def _load_wildsat(
     return backbone, image_head, meta, dev
 
 
-def _raw_chw_to_rgb_u8(
-    raw_chw: np.ndarray, *, image_size: int, norm_mode: str
-) -> np.ndarray:
+def _raw_chw_to_rgb_u8(raw_chw: np.ndarray, *, image_size: int, norm_mode: str) -> np.ndarray:
     if raw_chw.ndim != 3 or int(raw_chw.shape[0]) != 3:
         raise ModelError(
             f"WildSAT expects input_chw as CHW with C=3, got {getattr(raw_chw, 'shape', None)}"
@@ -597,12 +581,12 @@ def _wildsat_forward(
 
     try:
         backbone = backbone.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
     if image_head is not None:
         try:
             image_head = image_head.to(dev).eval()
-        except Exception:
+        except Exception as _e:
             pass
 
     with torch.no_grad():
@@ -615,24 +599,20 @@ def _wildsat_forward(
             try:
                 toks = _torchvision_vit_tokens(backbone, x)
                 tok_np = toks[0].detach().float().cpu().numpy().astype(np.float32)
-            except Exception:
+            except Exception as _e:
                 tok_np = None
 
         out = backbone(x)
 
         if not hasattr(out, "ndim"):
-            raise ModelError(
-                f"WildSAT backbone returned unsupported output type: {type(out)}"
-            )
+            raise ModelError(f"WildSAT backbone returned unsupported output type: {type(out)}")
 
         if int(out.ndim) == 2:
             backbone_vec_t = out
         elif int(out.ndim) == 4:
             backbone_vec_t = out.mean(dim=(2, 3))
         else:
-            raise ModelError(
-                f"WildSAT backbone output has unsupported shape: {tuple(out.shape)}"
-            )
+            raise ModelError(f"WildSAT backbone output has unsupported shape: {tuple(out.shape)}")
 
         head_vec_t = None
         if image_head is not None:
@@ -640,7 +620,7 @@ def _wildsat_forward(
                 head_out = image_head(backbone_vec_t)
                 if hasattr(head_out, "ndim") and int(head_out.ndim) == 2:
                     head_vec_t = head_out
-            except Exception:
+            except Exception as _e:
                 head_vec_t = None
 
         fs = str(feature_source).lower().strip()
@@ -662,9 +642,7 @@ def _wildsat_forward(
                 final_vec_t = backbone_vec_t
                 used_source = "backbone"
         else:
-            raise ModelError(
-                "RS_EMBED_WILDSAT_FEATURE must be one of: auto, image_head, backbone"
-            )
+            raise ModelError("RS_EMBED_WILDSAT_FEATURE must be one of: auto, image_head, backbone")
 
         vec_np = final_vec_t[0].detach().float().cpu().numpy().astype(np.float32)
 
@@ -777,24 +755,16 @@ class WildSATEmbedder(EmbedderBase):
         ckpt_path = _resolve_wildsat_ckpt_path()
 
         arch_hint = os.environ.get("RS_EMBED_WILDSAT_ARCH", "auto").strip()
-        image_size = int(
-            os.environ.get("RS_EMBED_WILDSAT_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_WILDSAT_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         norm_mode = os.environ.get("RS_EMBED_WILDSAT_NORM", "minmax").strip()
-        feature_source = os.environ.get(
-            "RS_EMBED_WILDSAT_FEATURE", "image_head"
-        ).strip()
+        feature_source = os.environ.get("RS_EMBED_WILDSAT_FEATURE", "image_head").strip()
         prefer_branch = int(os.environ.get("RS_EMBED_WILDSAT_IMAGE_BRANCH", "3"))
-        pooled_from_tokens = os.environ.get(
-            "RS_EMBED_WILDSAT_POOLED_FROM_TOKENS", "0"
-        ).strip() in {
+        pooled_from_tokens = os.environ.get("RS_EMBED_WILDSAT_POOLED_FROM_TOKENS", "0").strip() in {
             "1",
             "true",
             "True",
         }
-        grid_from_tokens = os.environ.get(
-            "RS_EMBED_WILDSAT_GRID_FROM_TOKENS", "1"
-        ).strip() not in {
+        grid_from_tokens = os.environ.get("RS_EMBED_WILDSAT_GRID_FROM_TOKENS", "1").strip() not in {
             "0",
             "false",
             "False",
@@ -816,9 +786,9 @@ class WildSATEmbedder(EmbedderBase):
                 raise ModelError(
                     f"input_chw must be CHW with 3 bands for wildsat, got {getattr(raw, 'shape', None)}"
                 )
-            raw = np.clip(
-                np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
-            ).astype(np.float32)
+            raw = np.clip(np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0).astype(
+                np.float32
+            )
 
         rgb_u8 = _raw_chw_to_rgb_u8(raw, image_size=image_size, norm_mode=norm_mode)
         x_bchw = _rgb_u8_to_bchw_unit(rgb_u8)
@@ -872,9 +842,7 @@ class WildSATEmbedder(EmbedderBase):
             ometa = {
                 **meta,
                 "pooling": (
-                    output.pooling
-                    if fmeta.get("pooled_from_tokens", False)
-                    else "identity"
+                    output.pooling if fmeta.get("pooled_from_tokens", False) else "identity"
                 ),
                 "pooled_shape": tuple(vec.shape),
             }

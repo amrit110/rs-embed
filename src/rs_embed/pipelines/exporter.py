@@ -155,9 +155,7 @@ class BatchExporter:
 
         # Chunk pipeline
         csize = cfg.effective_chunk_size
-        chunk_groups = [
-            pending_idxs[s : s + csize] for s in range(0, len(pending_idxs), csize)
-        ]
+        chunk_groups = [pending_idxs[s : s + csize] for s in range(0, len(pending_idxs), csize)]
 
         prefetch_pipeline_ex: Optional[ThreadPoolExecutor] = None
         prefetched_chunk_fut = None
@@ -175,9 +173,7 @@ class BatchExporter:
                     prefetched_chunk_fut = None
 
                 # Kick off next chunk prefetch
-                if prefetch_pipeline_ex is not None and (chunk_idx + 1) < len(
-                    chunk_groups
-                ):
+                if prefetch_pipeline_ex is not None and (chunk_idx + 1) < len(chunk_groups):
                     # Clone a fresh prefetch manager for next chunk to avoid
                     # cache collisions — the current chunk's data is still in use.
                     next_prefetch = self._clone_prefetch(prefetch)
@@ -237,16 +233,14 @@ class BatchExporter:
         assert out_file is not None
 
         # Initialize combined state (with resume support)
-        arrays, manifest, pending_models, json_path = (
-            self.checkpoint.combined_init_state(
-                spatials=self.spatials,
-                temporal=self.temporal,
-                output=self.output,
-                backend=self.backend,
-                device=self.device,
-                models=self.model_names,
-                out_path=out_file,
-            )
+        arrays, manifest, pending_models, json_path = self.checkpoint.combined_init_state(
+            spatials=self.spatials,
+            temporal=self.temporal,
+            output=self.output,
+            backend=self.backend,
+            device=self.device,
+            models=self.model_names,
+            out_path=out_file,
         )
 
         prefetch, _provider_enabled = self._setup_prefetch()
@@ -268,9 +262,7 @@ class BatchExporter:
 
         # Prefetch all inputs
         if prefetch.provider is not None and tasks:
-            prefetch.fetch_chunk(
-                all_idxs, self.spatials, self.temporal, progress=progress
-            )
+            prefetch.fetch_chunk(all_idxs, self.spatials, self.temporal, progress=progress)
 
         # Store prefetch checkpoint
         if prefetch.provider is not None:
@@ -291,9 +283,7 @@ class BatchExporter:
             )
 
         # Collect input refs from previously completed models
-        input_refs_by_sensor = self.checkpoint.collect_input_refs(
-            manifest, self.resolved_sensor
-        )
+        input_refs_by_sensor = self.checkpoint.collect_input_refs(manifest, self.resolved_sensor)
 
         # Run pending models
         from .combined_flow import run_pending_models
@@ -391,9 +381,7 @@ class BatchExporter:
             fetch_fn=self.fetch_fn,
             inspect_fn=self.inspect_fn,
         )
-        band_resolver = (
-            getattr(provider, "normalize_bands", None) if provider is not None else None
-        )
+        band_resolver = getattr(provider, "normalize_bands", None) if provider is not None else None
         prefetch.plan(resolve_bands_fn=band_resolver)
         return prefetch, prefetch.enabled
 
@@ -503,9 +491,7 @@ class BatchExporter:
             for i in idxs:
                 out_file = os.path.join(out_dir, f"{names[i]}{self.ext}")
                 try:
-                    per_item_cfg = (
-                        replace(cfg, save_embeddings=False) if use_batch else cfg
-                    )
+                    per_item_cfg = replace(cfg, save_embeddings=False) if use_batch else cfg
                     arrays, manifest = build_one_point_payload(
                         point_index=i,
                         spatial=self.spatials[i],
@@ -520,8 +506,7 @@ class BatchExporter:
                         inputs_cache=prefetch.cache,
                         input_reports=prefetch.input_reports,
                         prefetch_errors=prefetch.errors,
-                        pass_input_into_embedder=provider_enabled
-                        and bool(cfg.save_embeddings),
+                        pass_input_into_embedder=provider_enabled and bool(cfg.save_embeddings),
                         config=per_item_cfg,
                         provider_factory=self.provider_factory,
                         model_progress_cb=(None if use_batch else model_progress_cb),
@@ -672,9 +657,7 @@ class BatchExporter:
         """Inject pre-computed batch embeddings into a per-item payload."""
         model_entries = manifest.get("models") or []
         entry_by_model = {
-            str(entry.get("model")): entry
-            for entry in model_entries
-            if isinstance(entry, dict)
+            str(entry.get("model")): entry for entry in model_entries if isinstance(entry, dict)
         }
         for m in models:
             entry = entry_by_model.get(m)

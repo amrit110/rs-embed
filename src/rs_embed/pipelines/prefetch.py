@@ -132,9 +132,7 @@ class PrefetchManager:
         cfg = self.config
         provider = self.provider
 
-        def _fetch_one(
-            i: int, skey: str, sspec: SensorSpec
-        ) -> Tuple[int, str, np.ndarray]:
+        def _fetch_one(i: int, skey: str, sspec: SensorSpec) -> Tuple[int, str, np.ndarray]:
             x = run_with_retry(
                 lambda: self.fetch_fn(
                     provider, spatial=spatials[i], temporal=temporal, sensor=sspec
@@ -146,9 +144,7 @@ class PrefetchManager:
 
         mw = max(1, cfg.num_workers)
         with ThreadPoolExecutor(max_workers=mw) as ex:
-            fut_map = {
-                ex.submit(_fetch_one, i, sk, ss): (i, sk) for (i, sk, ss) in tasks
-            }
+            fut_map = {ex.submit(_fetch_one, i, sk, ss): (i, sk) for (i, sk, ss) in tasks}
             for fut in as_completed(fut_map):
                 i, skey = fut_map[fut]
                 try:
@@ -202,12 +198,8 @@ class PrefetchManager:
             return hit
         err = self.errors.get((idx, sensor_key))
         if err:
-            raise RuntimeError(
-                f"Prefetch failed for index={idx}, sensor={sensor_key}: {err}"
-            )
-        raise RuntimeError(
-            f"Missing prefetched input for index={idx}, sensor={sensor_key}"
-        )
+            raise RuntimeError(f"Prefetch failed for index={idx}, sensor={sensor_key}: {err}")
+        raise RuntimeError(f"Missing prefetched input for index={idx}, sensor={sensor_key}")
 
     def get_or_fetch(
         self,
@@ -223,27 +215,19 @@ class PrefetchManager:
             return hit
         err = self.errors.get((idx, skey))
         if err:
-            raise RuntimeError(
-                f"Prefetch previously failed for index={idx}, sensor={skey}: {err}"
-            )
+            raise RuntimeError(f"Prefetch previously failed for index={idx}, sensor={skey}: {err}")
         if self.provider is None:
-            raise RuntimeError(
-                f"Missing provider for input fetch: index={idx}, sensor={skey}"
-            )
+            raise RuntimeError(f"Missing provider for input fetch: index={idx}, sensor={skey}")
         cfg = self.config
         x = run_with_retry(
-            lambda: self.fetch_fn(
-                self.provider, spatial=spatial, temporal=temporal, sensor=sspec
-            ),
+            lambda: self.fetch_fn(self.provider, spatial=spatial, temporal=temporal, sensor=sspec),
             retries=cfg.max_retries,
             backoff_s=cfg.retry_backoff_s,
         )
         rep = self.inspect_fn(x, sensor=sspec, name=f"gee_input_{skey}")
         if cfg.fail_on_bad_input and (not bool(rep.get("ok", True))):
             issues = (rep.get("report", {}) or {}).get("issues", [])
-            raise RuntimeError(
-                f"Input inspection failed for index={idx}, sensor={skey}: {issues}"
-            )
+            raise RuntimeError(f"Input inspection failed for index={idx}, sensor={skey}: {issues}")
         self.cache[(idx, skey)] = x
         self.input_reports[(idx, skey)] = rep
         return x

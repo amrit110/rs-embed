@@ -97,17 +97,9 @@ def assert_supported(
     backends = desc.get("backend")
     if isinstance(backends, list):
         allowed = [str(b).lower() for b in backends]
-        auto_provider_compatible = backend == "auto" and (
-            "provider" in allowed or "gee" in allowed
-        )
-        provider_compatible = has_provider(backend) and (
-            "provider" in allowed or "gee" in allowed
-        )
-        if (
-            backend not in allowed
-            and not provider_compatible
-            and not auto_provider_compatible
-        ):
+        auto_provider_compatible = backend == "auto" and ("provider" in allowed or "gee" in allowed)
+        provider_compatible = has_provider(backend) and ("provider" in allowed or "gee" in allowed)
+        if backend not in allowed and not provider_compatible and not auto_provider_compatible:
             raise ModelError(
                 f"Model '{embedder.model_name}' does not support backend='{backend}'. Supported: {backends}"
             )

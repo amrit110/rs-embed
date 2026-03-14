@@ -92,3 +92,26 @@ only-include = [
 
 [tool.hatch.version]
 path = "src/rs_embed/_version.py"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["src/rs_embed/embedders/_vendor"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "UP",   # pyupgrade (modernize type hints, etc.)
+    "B",    # flake8-bugbear
+    "BLE",  # blind exceptions (BLE001: bare except Exception)
+    "I",    # isort
+]
+ignore = [
+    "E501",  # line too long
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/rs_embed/__init__.py" = ["F401"]  # public re-exports
+"src/rs_embed/api.py" = ["F401"]       # public re-exports

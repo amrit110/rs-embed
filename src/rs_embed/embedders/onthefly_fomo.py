@@ -126,7 +126,7 @@ def _download_url_to_path(url: str, dst_path: str) -> str:
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-        except Exception:
+        except Exception as _e:
             pass
     return dst_path
 
@@ -174,16 +174,10 @@ def _resolve_fomo_ckpt_path() -> str:
         os.environ.get("RS_EMBED_FOMO_CKPT_FILE", _DEFAULT_CKPT_FILENAME).strip()
         or _DEFAULT_CKPT_FILENAME
     )
-    url = (
-        os.environ.get("RS_EMBED_FOMO_CKPT_URL", _DEFAULT_CKPT_URL).strip()
-        or _DEFAULT_CKPT_URL
-    )
-    min_bytes = int(
-        os.environ.get("RS_EMBED_FOMO_CKPT_MIN_BYTES", str(50 * 1024 * 1024))
-    )
-    return _download_fomo_ckpt(
-        url=url, cache_dir=cache_dir, filename=filename, min_bytes=min_bytes
-    )
+    url = os.environ.get("RS_EMBED_FOMO_CKPT_URL", _DEFAULT_CKPT_URL).strip() or _DEFAULT_CKPT_URL
+    min_bytes = int(os.environ.get("RS_EMBED_FOMO_CKPT_MIN_BYTES", str(50 * 1024 * 1024)))
+    return _download_fomo_ckpt(url=url, cache_dir=cache_dir, filename=filename, min_bytes=min_bytes)
+
 
 @lru_cache(maxsize=8)
 def _load_fomo_module():
@@ -192,8 +186,7 @@ def _load_fomo_module():
         getattr(mod, "MultiSpectralViT")
     except Exception as e:
         raise ModelError(
-            "Failed to import vendored FoMo runtime. "
-            "Install missing dependencies: torch, einops."
+            "Failed to import vendored FoMo runtime. Install missing dependencies: torch, einops."
         ) from e
     return mod
 
@@ -289,7 +282,7 @@ def _load_fomo_cached(
 
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     p0 = None
@@ -298,13 +291,9 @@ def _load_fomo_cached(
             p0 = p.detach()
             break
     if p0 is None:
-        raise ModelError(
-            "FoMo model has no parameters; cannot verify loaded checkpoint."
-        )
+        raise ModelError("FoMo model has no parameters; cannot verify loaded checkpoint.")
     if not torch.isfinite(p0).all():
-        raise ModelError(
-            "FoMo model parameters contain NaN/Inf; checkpoint load likely failed."
-        )
+        raise ModelError("FoMo model parameters contain NaN/Inf; checkpoint load likely failed.")
     p0f = p0.float()
 
     meta = {
@@ -364,9 +353,7 @@ def _resize_chw(x_chw: np.ndarray, *, out_hw: int) -> np.ndarray:
     if x_chw.ndim != 3:
         raise ModelError(f"Expected CHW array, got {x_chw.shape}")
     x = torch.from_numpy(x_chw.astype(np.float32, copy=False)).unsqueeze(0)
-    y = F.interpolate(
-        x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False
-    )
+    y = F.interpolate(x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False)
     return y[0].detach().cpu().numpy().astype(np.float32)
 
 
@@ -423,16 +410,14 @@ def _fomo_forward_tokens(
 
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     with torch.no_grad():
         out = model((x, keys), pool=False)
 
     if not hasattr(out, "ndim") or int(out.ndim) != 3:
-        raise ModelError(
-            f"FoMo forward(pool=False) expected [B,N,D] tensor, got type={type(out)}"
-        )
+        raise ModelError(f"FoMo forward(pool=False) expected [B,N,D] tensor, got type={type(out)}")
     if int(out.shape[0]) != 1:
         raise ModelError(f"FoMo embedder expects B=1 per call, got {tuple(out.shape)}")
 
@@ -539,9 +524,7 @@ class FoMoEmbedder(EmbedderBase):
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
         v = int(
-            os.environ.get(
-                "RS_EMBED_FOMO_FETCH_WORKERS", str(FoMoEmbedder.DEFAULT_FETCH_WORKERS)
-            )
+            os.environ.get("RS_EMBED_FOMO_FETCH_WORKERS", str(FoMoEmbedder.DEFAULT_FETCH_WORKERS))
         )
         return max(1, min(int(n_items), v))
 
@@ -563,16 +546,12 @@ class FoMoEmbedder(EmbedderBase):
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
 
-        image_size = int(
-            os.environ.get("RS_EMBED_FOMO_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_FOMO_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         patch_size = int(os.environ.get("RS_EMBED_FOMO_PATCH", str(self.DEFAULT_PATCH)))
         dim = int(os.environ.get("RS_EMBED_FOMO_DIM", str(self.DEFAULT_DIM)))
         depth = int(os.environ.get("RS_EMBED_FOMO_DEPTH", str(self.DEFAULT_DEPTH)))
         heads = int(os.environ.get("RS_EMBED_FOMO_HEADS", str(self.DEFAULT_HEADS)))
-        mlp_dim = int(
-            os.environ.get("RS_EMBED_FOMO_MLP_DIM", str(self.DEFAULT_MLP_DIM))
-        )
+        mlp_dim = int(os.environ.get("RS_EMBED_FOMO_MLP_DIM", str(self.DEFAULT_MLP_DIM)))
         num_classes = int(
             os.environ.get("RS_EMBED_FOMO_NUM_CLASSES", str(self.DEFAULT_NUM_CLASSES))
         )
@@ -594,12 +573,10 @@ class FoMoEmbedder(EmbedderBase):
         else:
             raw = np.asarray(input_chw, dtype=np.float32)
             if raw.ndim != 3 or int(raw.shape[0]) != len(_S2_SR_12_BANDS):
-                raise ModelError(
-                    f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}"
-                )
-            raw = np.clip(
-                np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
-            ).astype(np.float32)
+                raise ModelError(f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}")
+            raw = np.clip(np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0).astype(
+                np.float32
+            )
 
         x = _normalize_s2(raw, mode=norm_mode)
         if int(x.shape[-2]) != image_size or int(x.shape[-1]) != image_size:

@@ -27,7 +27,7 @@ def _infer_native_y_axis_direction(meta: Dict[str, Any]) -> Tuple[str, str]:
                 return "north_to_south", f"transform.e={e:.6g} (<0)"
             if e > 0:
                 return "south_to_north", f"transform.e={e:.6g} (>0)"
-        except Exception:
+        except Exception as _e:
             pass
 
     y_axis = str(meta.get("y_axis_direction", "")).strip().lower()
@@ -53,7 +53,7 @@ def _flip_data_y(data: Any) -> Tuple[Any, bool, str]:
                     True,
                     f"xarray isel({dim}=reverse)",
                 )
-            except Exception:
+            except Exception as _e:
                 pass
 
     arr = np.asarray(getattr(data, "values", data))

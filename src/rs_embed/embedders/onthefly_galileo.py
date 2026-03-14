@@ -40,9 +40,7 @@ def _resize_tchw(x_tchw: np.ndarray, *, out_hw: int) -> np.ndarray:
     if x_tchw.ndim != 4:
         raise ModelError(f"Expected [T,C,H,W], got {x_tchw.shape}")
     x = torch.from_numpy(x_tchw.astype(np.float32, copy=False))
-    y = F.interpolate(
-        x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False
-    )
+    y = F.interpolate(x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False)
     return y.detach().cpu().numpy().astype(np.float32)
 
 
@@ -101,6 +99,7 @@ def _fetch_s2_10_raw_tchw(
     )
     return np.clip(raw, 0.0, 10000.0).astype(np.float32)
 
+
 def _resolve_model_folder(
     *,
     model_path: Optional[str],
@@ -156,8 +155,7 @@ def _download_galileo_model_folder(
         from huggingface_hub import snapshot_download
     except Exception as e:
         raise ModelError(
-            "Galileo auto-download requires huggingface_hub. "
-            "Install: pip install huggingface_hub"
+            "Galileo auto-download requires huggingface_hub. Install: pip install huggingface_hub"
         ) from e
 
     snap = snapshot_download(
@@ -229,7 +227,7 @@ def _load_galileo_cached(
 
     try:
         encoder = encoder.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     p0 = None
@@ -246,11 +244,7 @@ def _load_galileo_cached(
     meta = {
         "model_size": str(model_size),
         "model_root": model_root,
-        "model_source": (
-            model_root
-            if model_path
-            else f"hf://{hf_repo}/models/{model_size}"
-        ),
+        "model_source": (model_root if model_path else f"hf://{hf_repo}/models/{model_size}"),
         "device": str(dev),
         "param_mean": float(p0f.mean().cpu()),
         "param_std": float(p0f.std().cpu()),
@@ -339,7 +333,7 @@ def _prepare_galileo_encoder_inputs(
             ndvi = (nir - red) / np.maximum(nir + red, 1e-6)
             s_t_x[0, :, :, :, space_time_bands.index("NDVI")] = ndvi.astype(np.float32)
             ndvi_set = True
-        except Exception:
+        except Exception as _e:
             ndvi_set = False
 
     # masks: 0 means seen by encoder, 1 means masked/ignored
@@ -423,7 +417,7 @@ def _galileo_forward(
     dev = _resolve_device(device)
     try:
         encoder = encoder.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     with torch.no_grad():
@@ -449,26 +443,20 @@ def _galileo_forward(
     # pooled features from all visible tokens
     vec_t = encoder.average_tokens(s_t_x, sp_x, t_x, st_x, s_t_m, sp_m, t_m, st_m)
     if vec_t.ndim != 2 or int(vec_t.shape[0]) != 1:
-        raise ModelError(
-            f"Unexpected Galileo pooled output shape: {tuple(vec_t.shape)}"
-        )
+        raise ModelError(f"Unexpected Galileo pooled output shape: {tuple(vec_t.shape)}")
     vec = vec_t[0].detach().float().cpu().numpy().astype(np.float32)
 
     # grid features from S2-related space-time groups only
     s_t_groups = list(getattr(mod, "SPACE_TIME_BANDS_GROUPS_IDX").keys())
     s2_group_indices = [i for i, key in enumerate(s_t_groups) if "S2" in str(key)]
     if not s2_group_indices:
-        raise ModelError(
-            "Failed to locate Galileo S2 group indices in SPACE_TIME_BANDS_GROUPS_IDX"
-        )
+        raise ModelError("Failed to locate Galileo S2 group indices in SPACE_TIME_BANDS_GROUPS_IDX")
 
     # s_t_x shape: [B,H,W,T,Cg,D]
     s_t_sel = s_t_x[:, :, :, :, s2_group_indices, :]
     # average over time and channel-groups -> [B,H,W,D]
     grid_hwd = s_t_sel.mean(dim=3).mean(dim=3)[0]
-    grid = (
-        grid_hwd.detach().float().cpu().numpy().transpose(2, 0, 1).astype(np.float32)
-    )  # [D,H,W]
+    grid = grid_hwd.detach().float().cpu().numpy().transpose(2, 0, 1).astype(np.float32)  # [D,H,W]
 
     fmeta = {
         "feature_dim": int(vec.shape[0]),
@@ -555,9 +543,7 @@ class GalileoEmbedder(EmbedderBase):
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
 
-        model_size = os.environ.get(
-            "RS_EMBED_GALILEO_MODEL_SIZE", self.DEFAULT_MODEL_SIZE
-        ).strip()
+        model_size = os.environ.get("RS_EMBED_GALILEO_MODEL_SIZE", self.DEFAULT_MODEL_SIZE).strip()
         model_path = os.environ.get("RS_EMBED_GALILEO_MODEL_PATH")
         hf_repo = os.environ.get("RS_EMBED_GALILEO_HF_REPO", "nasaharvest/galileo").strip()
         cache_dir = os.environ.get(
@@ -570,24 +556,16 @@ class GalileoEmbedder(EmbedderBase):
             "False",
         }
 
-        image_size = int(
-            os.environ.get("RS_EMBED_GALILEO_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
-        patch_size = int(
-            os.environ.get("RS_EMBED_GALILEO_PATCH", str(self.DEFAULT_PATCH))
-        )
-        n_frames = max(
-            1, int(os.environ.get("RS_EMBED_GALILEO_FRAMES", str(self.DEFAULT_FRAMES)))
-        )
+        image_size = int(os.environ.get("RS_EMBED_GALILEO_IMG", str(self.DEFAULT_IMAGE_SIZE)))
+        patch_size = int(os.environ.get("RS_EMBED_GALILEO_PATCH", str(self.DEFAULT_PATCH)))
+        n_frames = max(1, int(os.environ.get("RS_EMBED_GALILEO_FRAMES", str(self.DEFAULT_FRAMES))))
         norm_mode = os.environ.get("RS_EMBED_GALILEO_NORM", "unit_scale").strip()
         add_layernorm = os.environ.get("RS_EMBED_GALILEO_ADD_LN", "1").strip() not in {
             "0",
             "false",
             "False",
         }
-        include_ndvi = os.environ.get(
-            "RS_EMBED_GALILEO_INCLUDE_NDVI", "1"
-        ).strip() not in {
+        include_ndvi = os.environ.get("RS_EMBED_GALILEO_INCLUDE_NDVI", "1").strip() not in {
             "0",
             "false",
             "False",
@@ -731,9 +709,7 @@ class GalileoEmbedder(EmbedderBase):
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()
         provider = self._get_provider(backend)
-        n_frames = max(
-            1, int(os.environ.get("RS_EMBED_GALILEO_FRAMES", str(self.DEFAULT_FRAMES)))
-        )
+        n_frames = max(1, int(os.environ.get("RS_EMBED_GALILEO_FRAMES", str(self.DEFAULT_FRAMES))))
 
         n = len(spatials)
         prefetched_raw: List[Optional[np.ndarray]] = [None] * n

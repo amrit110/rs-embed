@@ -225,9 +225,7 @@ class CopernicusEmbedder(EmbedderBase):
             try:
                 import xarray as xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
             da = xr.DataArray(
                 chw,

@@ -118,14 +118,8 @@ def run_pending_models(
             except Exception as e:
                 m_entry["describe"] = {"error": repr(e)}
 
-            needs_provider_input = (
-                provider_enabled and sspec is not None and not is_precomputed
-            )
-            skey = (
-                sensor_cache_key(sspec)
-                if needs_provider_input and sspec is not None
-                else None
-            )
+            needs_provider_input = provider_enabled and sspec is not None and not is_precomputed
+            skey = sensor_cache_key(sspec) if needs_provider_input and sspec is not None else None
 
             # ── Save inputs ─────────────────────────────────────
             _gather_inputs(
@@ -185,7 +179,7 @@ def run_pending_models(
             if remaining > 0:
                 try:
                     infer_progress.update(remaining)
-                except Exception:
+                except Exception as _e:
                     pass
             infer_progress.close()
             progress.update(1)
@@ -254,12 +248,12 @@ def _gather_inputs(
             ref["indices"] = list(xs_indices)
         input_refs_by_sensor[skey] = dict(ref)
         m_entry["inputs"] = ref
-    except Exception:
+    except Exception as _e:
         keys = []
         for i in range(len(spatials)):
             try:
                 x = get_or_fetch_input_fn(i, skey, sspec)
-            except Exception:
+            except Exception as _e:
                 continue
             k = f"input_chw__{sanitize_key(m)}__{i:05d}"
             arrays[k] = np.asarray(x, dtype=np.float32)
@@ -278,13 +272,9 @@ def _pack_embedding_results(
     arrays: Dict[str, np.ndarray],
 ) -> None:
     """Convert ``{idx: TaskResult}`` into stacked arrays and manifest entries."""
-    ok_indices = [
-        i for i in range(n) if i in results and results[i].status == Status.OK
-    ]
+    ok_indices = [i for i in range(n) if i in results and results[i].status == Status.OK]
     errors_by_idx = {
-        i: results[i].error
-        for i in range(n)
-        if i in results and results[i].status == Status.FAILED
+        i: results[i].error for i in range(n) if i in results and results[i].status == Status.FAILED
     }
     metas_by_idx = [results[i].meta if i in results else None for i in range(n)]
 
@@ -311,7 +301,7 @@ def _pack_embedding_results(
                     keys.append(k)
                     index_map.append(i)
                 m_entry["embeddings"] = {"npz_keys": keys, "indices": index_map}
-        except Exception:
+        except Exception as _e:
             keys = []
             index_map = []
             for i in ok_indices:

@@ -105,9 +105,7 @@ class InferenceEngine:
     def _embedding_to_result(self, emb: Embedding) -> TaskResult:
         """Normalize an embedding and convert it into a successful TaskResult."""
         emb_n = normalize_embedding_output(emb=emb, output=self.output)
-        return TaskResult.ok(
-            embedding_to_numpy(emb_n), jsonable(getattr(emb_n, "meta", None))
-        )
+        return TaskResult.ok(embedding_to_numpy(emb_n), jsonable(getattr(emb_n, "meta", None)))
 
     def _resolve_model_context(
         self,
@@ -241,7 +239,7 @@ class InferenceEngine:
                     out[sub_idx[j]] = self._embedding_to_result(emb)
                     on_done(sub_idx[j])
             return out, True
-        except Exception:
+        except Exception as _e:
             return out, False
 
     def _run_batch_no_input(
@@ -301,7 +299,7 @@ class InferenceEngine:
                     out[sub_idx[j]] = self._embedding_to_result(emb)
                     on_done(sub_idx[j])
             return out, True
-        except Exception:
+        except Exception as _e:
             return out, False
 
     def _run_single_fallback(
@@ -360,20 +358,14 @@ class InferenceEngine:
 
             def _get_input(i: int) -> np.ndarray:
                 if not ctx.needs_provider_input or ctx.skey is None:
-                    raise RuntimeError(
-                        f"Missing prefetched input for model={mc.name}, index={i}"
-                    )
+                    raise RuntimeError(f"Missing prefetched input for model={mc.name}, index={i}")
                 hit = prefetch_cache.get((i, ctx.skey))
                 if hit is not None:
                     return hit
                 err = prefetch_errors.get((i, ctx.skey))
                 if err:
-                    raise RuntimeError(
-                        f"Prefetch failed for model={mc.name}, index={i}: {err}"
-                    )
-                raise RuntimeError(
-                    f"Missing prefetched input for model={mc.name}, index={i}"
-                )
+                    raise RuntimeError(f"Prefetch failed for model={mc.name}, index={i}: {err}")
+                raise RuntimeError(f"Missing prefetched input for model={mc.name}, index={i}")
 
             def _single(i: int) -> Embedding:
                 inp = _get_input(i) if ctx.needs_provider_input else None
@@ -392,7 +384,7 @@ class InferenceEngine:
                     return
                 try:
                     model_progress_cb(mc.name)
-                except Exception:
+                except Exception as _e:
                     pass
 
             can_batch_prefetched, can_batch_no_input = self._evaluate_batch_capability(
@@ -629,6 +621,6 @@ def _device_has_gpu(device: str) -> bool:
         mps = getattr(torch.backends, "mps", None)
         if mps is not None and bool(getattr(mps, "is_available", lambda: False)()):
             return True
-    except Exception:
+    except Exception as _e:
         return False
     return False

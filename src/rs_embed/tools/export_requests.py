@@ -27,9 +27,7 @@ def normalize_export_layout(layout: str) -> ExportLayout:
         return ExportLayout.COMBINED
     if layout_n in {"per_item", "dir", "directory"}:
         return ExportLayout.PER_ITEM
-    raise ModelError(
-        f"Unsupported export layout: {layout!r}. Supported: 'combined', 'per_item'."
-    )
+    raise ModelError(f"Unsupported export layout: {layout!r}. Supported: 'combined', 'per_item'.")
 
 
 def normalize_export_format(format_name: str) -> tuple[str, str]:
@@ -55,9 +53,7 @@ def _resolve_export_batch_target(
 ) -> ExportTarget:
     if (out is not None) or (layout is not None):
         if out is None or layout is None:
-            raise ModelError(
-                "Provide both out and layout when using the decoupled output API."
-            )
+            raise ModelError("Provide both out and layout when using the decoupled output API.")
         if out_dir is not None or out_path is not None:
             raise ModelError("Use either out+layout or out_dir/out_path, not both.")
         layout_enum = normalize_export_layout(layout)
@@ -76,14 +72,10 @@ def _resolve_export_batch_target(
         return ExportTarget(layout=ExportLayout.COMBINED, out_file=out_file)
 
     assert out_dir is not None
-    point_names = (
-        names if names is not None else [f"p{i:05d}" for i in range(n_spatials)]
-    )
+    point_names = names if names is not None else [f"p{i:05d}" for i in range(n_spatials)]
     if len(point_names) != n_spatials:
         raise ModelError("names must have the same length as spatials.")
-    return ExportTarget(
-        layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names
-    )
+    return ExportTarget(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names)
 
 
 def normalize_export_target(
@@ -107,11 +99,7 @@ def normalize_export_target(
         if target.layout == ExportLayout.COMBINED:
             if not target.out_file:
                 raise ModelError("ExportTarget.COMBINED requires out_file.")
-            out_file = (
-                target.out_file
-                if target.out_file.endswith(ext)
-                else (target.out_file + ext)
-            )
+            out_file = target.out_file if target.out_file.endswith(ext) else (target.out_file + ext)
             return ExportTarget.combined(out_file)
         if target.layout == ExportLayout.PER_ITEM:
             if not target.out_dir:
@@ -220,9 +208,7 @@ def resolve_export_model_configs(
     per_model_modalities: Optional[Dict[str, str]],
 ) -> tuple[List[ModelConfig], Dict[str, str]]:
     if not isinstance(models, list) or len(models) == 0:
-        raise ModelError(
-            "models must be a non-empty List[str] or List[ExportModelRequest]."
-        )
+        raise ModelError("models must be a non-empty List[str] or List[ExportModelRequest].")
 
     per_model_sensors = per_model_sensors or {}
     per_model_modalities = per_model_modalities or {}
@@ -234,9 +220,7 @@ def resolve_export_model_configs(
         elif isinstance(item, str):
             requests.append(ExportModelRequest(name=item))
         else:
-            raise ModelError(
-                "models entries must be strings or ExportModelRequest instances."
-            )
+            raise ModelError("models entries must be strings or ExportModelRequest instances.")
 
     model_configs: List[ModelConfig] = []
     resolved_backend: Dict[str, str] = {}
@@ -248,13 +232,11 @@ def resolve_export_model_configs(
         cls = get_embedder_cls(model_n)
         try:
             emb_check = cls()
-            assert_supported(
-                emb_check, backend=eff_backend, output=output, temporal=temporal
-            )
+            assert_supported(emb_check, backend=eff_backend, output=output, temporal=temporal)
             desc = emb_check.describe() or {}
         except ModelError:
             raise
-        except Exception:
+        except Exception as _e:
             desc = {}
 
         modality_eff = req.modality

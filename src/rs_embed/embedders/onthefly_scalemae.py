@@ -44,7 +44,7 @@ def _load_scalemae_cached(model_id: str, dev: str):
     model = ScaleMAE.from_pretrained(model_id)
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     meta = {"model_id": model_id, "device": dev}
@@ -52,9 +52,7 @@ def _load_scalemae_cached(model_id: str, dev: str):
 
 
 def _load_scalemae(model_id: str, device: str = "auto"):
-    loaded, _dev = _load_cached_with_device(
-        _load_scalemae_cached, device=device, model_id=model_id
-    )
+    loaded, _dev = _load_cached_with_device(_load_scalemae_cached, device=device, model_id=model_id)
     return loaded
 
 
@@ -91,7 +89,7 @@ def _call_with_patch_size(fn, x, *, patch_size: int, input_res):
     sig = None
     try:
         sig = inspect.signature(fn)
-    except Exception:
+    except Exception as _e:
         sig = None
 
     # Try kwargs if signature seems to accept them
@@ -121,9 +119,7 @@ def _call_with_patch_size(fn, x, *, patch_size: int, input_res):
             try:
                 return fn(x, input_res, patch_size)
             except TypeError as e:
-                raise ModelError(
-                    f"ScaleMAE call failed even with patch_size/input_res: {e}"
-                ) from e
+                raise ModelError(f"ScaleMAE call failed even with patch_size/input_res: {e}") from e
 
 
 def _scalemae_forward_tokens_or_vec(
@@ -145,17 +141,13 @@ def _scalemae_forward_tokens_or_vec(
     import torch
 
     x = rgb_u8_to_tensor_clipnorm(rgb_u8, image_size).to(device)  # [B,3,H,W]
-    input_res = torch.tensor(
-        [float(input_res_m)], dtype=torch.float32, device=device
-    )  # 1D
+    input_res = torch.tensor([float(input_res_m)], dtype=torch.float32, device=device)  # 1D
     patch_size = _infer_patch_size(model)
 
     with torch.no_grad():
         ff = getattr(model, "forward_features", None)
         if callable(ff):
-            out = _call_with_patch_size(
-                ff, x, patch_size=patch_size, input_res=input_res
-            )
+            out = _call_with_patch_size(ff, x, patch_size=patch_size, input_res=input_res)
             out0 = out[0] if isinstance(out, (tuple, list)) else out
 
             if hasattr(out0, "ndim") and out0.ndim == 3:  # [B,N,D]
@@ -192,9 +184,7 @@ def _scalemae_forward_tokens_or_vec(
             )
 
         # fallback: forward (must pass patch_size + input_res)
-        out = _call_with_patch_size(
-            model, x, patch_size=patch_size, input_res=input_res
-        )
+        out = _call_with_patch_size(model, x, patch_size=patch_size, input_res=input_res)
         out0 = out[0] if isinstance(out, (tuple, list)) else out
 
         if hasattr(out0, "ndim") and out0.ndim == 3:
@@ -212,9 +202,7 @@ def _scalemae_forward_tokens_or_vec(
                 "vec_shape": tuple(out0.shape),
             }
 
-        raise ModelError(
-            "ScaleMAE: cannot obtain tokens or pooled vector from this model."
-        )
+        raise ModelError("ScaleMAE: cannot obtain tokens or pooled vector from this model.")
 
 
 def _scalemae_forward_tokens_or_vec_batch(
@@ -245,9 +233,7 @@ def _scalemae_forward_tokens_or_vec_batch(
     with torch.inference_mode():
         ff = getattr(model, "forward_features", None)
         if callable(ff):
-            out = _call_with_patch_size(
-                ff, xb, patch_size=patch_size, input_res=input_res
-            )
+            out = _call_with_patch_size(ff, xb, patch_size=patch_size, input_res=input_res)
             out0 = out[0] if isinstance(out, (tuple, list)) else out
 
             if hasattr(out0, "ndim") and out0.ndim == 3:  # [B,N,D]
@@ -284,9 +270,7 @@ def _scalemae_forward_tokens_or_vec_batch(
                 f"ScaleMAE forward_features returned unsupported: {type(out0)} {getattr(out0, 'shape', None)}"
             )
 
-        out = _call_with_patch_size(
-            model, xb, patch_size=patch_size, input_res=input_res
-        )
+        out = _call_with_patch_size(model, xb, patch_size=patch_size, input_res=input_res)
         out0 = out[0] if isinstance(out, (tuple, list)) else out
         if hasattr(out0, "ndim") and out0.ndim == 3:
             toks = out0.detach().float().cpu().numpy().astype(np.float32)
@@ -305,9 +289,7 @@ def _scalemae_forward_tokens_or_vec_batch(
                 "batch_shape": tuple(vec.shape),
             }
 
-        raise ModelError(
-            "ScaleMAE: cannot obtain tokens or pooled vector from this model."
-        )
+        raise ModelError("ScaleMAE: cannot obtain tokens or pooled vector from this model.")
 
 
 @register("scalemae")
@@ -396,9 +378,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
 
         t = temporal_to_range(temporal)
         # Fetch RGB patch (optionally reuse pre-fetched raw patch)
@@ -483,9 +463,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             try:
                 import xarray as xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
             da = xr.DataArray(
                 grid,
@@ -521,9 +499,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         t = temporal_to_range(temporal)
 
         provider = self._get_provider(backend)
@@ -564,9 +540,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
 
                 xr_mod = xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
         n = len(spatials)
         for s0 in range(0, n, infer_bs):
@@ -576,9 +550,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             for i in range(s0, s1):
                 rgb_u8 = rgb_u8_all[i]
                 if rgb_u8 is None:
-                    raise ModelError(
-                        f"Missing prefetched patch at index={i} for scalemae_rgb."
-                    )
+                    raise ModelError(f"Missing prefetched patch at index={i} for scalemae_rgb.")
                 chunk_idx.append(i)
                 chunk_rgb.append(rgb_u8)
 
@@ -590,7 +562,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                     device=dev,
                     input_res_m=float(sensor.scale_m),
                 )
-            except Exception:
+            except Exception as _e:
                 chunk_outs = []
                 chunk_extra = {}
                 for rgb_u8 in chunk_rgb:
@@ -676,9 +648,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 raise ModelError(f"Unknown output mode: {output.mode}")
 
         if any(e is None for e in out):
-            raise ModelError(
-                "scalemae_rgb batch inference produced incomplete outputs."
-            )
+            raise ModelError("scalemae_rgb batch inference produced incomplete outputs.")
         return [e for e in out if e is not None]
 
     def get_embeddings_batch_from_inputs(
@@ -705,9 +675,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SCALEMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SCALEMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         t = temporal_to_range(temporal)
         model, wmeta = _load_scalemae(model_id=model_id, device=device)
         dev = wmeta.get("device", device)
@@ -732,9 +700,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
 
                 xr_mod = xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
         n = len(spatials)
         for s0 in range(0, n, infer_bs):
@@ -821,7 +787,5 @@ class ScaleMAERGBEmbedder(EmbedderBase):
                 raise ModelError(f"Unknown output mode: {output.mode}")
 
         if any(e is None for e in out):
-            raise ModelError(
-                "scalemae_rgb prefetched batch inference produced incomplete outputs."
-            )
+            raise ModelError("scalemae_rgb prefetched batch inference produced incomplete outputs.")
         return [e for e in out if e is not None]

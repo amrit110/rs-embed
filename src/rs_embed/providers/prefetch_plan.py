@@ -13,9 +13,7 @@ _LEGACY_RESOLVE_BANDS_WARNED = False
 
 def sensor_fetch_group_key(sensor: SensorSpec) -> Tuple[str, int, int, float, str]:
     """Fetch identity excluding bands; used to build reusable band supersets."""
-    cloudy = (
-        -1 if getattr(sensor, "cloudy_pct", None) is None else int(sensor.cloudy_pct)
-    )
+    cloudy = -1 if getattr(sensor, "cloudy_pct", None) is None else int(sensor.cloudy_pct)
     return (
         str(sensor.collection),
         int(sensor.scale_m),

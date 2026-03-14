@@ -96,8 +96,7 @@ def get_embedder_cls(name: str) -> Type[Any]:
             msg += f" Import error for '{k}': {type(err).__name__}: {err}"
         elif _REGISTRY_IMPORT_ERRORS:
             parts = [
-                f"{mid}: {type(e).__name__}: {e}"
-                for mid, e in _REGISTRY_IMPORT_ERRORS.items()
+                f"{mid}: {type(e).__name__}: {e}" for mid, e in _REGISTRY_IMPORT_ERRORS.items()
             ]
             msg += f" Embedder import errors: {'; '.join(parts)}"
         raise ModelError(msg)

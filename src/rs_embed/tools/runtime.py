@@ -102,7 +102,7 @@ def embedder_accepts_input_chw(embedder_cls: type) -> bool:
         return False
     try:
         sig = inspect.signature(fn)
-    except Exception:
+    except Exception as _e:
         return False
     if "input_chw" in sig.parameters:
         return True
@@ -187,9 +187,7 @@ def _prepare_embedding_request_context(
     from .tiling import _resolve_input_prep_spec
 
     model_n = normalize_model_name(model)
-    backend_n = _resolve_embedding_api_backend(
-        model_n, normalize_backend_name(backend)
-    )
+    backend_n = _resolve_embedding_api_backend(model_n, normalize_backend_name(backend))
     device_n = normalize_device_name(device)
     input_prep_resolved = _resolve_input_prep_spec(input_prep)
 

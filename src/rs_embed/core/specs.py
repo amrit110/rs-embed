@@ -161,9 +161,7 @@ class TemporalSpec:
                 start_d = date.fromisoformat(str(self.start))
                 end_d = date.fromisoformat(str(self.end))
             except Exception as e:
-                raise SpecError(
-                    "TemporalSpec.range expects ISO dates 'YYYY-MM-DD'."
-                ) from e
+                raise SpecError("TemporalSpec.range expects ISO dates 'YYYY-MM-DD'.") from e
             if start_d >= end_d:
                 raise SpecError("TemporalSpec.range requires start < end.")
         else:
@@ -266,9 +264,7 @@ class OutputSpec:
         OutputSpec
             Output specification with ``mode="grid"``.
         """
-        return OutputSpec(
-            mode="grid", scale_m=scale_m, grid_orientation=grid_orientation
-        )
+        return OutputSpec(mode="grid", scale_m=scale_m, grid_orientation=grid_orientation)
 
     @staticmethod
     def pooled(pooling: Literal["mean", "max"] = "mean") -> "OutputSpec":
@@ -284,9 +280,7 @@ class OutputSpec:
         OutputSpec
             Output specification with ``mode="pooled"``.
         """
-        return OutputSpec(
-            mode="pooled", scale_m=10, pooling=pooling, grid_orientation="north_up"
-        )
+        return OutputSpec(mode="pooled", scale_m=10, pooling=pooling, grid_orientation="north_up")
 
 
 @dataclass(frozen=True)

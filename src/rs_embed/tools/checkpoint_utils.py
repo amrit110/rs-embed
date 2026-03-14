@@ -53,9 +53,7 @@ def store_prefetch_checkpoint_arrays(
     prefetch_meta: Dict[str, Any] = {}
     for skey in sorted(sensor_by_key.keys()):
         hit_items = [
-            (i, inputs_cache[(i, skey)])
-            for i in range(n_items)
-            if (i, skey) in inputs_cache
+            (i, inputs_cache[(i, skey)]) for i in range(n_items) if (i, skey) in inputs_cache
         ]
         if not hit_items:
             continue
@@ -75,13 +73,11 @@ def store_prefetch_checkpoint_arrays(
         if len(hit_items) == n_items:
             key = f"{_CHECKPOINT_PREFETCH_BCHW_PREFIX}{skey}"
             try:
-                arr = np.stack(
-                    [np.asarray(x, dtype=np.float32) for _, x in hit_items], axis=0
-                )
+                arr = np.stack([np.asarray(x, dtype=np.float32) for _, x in hit_items], axis=0)
                 arrays[key] = arr
                 entry["npz_key"] = key
                 entry["shape"] = list(arr.shape)
-            except Exception:
+            except Exception as _e:
                 # Some providers can return variable H/W across points.
                 # Keep checkpointing by storing per-item CHW arrays instead.
                 _store_per_item(hit_items)
@@ -116,15 +112,13 @@ def restore_prefetch_checkpoint_cache(
                     continue
                 try:
                     idx = int(indices[j]) if j < len(indices) else int(j)
-                except Exception:
+                except Exception as _e:
                     idx = int(j)
                 cache[(idx, str(skey))] = np.asarray(arrays[key], dtype=np.float32)
     return cache
 
 
-def drop_model_arrays(
-    arrays: Dict[str, np.ndarray], model_name: str, *, sanitize_key
-) -> None:
+def drop_model_arrays(arrays: Dict[str, np.ndarray], model_name: str, *, sanitize_key) -> None:
     mkey = sanitize_key(model_name)
     prefixes = (
         f"embeddings__{mkey}",

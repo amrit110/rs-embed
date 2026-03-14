@@ -58,7 +58,7 @@ def _safe_float(x: Any) -> Optional[float]:
         if x is None:
             return None
         return float(x)
-    except Exception:
+    except Exception as _e:
         return None
 
 
@@ -107,17 +107,13 @@ def inspect_chw(
 
     if x_chw.ndim != 3:
         report["ok"] = False
-        report["issues"].append(
-            f"{name}: expected CHW with ndim=3, got ndim={x_chw.ndim}"
-        )
+        report["issues"].append(f"{name}: expected CHW with ndim=3, got ndim={x_chw.ndim}")
         return report
 
     c, h, w = (int(x_chw.shape[0]), int(x_chw.shape[1]), int(x_chw.shape[2]))
     if expected_channels is not None and c != int(expected_channels):
         report["ok"] = False
-        report["issues"].append(
-            f"{name}: channel mismatch (C={c}, expected {expected_channels})"
-        )
+        report["issues"].append(f"{name}: channel mismatch (C={c}, expected {expected_channels})")
 
     if h <= 0 or w <= 0:
         report["ok"] = False
@@ -141,9 +137,7 @@ def inspect_chw(
     if finite_frac < 0.999:
         report["ok"] = False
         n_bad = int((~finite).sum())
-        report["issues"].append(
-            f"{name}: contains NaN/Inf (count≈{n_bad} on sampled data)"
-        )
+        report["issues"].append(f"{name}: contains NaN/Inf (count≈{n_bad} on sampled data)")
 
     # Replace non-finite for stats
     xf2 = np.where(finite, xf, np.nan)
@@ -166,17 +160,14 @@ def inspect_chw(
         try:
             qv = np.nanquantile(xf2, qs, axis=(1, 2))  # [Q, C]
             report["band_quantiles"] = {
-                f"p{int(round(q * 100)):02d}": [float(v) for v in qv[i]]
-                for i, q in enumerate(qs)
+                f"p{int(round(q * 100)):02d}": [float(v) for v in qv[i]] for i, q in enumerate(qs)
             }
             for qi, q in enumerate(qs):
                 key = f"band_p{int(round(q * 100)):02d}"
                 report[key] = [float(v) for v in qv[qi]]
             report["quantiles"] = list(qs)
         except Exception as e:
-            report.setdefault("warnings", []).append(
-                f"{name}: failed to compute quantiles: {e!r}"
-            )
+            report.setdefault("warnings", []).append(f"{name}: failed to compute quantiles: {e!r}")
 
     # Histograms (computed once; export both legacy and compact fields).
     if int(hist_bins) > 0 and c <= int(max_bands_for_hist):

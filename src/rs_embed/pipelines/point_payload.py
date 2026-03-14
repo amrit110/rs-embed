@@ -88,7 +88,7 @@ def build_one_point_payload(
         from importlib.metadata import version
 
         manifest["package_version"] = version("rs-embed")
-    except Exception:
+    except Exception as _e:
         manifest["package_version"] = None
 
     local_inp: Dict[str, np.ndarray] = {}
@@ -165,19 +165,11 @@ def build_one_point_payload(
 
                 report = input_reports.get((point_index, skey))
                 if report is None and input_chw is not None:
-                    report = inspect(
-                        input_chw, sensor=sspec, name=f"gee_input_{skey}"
-                    )
+                    report = inspect(input_chw, sensor=sspec, name=f"gee_input_{skey}")
 
-                if (
-                    fail_on_bad_input
-                    and report is not None
-                    and (not bool(report.get("ok", True)))
-                ):
+                if fail_on_bad_input and report is not None and (not bool(report.get("ok", True))):
                     issues = (report.get("report", {}) or {}).get("issues", [])
-                    raise RuntimeError(
-                        f"Input inspection failed for model={m}: {issues}"
-                    )
+                    raise RuntimeError(f"Input inspection failed for model={m}: {issues}")
 
                 if save_inputs and input_chw is not None:
                     if skey in local_input_meta:
@@ -245,7 +237,7 @@ def build_one_point_payload(
             if model_progress_cb is not None:
                 try:
                     model_progress_cb(m)
-                except Exception:
+                except Exception as _e:
                     pass
 
         manifest["models"].append(m_entry)

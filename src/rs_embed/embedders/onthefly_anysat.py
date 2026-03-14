@@ -38,9 +38,7 @@ def _resize_tchw(x_tchw: np.ndarray, *, out_hw: int) -> np.ndarray:
     if x_tchw.ndim != 4:
         raise ModelError(f"Expected [T,C,H,W], got {x_tchw.shape}")
     x = torch.from_numpy(x_tchw.astype(np.float32, copy=False))
-    y = F.interpolate(
-        x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False
-    )
+    y = F.interpolate(x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False)
     return y.detach().cpu().numpy().astype(np.float32)
 
 
@@ -112,8 +110,7 @@ def _load_anysat_hub_module():
         getattr(mod, "AnySat")
     except Exception as e:
         raise ModelError(
-            "Failed to import vendored AnySat runtime. "
-            "Install missing dependencies: torch, einops."
+            "Failed to import vendored AnySat runtime. Install missing dependencies: torch, einops."
         ) from e
     return mod
 
@@ -139,9 +136,7 @@ def _download_anysat_ckpt(
         raise ModelError(f"Failed to download AnySat checkpoint: {hf_repo}/{filename}")
     sz = os.path.getsize(p)
     if sz < int(min_bytes):
-        raise ModelError(
-            f"Downloaded AnySat checkpoint looks too small ({sz} bytes): {p}"
-        )
+        raise ModelError(f"Downloaded AnySat checkpoint looks too small ({sz} bytes): {p}")
     return p
 
 
@@ -150,11 +145,7 @@ def _load_ckpt_state_dict(ckpt_path: str) -> Dict[str, Any]:
     import torch
 
     obj = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    if (
-        isinstance(obj, dict)
-        and "state_dict" in obj
-        and isinstance(obj["state_dict"], dict)
-    ):
+    if isinstance(obj, dict) and "state_dict" in obj and isinstance(obj["state_dict"], dict):
         return obj["state_dict"]
     if isinstance(obj, dict):
         return obj
@@ -187,9 +178,7 @@ def _load_anysat_cached(
             raise ModelError(f"AnySat checkpoint not found: {ckpt_local}")
         if os.path.getsize(ckpt_local) < 50 * 1024 * 1024:
             raise ModelError(f"AnySat checkpoint seems too small: {ckpt_local}")
-        model = hub.AnySat(
-            model_size=model_size, flash_attn=bool(flash_attn), device=dev
-        )
+        model = hub.AnySat(model_size=model_size, flash_attn=bool(flash_attn), device=dev)
         sd = _load_ckpt_state_dict(ckpt_local)
         model.model.load_state_dict(sd, strict=True)
         loaded_from = ckpt_local
@@ -201,21 +190,17 @@ def _load_anysat_cached(
                 cache_dir=hf_cache_dir,
                 min_bytes=hf_min_bytes,
             )
-            model = hub.AnySat(
-                model_size=model_size, flash_attn=bool(flash_attn), device=dev
-            )
+            model = hub.AnySat(model_size=model_size, flash_attn=bool(flash_attn), device=dev)
             sd = _load_ckpt_state_dict(ckpt_local)
             model.model.load_state_dict(sd, strict=True)
             loaded_from = f"hf://{hf_repo}/{hf_filename}"
         else:
-            model = hub.AnySat(
-                model_size=model_size, flash_attn=bool(flash_attn), device=dev
-            )
+            model = hub.AnySat(model_size=model_size, flash_attn=bool(flash_attn), device=dev)
             loaded_from = "random_init"
 
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     p0 = None
@@ -226,9 +211,7 @@ def _load_anysat_cached(
     if p0 is None:
         raise ModelError("AnySat model has no parameters; cannot verify load.")
     if not torch.isfinite(p0).all():
-        raise ModelError(
-            "AnySat parameters contain NaN/Inf; checkpoint load likely failed."
-        )
+        raise ModelError("AnySat parameters contain NaN/Inf; checkpoint load likely failed.")
     p0f = p0.float()
 
     meta = {
@@ -288,9 +271,7 @@ def _prepare_anysat_s2_input(
         raise ModelError(f"AnySat s2 expects [T,10,H,W], got shape={raw_tchw.shape}")
     x_tchw = raw_tchw.astype(np.float32, copy=False)
 
-    if image_size > 0 and (
-        x_tchw.shape[-1] != image_size or x_tchw.shape[-2] != image_size
-    ):
+    if image_size > 0 and (x_tchw.shape[-1] != image_size or x_tchw.shape[-2] != image_size):
         x_tchw = _resize_tchw(x_tchw, out_hw=image_size)
 
     x_tchw = _normalize_series(x_tchw, mode=norm_mode)
@@ -299,9 +280,7 @@ def _prepare_anysat_s2_input(
     if doy.size == 0:
         doy = np.full((t,), 182, dtype=np.int64)
     if doy.size < t:
-        doy = np.concatenate(
-            [doy, np.full((t - doy.size,), int(doy[-1]), dtype=np.int64)], axis=0
-        )
+        doy = np.concatenate([doy, np.full((t - doy.size,), int(doy[-1]), dtype=np.int64)], axis=0)
     elif doy.size > t:
         doy = doy[:t]
     dates = doy[None, :]
@@ -336,9 +315,7 @@ def _anysat_patch_features(
 
     # AnySat patch output: [B,H,W,D]
     if int(out.shape[0]) != 1:
-        raise ModelError(
-            f"AnySat embedder expects B=1 per call, got {tuple(out.shape)}"
-        )
+        raise ModelError(f"AnySat embedder expects B=1 per call, got {tuple(out.shape)}")
     arr = out[0].detach().float().cpu().numpy().astype(np.float32)  # [H,W,D]
     grid = np.transpose(arr, (2, 0, 1)).astype(np.float32)  # [D,H,W]
     meta = {
@@ -420,13 +397,9 @@ class AnySatEmbedder(EmbedderBase):
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
-        n_frames = max(
-            1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES)))
-        )
+        n_frames = max(1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES))))
 
-        model_size = (
-            os.environ.get("RS_EMBED_ANYSAT_MODEL_SIZE", "base").strip().lower()
-        )
+        model_size = os.environ.get("RS_EMBED_ANYSAT_MODEL_SIZE", "base").strip().lower()
         flash_attn = os.environ.get("RS_EMBED_ANYSAT_FLASH_ATTN", "0").strip() in {
             "1",
             "true",
@@ -448,9 +421,7 @@ class AnySatEmbedder(EmbedderBase):
             "RS_EMBED_ANYSAT_CACHE_DIR",
             os.path.join("~", ".cache", "rs_embed", "anysat"),
         )
-        hf_min_bytes = int(
-            os.environ.get("RS_EMBED_ANYSAT_CKPT_MIN_BYTES", str(50 * 1024 * 1024))
-        )
+        hf_min_bytes = int(os.environ.get("RS_EMBED_ANYSAT_CKPT_MIN_BYTES", str(50 * 1024 * 1024)))
 
         if input_chw is None:
             provider = self._get_provider(backend)
@@ -582,9 +553,7 @@ class AnySatEmbedder(EmbedderBase):
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()
         provider = self._get_provider(backend)
-        n_frames = max(
-            1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES)))
-        )
+        n_frames = max(1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES))))
 
         n = len(spatials)
         prefetched_raw: List[Optional[np.ndarray]] = [None] * n

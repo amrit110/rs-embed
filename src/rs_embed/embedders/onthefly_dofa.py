@@ -190,9 +190,7 @@ def _load_dofa_model_cached(variant: str, dev: str):
         weights = DOFALarge16_Weights.DOFA_MAE
         model = dofa_large_patch16_224(weights=weights)
     else:
-        raise ModelError(
-            f"Unknown DOFA variant='{variant}' (expected 'base' or 'large')."
-        )
+        raise ModelError(f"Unknown DOFA variant='{variant}' (expected 'base' or 'large').")
 
     model = model.to(dev).eval()
 
@@ -283,9 +281,7 @@ def _dofa_forward_tokens_and_pooled(
             pooled = xseq[:, 0][0].detach().float().cpu().numpy().astype(np.float32)
             norm_applied = "norm(cls)"
 
-        patch_tokens = (
-            xseq[:, 1:, :][0].detach().float().cpu().numpy().astype(np.float32)
-        )  # [N,D]
+        patch_tokens = xseq[:, 1:, :][0].detach().float().cpu().numpy().astype(np.float32)  # [N,D]
 
     n, d = patch_tokens.shape
     side = int(round(math.sqrt(n)))
@@ -337,14 +333,10 @@ def _dofa_forward_tokens_and_pooled_batch(
             norm_applied = "fc_norm(global_pool_mean)"
         else:
             xseq = model.norm(xseq)
-            pooled = (
-                xseq[:, 0].detach().float().cpu().numpy().astype(np.float32)
-            )  # [B,D]
+            pooled = xseq[:, 0].detach().float().cpu().numpy().astype(np.float32)  # [B,D]
             norm_applied = "norm(cls)"
 
-        patch_tokens = (
-            xseq[:, 1:, :].detach().float().cpu().numpy().astype(np.float32)
-        )  # [B,N,D]
+        patch_tokens = xseq[:, 1:, :].detach().float().cpu().numpy().astype(np.float32)  # [B,N,D]
 
     n = int(patch_tokens.shape[1])
     d = int(patch_tokens.shape[2])
@@ -417,9 +409,7 @@ class DOFAEmbedder(EmbedderBase):
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
         v = int(
-            os.environ.get(
-                "RS_EMBED_DOFA_FETCH_WORKERS", str(DOFAEmbedder.DEFAULT_FETCH_WORKERS)
-            )
+            os.environ.get("RS_EMBED_DOFA_FETCH_WORKERS", str(DOFAEmbedder.DEFAULT_FETCH_WORKERS))
         )
         return max(1, min(int(n_items), v))
 
@@ -470,11 +460,7 @@ class DOFAEmbedder(EmbedderBase):
 
             wavelengths_um = getattr(sensor, "wavelengths", None)
             if wavelengths_um is None:
-                bands = (
-                    list(getattr(sensor, "bands", []))
-                    if hasattr(sensor, "bands")
-                    else []
-                )
+                bands = list(getattr(sensor, "bands", [])) if hasattr(sensor, "bands") else []
                 if bands:
                     wavelengths_um = _infer_wavelengths_um(bands)
             if wavelengths_um is None:
@@ -489,14 +475,10 @@ class DOFAEmbedder(EmbedderBase):
         else:
             provider = self._get_provider(backend)
             if temporal is None:
-                raise ModelError(
-                    "dofa provider backend requires TemporalSpec.range(start,end)."
-                )
+                raise ModelError("dofa provider backend requires TemporalSpec.range(start,end).")
             temporal.validate()
             if temporal.mode != "range":
-                raise ModelError(
-                    "dofa provider backend requires TemporalSpec.range in v0.1."
-                )
+                raise ModelError("dofa provider backend requires TemporalSpec.range in v0.1.")
 
             # overrides
             collection = (
@@ -505,15 +487,11 @@ class DOFAEmbedder(EmbedderBase):
                 else "COPERNICUS/S2_SR_HARMONIZED"
             )
             bands = (
-                list(getattr(sensor, "bands", _S2_SR_12_BANDS))
-                if sensor
-                else list(_S2_SR_12_BANDS)
+                list(getattr(sensor, "bands", _S2_SR_12_BANDS)) if sensor else list(_S2_SR_12_BANDS)
             )
             scale_m = int(getattr(sensor, "scale_m", 10)) if sensor else 10
             cloudy_pct = int(getattr(sensor, "cloudy_pct", 30)) if sensor else 30
-            composite = (
-                str(getattr(sensor, "composite", "median")) if sensor else "median"
-            )
+            composite = str(getattr(sensor, "composite", "median")) if sensor else "median"
 
             wavelengths_um = getattr(sensor, "wavelengths", None) if sensor else None
             if wavelengths_um is None:
@@ -542,9 +520,7 @@ class DOFAEmbedder(EmbedderBase):
                     raise ModelError(
                         f"input_chw must be CHW with {len(bands)} bands for DOFA, got {getattr(input_chw, 'shape', None)}"
                     )
-                x_chw = np.clip(
-                    input_chw.astype(np.float32) / 10000.0, 0.0, 1.0
-                ).astype(np.float32)
+                x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0).astype(np.float32)
                 provider_meta = {
                     "raw_chw_shape": tuple(x_chw.shape),
                     "input_override": True,
@@ -563,23 +539,16 @@ class DOFAEmbedder(EmbedderBase):
                 fill_value=0.0,
                 meta=check_meta,
             )
-            if (
-                report is not None
-                and (not report.get("ok", True))
-                and checks_should_raise(sensor)
-            ):
+            if report is not None and (not report.get("ok", True)) and checks_should_raise(sensor):
                 raise ModelError(
-                    "Provider input inspection failed: "
-                    + "; ".join(report.get("issues", []))
+                    "Provider input inspection failed: " + "; ".join(report.get("issues", []))
                 )
 
             x_chw, resize_meta = _resize_chw(x_chw, size=image_size)
             x_bchw = x_chw[None, ...].astype(np.float32)
         c = int(x_bchw.shape[1])
         if len(wavelengths_um) != c:
-            raise ModelError(
-                f"wavelengths length={len(wavelengths_um)} must equal channels C={c}."
-            )
+            raise ModelError(f"wavelengths length={len(wavelengths_um)} must equal channels C={c}.")
 
         # -----------------
         # Model + forward
@@ -618,9 +587,7 @@ class DOFAEmbedder(EmbedderBase):
             n, d = tokens.shape
             side = int(round(math.sqrt(n)))
             if side * side != n:
-                raise ModelError(
-                    f"DOFA tokens N={n} not square; cannot reshape to grid."
-                )
+                raise ModelError(f"DOFA tokens N={n} not square; cannot reshape to grid.")
             grid = tokens.reshape(side, side, d).transpose(2, 0, 1).astype(np.float32)
 
             meta = {
@@ -662,19 +629,14 @@ class DOFAEmbedder(EmbedderBase):
         backend_l = backend.lower().strip()
         if backend_l == "tensor":
             raise ModelError(
-                "backend='tensor' batch inference requires "
-                "get_embeddings_batch_from_inputs(...)."
+                "backend='tensor' batch inference requires get_embeddings_batch_from_inputs(...)."
             )
         provider = self._get_provider(backend)
         if temporal is None:
-            raise ModelError(
-                "dofa provider backend requires TemporalSpec.range(start,end)."
-            )
+            raise ModelError("dofa provider backend requires TemporalSpec.range(start,end).")
         temporal.validate()
         if temporal.mode != "range":
-            raise ModelError(
-                "dofa provider backend requires TemporalSpec.range in v0.1."
-            )
+            raise ModelError("dofa provider backend requires TemporalSpec.range in v0.1.")
 
         ss = sensor or self._default_sensor()
         collection = str(getattr(ss, "collection", "COPERNICUS/S2_SR_HARMONIZED"))
@@ -760,14 +722,10 @@ class DOFAEmbedder(EmbedderBase):
             )
         self._get_provider(backend)
         if temporal is None:
-            raise ModelError(
-                "dofa provider backend requires TemporalSpec.range(start,end)."
-            )
+            raise ModelError("dofa provider backend requires TemporalSpec.range(start,end).")
         temporal.validate()
         if temporal.mode != "range":
-            raise ModelError(
-                "dofa provider backend requires TemporalSpec.range in v0.1."
-            )
+            raise ModelError("dofa provider backend requires TemporalSpec.range in v0.1.")
 
         ss = sensor or self._default_sensor()
         variant = getattr(ss, "variant", "base")
@@ -789,9 +747,7 @@ class DOFAEmbedder(EmbedderBase):
                     f"input_chw must be CHW with {len(bands)} bands for DOFA, got "
                     f"{getattr(input_chw, 'shape', None)} at index={i}"
                 )
-            x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0).astype(
-                np.float32
-            )
+            x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0).astype(np.float32)
             x_chw, resize_meta = _resize_chw(x_chw, size=224)
             x_bchw_all.append(x_chw)
             resize_meta_all.append(resize_meta)
@@ -851,11 +807,7 @@ class DOFAEmbedder(EmbedderBase):
                         raise ModelError(
                             f"DOFA tokens N={n_tok} not square; cannot reshape to grid."
                         )
-                    grid = (
-                        tokens.reshape(side, side, d_tok)
-                        .transpose(2, 0, 1)
-                        .astype(np.float32)
-                    )
+                    grid = tokens.reshape(side, side, d_tok).transpose(2, 0, 1).astype(np.float32)
                     meta = {
                         **base_meta,
                         "grid_type": "vit_patch_tokens",

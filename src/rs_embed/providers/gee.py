@@ -89,9 +89,7 @@ def _resolve_band_aliases(collection: str, bands: Tuple[str, ...]) -> Tuple[str,
     return tuple(out)
 
 
-def _split_date_range(
-    start: str, end: str, n_parts: int
-) -> Tuple[Tuple[str, str], ...]:
+def _split_date_range(start: str, end: str, n_parts: int) -> Tuple[Tuple[str, str], ...]:
     try:
         return _split_date_range_core(start, end, n_parts)
     except SpecError as e:
@@ -107,7 +105,7 @@ def _no_images_found_message(*, collection: Optional[str] = None) -> str:
 def _collection_size_or_none(col: Any) -> Optional[int]:
     try:
         return int(col.size().getInfo())
-    except Exception:
+    except Exception as _e:
         return None
 
 
@@ -150,7 +148,7 @@ class GEEProvider(ProviderBase):
             import ee
 
             ee.Initialize()
-        except Exception:
+        except Exception as _e:
             if not self.auto_auth:
                 raise ProviderError(
                     "Earth Engine not initialized. Run `earthengine authenticate` and try again."
@@ -172,17 +170,13 @@ class GEEProvider(ProviderBase):
             x, y = to_3857.transform(spatial.lon, spatial.lat)
             half = spatial.buffer_m
             minx, miny, maxx, maxy = x - half, y - half, x + half, y + half
-            return ee.Geometry.Rectangle(
-                [minx, miny, maxx, maxy], proj="EPSG:3857", geodesic=False
-            )
+            return ee.Geometry.Rectangle([minx, miny, maxx, maxy], proj="EPSG:3857", geodesic=False)
 
         if isinstance(spatial, BBox):
             spatial.validate()
             minx, miny = to_3857.transform(spatial.minlon, spatial.minlat)
             maxx, maxy = to_3857.transform(spatial.maxlon, spatial.maxlat)
-            return ee.Geometry.Rectangle(
-                [minx, miny, maxx, maxy], proj="EPSG:3857", geodesic=False
-            )
+            return ee.Geometry.Rectangle([minx, miny, maxx, maxy], proj="EPSG:3857", geodesic=False)
 
         raise ProviderError(f"Unsupported spatial type: {type(spatial)}")
 
@@ -222,10 +216,8 @@ class GEEProvider(ProviderBase):
                 ic = ic.filterDate(temporal_range[0], temporal_range[1])
             if sensor.cloudy_pct is not None:
                 try:
-                    ic = ic.filter(
-                        ee.Filter.lte("CLOUDY_PIXEL_PERCENTAGE", int(sensor.cloudy_pct))
-                    )
-                except Exception:
+                    ic = ic.filter(ee.Filter.lte("CLOUDY_PIXEL_PERCENTAGE", int(sensor.cloudy_pct)))
+                except Exception as _e:
                     pass
             _raise_if_empty_collection(ic, collection=str(sensor.collection))
 
@@ -237,7 +229,7 @@ class GEEProvider(ProviderBase):
                 img = ic.median()
         except ProviderError:
             raise
-        except Exception:
+        except Exception as _e:
             img = ee.Image(sensor.collection)
 
         return img
@@ -320,9 +312,7 @@ class GEEProvider(ProviderBase):
         temporal.validate()
 
         region = self.get_region(spatial)
-        collection_id = (
-            "COPERNICUS/S1_GRD_FLOAT" if bool(use_float_linear) else "COPERNICUS/S1_GRD"
-        )
+        collection_id = "COPERNICUS/S1_GRD_FLOAT" if bool(use_float_linear) else "COPERNICUS/S1_GRD"
         col = (
             ee.ImageCollection(collection_id)
             .filterDate(temporal.start, temporal.end)
@@ -341,14 +331,10 @@ class GEEProvider(ProviderBase):
         elif comp == "mosaic":
             img = col.mosaic()
         else:
-            raise ProviderError(
-                f"Unknown composite='{composite}'. Use 'median' or 'mosaic'."
-            )
+            raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
         img = img.select(["VV", "VH"]).reproject(crs="EPSG:3857", scale=int(scale_m))
-        rect = img.sampleRectangle(
-            region=region, defaultValue=float(fill_value)
-        ).getInfo()
+        rect = img.sampleRectangle(region=region, defaultValue=float(fill_value)).getInfo()
         props = rect.get("properties", {}) if isinstance(rect, dict) else {}
         if not props:
             raise ProviderError(_no_images_found_message(collection=collection_id))
@@ -357,9 +343,7 @@ class GEEProvider(ProviderBase):
         try:
             arr = np.stack([vv, vh], axis=0).astype(np.float32)
         except Exception as e:
-            raise ProviderError(
-                "Failed to sample S1 VV/VH rectangle from GEE image."
-            ) from e
+            raise ProviderError("Failed to sample S1 VV/VH rectangle from GEE image.") from e
         arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
         if arr.ndim != 3 or int(arr.shape[0]) != 2:
             raise ProviderError(
@@ -396,18 +380,14 @@ class GEEProvider(ProviderBase):
         )
         if cloudy_pct is not None:
             try:
-                col_all = col_all.filter(
-                    ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", int(cloudy_pct))
-                )
-            except Exception:
+                col_all = col_all.filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", int(cloudy_pct)))
+            except Exception as _e:
                 pass
         _raise_if_empty_collection(col_all, collection=str(collection))
 
         comp = str(composite).lower().strip()
         if comp not in {"median", "mosaic"}:
-            raise ProviderError(
-                f"Unknown composite='{composite}'. Use 'median' or 'mosaic'."
-            )
+            raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
         def _reduce(c: Any) -> Any:
             return c.median() if comp == "median" else c.mosaic()
@@ -422,7 +402,7 @@ class GEEProvider(ProviderBase):
                     scale_m=scale_m,
                     fill_value=fill_value,
                 )
-        except Exception:
+        except Exception as _e:
             fallback_frame = None
 
         frames = []
@@ -431,7 +411,7 @@ class GEEProvider(ProviderBase):
             col_i = col_all.filterDate(start_i, end_i)
             try:
                 has_data = int(col_i.size().getInfo()) > 0
-            except Exception:
+            except Exception as _e:
                 has_data = False
 
             if has_data:
@@ -451,9 +431,7 @@ class GEEProvider(ProviderBase):
             if fallback_frame is not None:
                 frames = [fallback_frame.copy() for _ in range(max(1, int(n_frames)))]
             else:
-                raise ProviderError(
-                    _no_images_found_message(collection=str(collection))
-                )
+                raise ProviderError(_no_images_found_message(collection=str(collection)))
 
         t = max(1, int(n_frames))
         if len(frames) < t:
@@ -463,9 +441,7 @@ class GEEProvider(ProviderBase):
 
         arr = np.stack(frames, axis=0).astype(np.float32)
         if arr.ndim != 4:
-            raise ProviderError(
-                f"Expected TCHW array, got shape={getattr(arr, 'shape', None)}"
-            )
+            raise ProviderError(f"Expected TCHW array, got shape={getattr(arr, 'shape', None)}")
         if int(arr.shape[1]) != len(tuple(resolved_bands)):
             raise ProviderError(
                 f"Time series channel mismatch: got C={int(arr.shape[1])}, expected C={len(tuple(resolved_bands))}"
@@ -509,9 +485,7 @@ class GEEProvider(ProviderBase):
         elif comp == "mosaic":
             img = col.mosaic()
         else:
-            raise ProviderError(
-                f"Unknown composite='{composite}'. Use 'median' or 'mosaic'."
-            )
+            raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
         img = img.reproject(crs="EPSG:3857", scale=int(scale_m)).clip(region)
         band_names_raw = img.bandNames().getInfo()
@@ -519,9 +493,7 @@ class GEEProvider(ProviderBase):
         if not band_names:
             raise ProviderError(f"No bands found for collection={collection!r}.")
 
-        rect = img.sampleRectangle(
-            region=region, defaultValue=float(fill_value)
-        ).getInfo()
+        rect = img.sampleRectangle(region=region, defaultValue=float(fill_value)).getInfo()
         props = rect.get("properties", {}) if isinstance(rect, dict) else {}
         if not props:
             raise ProviderError(_no_images_found_message(collection=str(collection)))
@@ -529,8 +501,6 @@ class GEEProvider(ProviderBase):
         try:
             arr = np.stack(arrs, axis=0).astype(np.float32)
         except Exception as e:
-            raise ProviderError(
-                "Failed to sample rectangle for all collection bands."
-            ) from e
+            raise ProviderError("Failed to sample rectangle for all collection bands.") from e
         arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
         return arr, band_names

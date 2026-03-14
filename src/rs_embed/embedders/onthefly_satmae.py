@@ -43,7 +43,7 @@ def _load_satmae_cached(model_id: str, dev: str):
     model = SatMAE.from_pretrained(model_id)
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     meta = {"model_id": model_id, "device": dev}
@@ -51,9 +51,7 @@ def _load_satmae_cached(model_id: str, dev: str):
 
 
 def _load_satmae(model_id: str, device: str = "auto"):
-    loaded, _dev = _load_cached_with_device(
-        _load_satmae_cached, device=device, model_id=model_id
-    )
+    loaded, _dev = _load_cached_with_device(_load_satmae_cached, device=device, model_id=model_id)
     return loaded
 
 
@@ -105,9 +103,7 @@ def _satmae_forward_tokens_batch(
 
     fe = getattr(model, "forward_encoder", None)
     if not callable(fe):
-        raise ModelError(
-            "SatMAE wrapper does not expose forward_encoder(). Update rshf."
-        )
+        raise ModelError("SatMAE wrapper does not expose forward_encoder(). Update rshf.")
 
     with torch.no_grad():
         out = fe(xb, mask_ratio=0.0)
@@ -169,18 +165,12 @@ class SatMAERGBEmbedder(EmbedderBase):
         )
 
     def _resolve_fetch_workers(self, n_items: int) -> int:
-        v = int(
-            os.environ.get(
-                "RS_EMBED_SATMAE_FETCH_WORKERS", str(self.DEFAULT_FETCH_WORKERS)
-            )
-        )
+        v = int(os.environ.get("RS_EMBED_SATMAE_FETCH_WORKERS", str(self.DEFAULT_FETCH_WORKERS)))
         return max(1, min(int(n_items), v))
 
     def _resolve_infer_batch(self, dev: str) -> int:
         default_bs = (
-            self.DEFAULT_BATCH_CUDA
-            if str(dev).startswith("cuda")
-            else self.DEFAULT_BATCH_CPU
+            self.DEFAULT_BATCH_CUDA if str(dev).startswith("cuda") else self.DEFAULT_BATCH_CPU
         )
         v = int(os.environ.get("RS_EMBED_SATMAE_BATCH_SIZE", str(default_bs)))
         return max(1, v)
@@ -203,9 +193,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
 
         t = temporal_to_range(temporal)
         # Fetch RGB patch (optionally reuse pre-fetched raw patch)
@@ -231,9 +219,7 @@ class SatMAERGBEmbedder(EmbedderBase):
 
         model, wmeta = _load_satmae(model_id=model_id, device=device)
         dev = wmeta.get("device", device)
-        tokens = _satmae_forward_tokens(
-            model, rgb_u8, image_size=image_size, device=dev
-        )  # [N,D]
+        tokens = _satmae_forward_tokens(model, rgb_u8, image_size=image_size, device=dev)  # [N,D]
 
         meta = base_meta(
             model_name=self.model_name,
@@ -251,9 +237,7 @@ class SatMAERGBEmbedder(EmbedderBase):
 
         if output.mode == "pooled":
             vec, cls_removed = pool_from_tokens(tokens, output.pooling)
-            meta.update(
-                {"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)}
-            )
+            meta.update({"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)})
             return Embedding(data=vec, meta=meta)
 
         if output.mode == "grid":
@@ -269,9 +253,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             try:
                 import xarray as xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
             da = xr.DataArray(
                 grid,
@@ -307,9 +289,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         t = temporal_to_range(temporal)
 
         provider = self._get_provider(backend)
@@ -340,9 +320,7 @@ class SatMAERGBEmbedder(EmbedderBase):
 
         for i, x in enumerate(rgb_u8_all):
             if x is None:
-                raise ModelError(
-                    f"Missing fetched patch at index={i}; batch fetch failed."
-                )
+                raise ModelError(f"Missing fetched patch at index={i}; batch fetch failed.")
 
         model, wmeta = _load_satmae(model_id=model_id, device=device)
         dev = wmeta.get("device", device)
@@ -357,9 +335,7 @@ class SatMAERGBEmbedder(EmbedderBase):
 
                 xr_mod = xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
         for s0 in range(0, n, infer_bs):
             s1 = min(n, s0 + infer_bs)
@@ -447,9 +423,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             sensor = self._default_sensor()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
-        image_size = int(
-            os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         t = temporal_to_range(temporal)
 
         rgb_u8_all: List[np.ndarray] = []
@@ -476,9 +450,7 @@ class SatMAERGBEmbedder(EmbedderBase):
 
                 xr_mod = xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
         n = len(spatials)
         for s0 in range(0, n, infer_bs):

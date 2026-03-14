@@ -71,9 +71,7 @@ def _fetch_s2_prithvi6_chw(
     return x_chw
 
 
-def _pad_chw_to_multiple(
-    x_chw: np.ndarray, mult: int = 16, value: float = 0.0
-) -> np.ndarray:
+def _pad_chw_to_multiple(x_chw: np.ndarray, mult: int = 16, value: float = 0.0) -> np.ndarray:
     """
     Pad CHW to make H and W divisible by mult.
     Pads on bottom and right only.
@@ -99,9 +97,7 @@ def _resize_chw(x_chw: np.ndarray, *, size: int = 224) -> np.ndarray:
     if x_chw.ndim != 3:
         raise ModelError(f"Expected CHW array, got {x_chw.shape}")
     x = torch.from_numpy(x_chw.astype(np.float32, copy=False)).unsqueeze(0)
-    y = F.interpolate(
-        x, size=(int(size), int(size)), mode="bilinear", align_corners=False
-    )
+    y = F.interpolate(x, size=(int(size), int(size)), mode="bilinear", align_corners=False)
     return y[0].detach().cpu().numpy().astype(np.float32)
 
 
@@ -126,9 +122,7 @@ def _prepare_prithvi_chw(
     elif prep == "pad":
         y = _pad_chw_to_multiple(x_chw, mult=patch_mult, value=float(fill_value))
     else:
-        raise ModelError(
-            f"Unknown RS_EMBED_PRITHVI_PREP='{prep}'. Use 'resize' or 'pad'."
-        )
+        raise ModelError(f"Unknown RS_EMBED_PRITHVI_PREP='{prep}'. Use 'resize' or 'pad'.")
 
     return y, {
         "prep_mode": prep,
@@ -171,9 +165,7 @@ def _load_prithvi_cached(
         from terratorch.registry import BACKBONE_REGISTRY
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError(
-                "Prithvi requires terratorch. Install: pip install terratorch"
-            ) from e
+            raise ModelError("Prithvi requires terratorch. Install: pip install terratorch") from e
         raise ModelError(
             "Failed to import terratorch registry while loading Prithvi. "
             f"Missing dependency: {getattr(e, 'name', None) or e}. "
@@ -181,8 +173,7 @@ def _load_prithvi_cached(
         ) from e
     except Exception as e:
         raise ModelError(
-            "Failed to import terratorch registry while loading Prithvi: "
-            f"{type(e).__name__}: {e}"
+            f"Failed to import terratorch registry while loading Prithvi: {type(e).__name__}: {e}"
         ) from e
 
     try:
@@ -201,7 +192,7 @@ def _load_prithvi_cached(
 
     try:
         m = m.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     meta = {
@@ -283,11 +274,7 @@ def _prithvi_forward_tokens(
     elif hasattr(out, "last_hidden_state"):
         tokens = out.last_hidden_state
     elif isinstance(out, dict):
-        tokens = (
-            out.get("tokens")
-            or out.get("last_hidden_state")
-            or out.get("hidden_states")
-        )
+        tokens = out.get("tokens") or out.get("last_hidden_state") or out.get("hidden_states")
         if isinstance(tokens, (tuple, list)):
             tokens = tokens[-1]
     else:
@@ -332,15 +319,13 @@ def _prithvi_forward_tokens_batch(
         tcoords.append([float(d.year), float(d.dayofyear - 1)])
         lon, lat = lon_lat_batch[i]
         lcoords.append([float(lon), float(lat)])
-    temporal_coords = torch.tensor(
-        tcoords, dtype=torch.float32, device=device
-    ).unsqueeze(1)  # [B,1,2]
+    temporal_coords = torch.tensor(tcoords, dtype=torch.float32, device=device).unsqueeze(
+        1
+    )  # [B,1,2]
     location_coords = torch.tensor(lcoords, dtype=torch.float32, device=device)  # [B,2]
 
     with torch.inference_mode():
-        out = model(
-            xb, temporal_coords=temporal_coords, location_coords=location_coords
-        )
+        out = model(xb, temporal_coords=temporal_coords, location_coords=location_coords)
 
     tokens = None
     if isinstance(out, (tuple, list)):
@@ -348,11 +333,7 @@ def _prithvi_forward_tokens_batch(
     elif hasattr(out, "last_hidden_state"):
         tokens = out.last_hidden_state
     elif isinstance(out, dict):
-        tokens = (
-            out.get("tokens")
-            or out.get("last_hidden_state")
-            or out.get("hidden_states")
-        )
+        tokens = out.get("tokens") or out.get("last_hidden_state") or out.get("hidden_states")
         if isinstance(tokens, (tuple, list)):
             tokens = tokens[-1]
     else:
@@ -365,9 +346,7 @@ def _prithvi_forward_tokens_batch(
             f"Unexpected Prithvi batch tokens shape/type: {type(tokens)} {getattr(tokens, 'shape', None)}"
         )
     if int(tokens.shape[0]) != bsz:
-        raise ModelError(
-            f"Prithvi batch mismatch: got B={int(tokens.shape[0])}, expected {bsz}"
-        )
+        raise ModelError(f"Prithvi batch mismatch: got B={int(tokens.shape[0])}, expected {bsz}")
 
     toks_np = tokens.detach().float().cpu().numpy().astype(np.float32)  # [B,N,D]
     return [toks_np[i] for i in range(bsz)]
@@ -463,9 +442,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         input_chw: Optional[np.ndarray] = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=True):
-            raise ModelError(
-                "prithvi_eo_v2_s2_6b expects a provider backend (or 'auto')."
-            )
+            raise ModelError("prithvi_eo_v2_s2_6b expects a provider backend (or 'auto').")
 
         # Defaults for Prithvi inputs
         if sensor is None:
@@ -514,9 +491,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 )
             x_chw = input_chw.astype(np.float32) / 10000.0
             x_chw = np.clip(x_chw, 0.0, 1.0)
-            x_chw = np.nan_to_num(x_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(
-                np.float32
-            )
+            x_chw = np.nan_to_num(x_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
         # Optional: inspect on-the-fly provider input
         from ..tools.inspection import (
@@ -536,14 +511,9 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             fill_value=float(sensor.fill_value),
             meta=check_meta,
         )
-        if (
-            report is not None
-            and (not report.get("ok", True))
-            and checks_should_raise(sensor)
-        ):
+        if report is not None and (not report.get("ok", True)) and checks_should_raise(sensor):
             raise ModelError(
-                "Provider input inspection failed: "
-                + "; ".join(report.get("issues", []))
+                "Provider input inspection failed: " + "; ".join(report.get("issues", []))
             )
 
         # Optional quicklook (RGB from RED/GREEN/BLUE)
@@ -611,9 +581,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
 
         if output.mode == "pooled":
             vec, cls_removed = pool_from_tokens(tokens, output.pooling)
-            meta.update(
-                {"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)}
-            )
+            meta.update({"pooling": f"patch_{output.pooling}", "cls_removed": bool(cls_removed)})
             return Embedding(data=vec, meta=meta)
 
         if output.mode == "grid":
@@ -629,9 +597,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             try:
                 import xarray as xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
             da = xr.DataArray(
                 grid,
@@ -661,9 +627,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         if not spatials:
             return []
         if not is_provider_backend(backend, allow_auto=True):
-            raise ModelError(
-                "prithvi_eo_v2_s2_6b expects a provider backend (or 'auto')."
-            )
+            raise ModelError("prithvi_eo_v2_s2_6b expects a provider backend (or 'auto').")
 
         if sensor is None:
             sensor = self._default_sensor()
@@ -702,9 +666,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         raw_inputs: List[np.ndarray] = []
         for i, raw in enumerate(prefetched_raw):
             if raw is None:
-                raise ModelError(
-                    f"Missing prefetched input at index={i} for prithvi_eo_v2_s2_6b."
-                )
+                raise ModelError(f"Missing prefetched input at index={i} for prithvi_eo_v2_s2_6b.")
             raw_inputs.append(raw)
         return self.get_embeddings_batch_from_inputs(
             spatials=spatials,
@@ -728,9 +690,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         device: str = "auto",
     ) -> list[Embedding]:
         if not is_provider_backend(backend, allow_auto=True):
-            raise ModelError(
-                "prithvi_eo_v2_s2_6b expects a provider backend (or 'auto')."
-            )
+            raise ModelError("prithvi_eo_v2_s2_6b expects a provider backend (or 'auto').")
         if len(spatials) != len(input_chws):
             raise ModelError(
                 f"spatials/input_chws length mismatch: {len(spatials)} != {len(input_chws)}"
@@ -773,9 +733,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 )
             x_chw = input_chw.astype(np.float32) / 10000.0
             x_chw = np.clip(x_chw, 0.0, 1.0)
-            x_chw = np.nan_to_num(x_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(
-                np.float32
-            )
+            x_chw = np.nan_to_num(x_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
             x_chw, _ = _prepare_prithvi_chw(
                 x_chw,
                 fill_value=float(sensor.fill_value),
@@ -796,16 +754,12 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
 
                 xr_mod = xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray. Install: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray. Install: pip install xarray") from e
 
         for idxs in shape_groups.values():
             for s0 in range(0, len(idxs), infer_bs):
                 chunk_ids = idxs[s0 : s0 + infer_bs]
-                xb = np.stack([x_prepared[i] for i in chunk_ids], axis=0).astype(
-                    np.float32
-                )
+                xb = np.stack([x_prepared[i] for i in chunk_ids], axis=0).astype(np.float32)
                 toks_list = _prithvi_forward_tokens_batch(
                     model,
                     xb,
@@ -887,7 +841,5 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                     raise ModelError(f"Unknown output mode: {output.mode}")
 
         if any(e is None for e in out):
-            raise ModelError(
-                "prithvi_eo_v2_s2_6b batch inference produced incomplete outputs."
-            )
+            raise ModelError("prithvi_eo_v2_s2_6b batch inference produced incomplete outputs.")
         return [e for e in out if e is not None]

@@ -33,9 +33,7 @@ def normalize_input_chw(
 ) -> np.ndarray:
     x = np.asarray(x_chw, dtype=np.float32)
     if x.ndim != 3:
-        raise ModelError(
-            f"{name} must be CHW with ndim=3, got shape={getattr(x, 'shape', None)}"
-        )
+        raise ModelError(f"{name} must be CHW with ndim=3, got shape={getattr(x, 'shape', None)}")
     if expected_channels is not None and int(x.shape[0]) != int(expected_channels):
         raise ModelError(
             f"{name} channel mismatch: got C={int(x.shape[0])}, expected C={int(expected_channels)}"
@@ -50,7 +48,7 @@ def _probe_model_describe(model_n: str) -> Dict[str, Any]:
         emb = cls()
         desc = emb.describe() or {}
         return desc if isinstance(desc, dict) else {}
-    except Exception:
+    except Exception as _e:
         return {}
 
 

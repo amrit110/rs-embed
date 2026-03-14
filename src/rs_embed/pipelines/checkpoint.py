@@ -138,7 +138,7 @@ class CheckpointManager:
             if is_incomplete_combined_manifest(resume_manifest):
                 try:
                     arrays = load_saved_arrays(fmt=fmt, out_path=out_path)
-                except Exception:
+                except Exception as _e:
                     arrays = {}
                 if resume_manifest is not None:
                     manifest = dict(resume_manifest)
@@ -208,7 +208,7 @@ class CheckpointManager:
             try:
                 if os.path.exists(json_path):
                     os.remove(json_path)
-            except Exception:
+            except Exception as _e:
                 pass
         return written
 
@@ -222,9 +222,7 @@ class CheckpointManager:
         prefetch_meta = manifest.get("prefetch")
         if isinstance(prefetch_meta, dict):
             cache.update(
-                restore_prefetch_checkpoint_cache(
-                    arrays=arrays, prefetch_meta=prefetch_meta
-                )
+                restore_prefetch_checkpoint_cache(arrays=arrays, prefetch_meta=prefetch_meta)
             )
         return cache
 

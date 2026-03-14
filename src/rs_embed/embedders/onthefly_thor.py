@@ -78,17 +78,13 @@ def _resize_chw(x_chw: np.ndarray, *, out_hw: int) -> np.ndarray:
     if x_chw.ndim != 3:
         raise ModelError(f"Expected CHW array, got {x_chw.shape}")
     x = torch.from_numpy(x_chw.astype(np.float32, copy=False)).unsqueeze(0)
-    y = F.interpolate(
-        x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False
-    )
+    y = F.interpolate(x, size=(int(out_hw), int(out_hw)), mode="bilinear", align_corners=False)
     return y[0].detach().cpu().numpy().astype(np.float32)
 
 
 def _normalize_s2_for_thor(raw_chw: np.ndarray, *, mode: str) -> np.ndarray:
     if raw_chw.ndim != 3 or int(raw_chw.shape[0]) != len(_S2_SR_10_BANDS):
-        raise ModelError(
-            f"Expected CHW with 10 S2 bands, got {getattr(raw_chw, 'shape', None)}"
-        )
+        raise ModelError(f"Expected CHW with 10 S2 bands, got {getattr(raw_chw, 'shape', None)}")
 
     x = np.asarray(raw_chw, dtype=np.float32)
     x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
@@ -108,8 +104,7 @@ def _normalize_s2_for_thor(raw_chw: np.ndarray, *, mode: str) -> np.ndarray:
         return np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
     raise ModelError(
-        f"Unknown THOR normalization mode '{mode}'. "
-        "Use one of: thor_stats, unit_scale, none."
+        f"Unknown THOR normalization mode '{mode}'. Use one of: thor_stats, unit_scale, none."
     )
 
 
@@ -147,9 +142,7 @@ def _extract_feature_and_channel_params(
         if isinstance(out[1], dict):
             channel_params = out[1]
     if not isinstance(features, (list, tuple)) or len(features) == 0:
-        raise ModelError(
-            f"THOR forward expected list/tuple of features, got type={type(features)}"
-        )
+        raise ModelError(f"THOR forward expected list/tuple of features, got type={type(features)}")
     feat_t = features[-1]
     return feat_t, channel_params
 
@@ -194,13 +187,9 @@ def _thor_group_grid_from_tokens(
     import torch.nn.functional as F
 
     if not torch.is_tensor(tokens_bnd) or tokens_bnd.ndim != 3:
-        raise ModelError(
-            f"Expected THOR tokens [B,N,D], got {getattr(tokens_bnd, 'shape', None)}"
-        )
+        raise ModelError(f"Expected THOR tokens [B,N,D], got {getattr(tokens_bnd, 'shape', None)}")
 
-    patch_sizes, used_groups = _group_patch_sizes(
-        channel_params=channel_params, groups=groups
-    )
+    patch_sizes, used_groups = _group_patch_sizes(channel_params=channel_params, groups=groups)
     if not patch_sizes:
         raise ModelError("THOR returned no usable group patch sizes in channel_params.")
 
@@ -224,9 +213,7 @@ def _thor_group_grid_from_tokens(
         idx += pp
         t = t.reshape(b, p, p, d).permute(0, 3, 1, 2)  # [B,D,H,W]
         if p != max_p:
-            t = F.interpolate(
-                t, size=(max_p, max_p), mode="bilinear", align_corners=False
-            )
+            t = F.interpolate(t, size=(max_p, max_p), mode="bilinear", align_corners=False)
         maps.append(t)
 
     merge_l = str(merge).lower().strip()
@@ -236,9 +223,7 @@ def _thor_group_grid_from_tokens(
         grid = torch.stack(maps, dim=0).sum(dim=0)
     else:
         if merge_l not in {"mean", "avg", "average"}:
-            raise ModelError(
-                f"Unknown THOR group merge '{merge}'. Use mean/sum/concat."
-            )
+            raise ModelError(f"Unknown THOR group merge '{merge}'. Use mean/sum/concat.")
         grid = torch.stack(maps, dim=0).mean(dim=0)
 
     meta = {
@@ -260,8 +245,7 @@ def _pool_thor_tokens(
     if (
         expected_patch_tokens is not None
         and tokens.ndim == 2
-        and int(tokens.shape[0])
-        in {int(expected_patch_tokens), int(expected_patch_tokens) + 1}
+        and int(tokens.shape[0]) in {int(expected_patch_tokens), int(expected_patch_tokens) + 1}
     ):
         cls_removed = int(tokens.shape[0]) == int(expected_patch_tokens) + 1
         patch_tokens = tokens[1:] if cls_removed else tokens
@@ -290,9 +274,7 @@ def _load_thor_cached(
         from terratorch.registry import BACKBONE_REGISTRY
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError(
-                "THOR requires terratorch. Install: pip install terratorch"
-            ) from e
+            raise ModelError("THOR requires terratorch. Install: pip install terratorch") from e
         raise ModelError(
             "Failed to import terratorch registry while loading THOR. "
             f"Missing dependency: {getattr(e, 'name', None) or e}. "
@@ -300,8 +282,7 @@ def _load_thor_cached(
         ) from e
     except Exception as e:
         raise ModelError(
-            "Failed to import terratorch registry while loading THOR: "
-            f"{type(e).__name__}: {e}"
+            f"Failed to import terratorch registry while loading THOR: {type(e).__name__}: {e}"
         ) from e
 
     try:
@@ -334,7 +315,7 @@ def _load_thor_cached(
 
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     p0 = None
@@ -353,7 +334,7 @@ def _load_thor_cached(
     if isinstance(out_channels, (list, tuple)) and len(out_channels) > 0:
         try:
             embed_dim = int(out_channels[-1])
-        except Exception:
+        except Exception as _e:
             embed_dim = None
 
     meta = {
@@ -407,9 +388,7 @@ def _thor_forward_single(
     import torch
 
     if x_chw.ndim != 3:
-        raise ModelError(
-            f"Expected CHW input for THOR, got {getattr(x_chw, 'shape', None)}"
-        )
+        raise ModelError(f"Expected CHW input for THOR, got {getattr(x_chw, 'shape', None)}")
 
     dev = _resolve_device(device)
     model = model.to(dev).eval()
@@ -452,7 +431,7 @@ def _thor_forward_single(
                 "cls_removed": bool(gmeta["cls_removed"]),
                 "expected_patch_tokens": expected_patch_tokens,
             }
-        except Exception:
+        except Exception as _e:
             # fall back to square-token reshape (works for simple ViT-style outputs)
             grid = None
 
@@ -465,7 +444,7 @@ def _thor_forward_single(
                 "grid_hw": (int(gh), int(gw)),
                 "cls_removed": bool(cls_removed),
             }
-        except Exception:
+        except Exception as _e:
             grid = None
 
     meta = {
@@ -544,9 +523,7 @@ class THORBaseEmbedder(EmbedderBase):
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
 
-        image_size = int(
-            os.environ.get("RS_EMBED_THOR_IMG", str(self.DEFAULT_IMAGE_SIZE))
-        )
+        image_size = int(os.environ.get("RS_EMBED_THOR_IMG", str(self.DEFAULT_IMAGE_SIZE)))
         model_key = (
             os.environ.get("RS_EMBED_THOR_MODEL_KEY", self.DEFAULT_MODEL_KEY).strip()
             or self.DEFAULT_MODEL_KEY
@@ -558,9 +535,7 @@ class THORBaseEmbedder(EmbedderBase):
             "False",
         }
         normalize_mode = os.environ.get("RS_EMBED_THOR_NORMALIZE", "thor_stats").strip()
-        group_merge = (
-            os.environ.get("RS_EMBED_THOR_GROUP_MERGE", "mean").strip().lower()
-        )
+        group_merge = os.environ.get("RS_EMBED_THOR_GROUP_MERGE", "mean").strip().lower()
         patch_size = int(os.environ.get("RS_EMBED_THOR_PATCH_SIZE", "16"))
         ground_cover = int(round(float(getattr(ss, "scale_m", 10)) * float(image_size)))
 
@@ -602,14 +577,9 @@ class THORBaseEmbedder(EmbedderBase):
             fill_value=fill_value,
             meta=check_meta,
         )
-        if (
-            report is not None
-            and (not report.get("ok", True))
-            and checks_should_raise(ss)
-        ):
+        if report is not None and (not report.get("ok", True)) and checks_should_raise(ss):
             raise ModelError(
-                "Provider input inspection failed: "
-                + "; ".join(report.get("issues", []))
+                "Provider input inspection failed: " + "; ".join(report.get("issues", []))
             )
 
         x_chw = _normalize_s2_for_thor(raw_chw, mode=normalize_mode)
@@ -756,9 +726,7 @@ class THORBaseEmbedder(EmbedderBase):
         for i, sp in enumerate(spatials):
             raw = prefetched_raw[i]
             if raw is None:
-                raise ModelError(
-                    f"Missing prefetched input at index={i} for thor_1_0_base."
-                )
+                raise ModelError(f"Missing prefetched input at index={i} for thor_1_0_base.")
             out.append(
                 self.get_embedding(
                     spatial=sp,

@@ -123,7 +123,7 @@ def resolve_device_auto_torch(device: str) -> str:
         import torch
 
         return "cuda" if torch.cuda.is_available() else "cpu"
-    except Exception:
+    except Exception as _e:
         return "cpu"
 
 
@@ -231,8 +231,7 @@ def _fetch_spatial_array_with_bbox_fallback(
         return np.asarray(fetch_fn(spatial), dtype=np.float32)
     except Exception as e:
         if not (
-            _ah._looks_like_gee_sample_too_many_pixels(e)
-            and _ah._looks_like_bbox_spatial(spatial)
+            _ah._looks_like_gee_sample_too_many_pixels(e) and _ah._looks_like_bbox_spatial(spatial)
         ):
             raise
         max_depth = int(getattr(_ah, "_MAX_GEE_BBOX_SPLIT_DEPTH", 12))
@@ -242,9 +241,7 @@ def _fetch_spatial_array_with_bbox_fallback(
             ) from e
 
         spatial_bbox = _ah._coerce_bbox_like(spatial)
-        h_est, w_est = _ah._bbox_span_pixels_estimate(
-            spatial_bbox, scale_m=int(scale_m)
-        )
+        h_est, w_est = _ah._bbox_span_pixels_estimate(spatial_bbox, scale_m=int(scale_m))
         prefer_axis = "x" if int(w_est) >= int(h_est) else "y"
         a_sp, b_sp, axis = _ah._split_bbox_for_recursive_fetch(
             spatial_bbox, prefer_axis=prefer_axis
@@ -305,8 +302,7 @@ def fetch_collection_patch_all_bands_chw(
         from ..providers import gee_utils as _ah
 
         if not (
-            _ah._looks_like_gee_sample_too_many_pixels(e)
-            and _ah._looks_like_bbox_spatial(spatial)
+            _ah._looks_like_gee_sample_too_many_pixels(e) and _ah._looks_like_bbox_spatial(spatial)
         ):
             raise
 
@@ -325,9 +321,7 @@ def fetch_collection_patch_all_bands_chw(
                         f"GEE bbox fallback exceeded max recursive splits ({max_depth})."
                     ) from ee
                 sp_bbox = _ah._coerce_bbox_like(sp)
-                h_est, w_est = _ah._bbox_span_pixels_estimate(
-                    sp_bbox, scale_m=int(scale_m)
-                )
+                h_est, w_est = _ah._bbox_span_pixels_estimate(sp_bbox, scale_m=int(scale_m))
                 prefer_axis = "x" if int(w_est) >= int(h_est) else "y"
                 a_sp, b_sp, axis = _ah._split_bbox_for_recursive_fetch(
                     sp_bbox, prefer_axis=prefer_axis
@@ -335,9 +329,7 @@ def fetch_collection_patch_all_bands_chw(
                 arr_a, names_a = _rec(a_sp, depth + 1)
                 arr_b, names_b = _rec(b_sp, depth + 1)
                 if tuple(names_a) != tuple(names_b):
-                    raise ModelError(
-                        "Band names mismatch while stitching all-band bbox tiles."
-                    )
+                    raise ModelError("Band names mismatch while stitching all-band bbox tiles.")
                 stitched = _stitch_spatial_last2_arrays(
                     a=arr_a,
                     b=arr_b,
@@ -404,9 +396,7 @@ def fetch_s1_vvvh_raw_chw(
     )
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim != 3 or int(arr.shape[0]) != 2:
-        raise ModelError(
-            f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}"
-        )
+        raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
     return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
 
@@ -456,9 +446,7 @@ def fetch_s2_multiframe_raw_tchw(
     )
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim != 4:
-        raise ModelError(
-            f"Expected TCHW array, got shape={getattr(arr, 'shape', None)}"
-        )
+        raise ModelError(f"Expected TCHW array, got shape={getattr(arr, 'shape', None)}")
     if int(arr.shape[1]) != len(tuple(bands)):
         raise ModelError(
             f"Time series channel mismatch: got C={int(arr.shape[1])}, expected C={len(tuple(bands))}"
@@ -521,7 +509,7 @@ def coerce_single_input_chw(
 
         if torch.is_tensor(raw):
             raw = raw.detach().cpu().numpy()
-    except Exception:
+    except Exception as _e:
         pass
 
     arr = np.asarray(raw, dtype=np.float32)
@@ -533,8 +521,7 @@ def coerce_single_input_chw(
         )
     if arr.ndim != 3:
         raise ModelError(
-            f"{model_name} expects input_chw as CHW (C,H,W), "
-            f"got {tuple(int(v) for v in arr.shape)}"
+            f"{model_name} expects input_chw as CHW (C,H,W), got {tuple(int(v) for v in arr.shape)}"
         )
     if expected_channels is not None and int(arr.shape[0]) != int(expected_channels):
         raise ModelError(

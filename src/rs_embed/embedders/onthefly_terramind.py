@@ -163,9 +163,7 @@ def _fetch_s2_sr_12_raw_chw(
     return np.clip(raw, 0.0, 10000.0).astype(np.float32)
 
 
-def _terramind_zscore_s2(
-    raw_chw: np.ndarray, *, model_key: str, mode: str
-) -> np.ndarray:
+def _terramind_zscore_s2(raw_chw: np.ndarray, *, model_key: str, mode: str) -> np.ndarray:
     if raw_chw.ndim != 3 or int(raw_chw.shape[0]) != len(_S2_SR_12_BANDS):
         raise ModelError(
             f"TerraMind expects CHW with 12 S2 bands, got {getattr(raw_chw, 'shape', None)}"
@@ -210,8 +208,7 @@ def _load_terramind_cached(
         ) from e
     except Exception as e:
         raise ModelError(
-            "Failed to import terratorch registry while loading TerraMind: "
-            f"{type(e).__name__}: {e}"
+            f"Failed to import terratorch registry while loading TerraMind: {type(e).__name__}: {e}"
         ) from e
 
     try:
@@ -228,7 +225,7 @@ def _load_terramind_cached(
 
     try:
         model = model.to(dev).eval()
-    except Exception:
+    except Exception as _e:
         pass
 
     p0 = None
@@ -292,7 +289,7 @@ def _terramind_forward_tokens(
         # Preferred path: explicit modality dict
         try:
             out = model({str(modality): x})
-        except Exception:
+        except Exception as _e:
             # Fallback for wrappers that accept plain tensor
             out = model(x)
 
@@ -302,7 +299,7 @@ def _terramind_forward_tokens(
         cand = None
         try:
             cand = seq[idx]
-        except Exception:
+        except Exception as _e:
             cand = None
         if torch.is_tensor(cand) and cand.ndim == 3:
             return cand
@@ -330,8 +327,7 @@ def _terramind_forward_tokens(
 
     if toks_t is None:
         raise ModelError(
-            "TerraMind forward did not return token tensor [B,N,D]. "
-            f"Got type={type(out)}."
+            f"TerraMind forward did not return token tensor [B,N,D]. Got type={type(out)}."
         )
 
     tokens = toks_t[0].detach().float().cpu().numpy().astype(np.float32)
@@ -362,7 +358,7 @@ def _terramind_forward_tokens_batch(
         out = None
         try:
             out = model({str(modality): x})
-        except Exception:
+        except Exception as _e:
             out = model(x)
 
     def _pick_from_sequence(seq: Any, idx: int) -> Optional[torch.Tensor]:
@@ -371,7 +367,7 @@ def _terramind_forward_tokens_batch(
         cand = None
         try:
             cand = seq[idx]
-        except Exception:
+        except Exception as _e:
             cand = None
         if torch.is_tensor(cand) and cand.ndim == 3:
             return cand
@@ -399,8 +395,7 @@ def _terramind_forward_tokens_batch(
 
     if toks_t is None:
         raise ModelError(
-            "TerraMind forward did not return token tensor [B,N,D]. "
-            f"Got type={type(out)}."
+            f"TerraMind forward did not return token tensor [B,N,D]. Got type={type(out)}."
         )
 
     tokens = toks_t.detach().float().cpu().numpy().astype(np.float32)
@@ -505,9 +500,7 @@ class TerraMindEmbedder(EmbedderBase):
     ) -> Embedding:
         backend_l = backend.lower().strip()
 
-        model_key = os.environ.get(
-            "RS_EMBED_TERRAMIND_MODEL_KEY", self.DEFAULT_MODEL_KEY
-        ).strip()
+        model_key = os.environ.get("RS_EMBED_TERRAMIND_MODEL_KEY", self.DEFAULT_MODEL_KEY).strip()
         modality = str(
             getattr(sensor, "modality", None)
             or os.environ.get("RS_EMBED_TERRAMIND_MODALITY", self.DEFAULT_MODALITY).strip()
@@ -515,13 +508,13 @@ class TerraMindEmbedder(EmbedderBase):
         )
         if modality.strip().lower().replace("-", "_") == "s2_l2a":
             modality = self.DEFAULT_MODALITY
-        normalize_mode = os.environ.get(
-            "RS_EMBED_TERRAMIND_NORMALIZE", "zscore"
-        ).strip()
+        normalize_mode = os.environ.get("RS_EMBED_TERRAMIND_NORMALIZE", "zscore").strip()
         layer_index = int(os.environ.get("RS_EMBED_TERRAMIND_LAYER_INDEX", "-1"))
-        pretrained = os.environ.get(
-            "RS_EMBED_TERRAMIND_PRETRAINED", "1"
-        ).strip() not in {"0", "false", "False"}
+        pretrained = os.environ.get("RS_EMBED_TERRAMIND_PRETRAINED", "1").strip() not in {
+            "0",
+            "false",
+            "False",
+        }
         image_size = self.DEFAULT_IMAGE_SIZE
 
         check_meta: Dict[str, Any] = {}
@@ -564,9 +557,7 @@ class TerraMindEmbedder(EmbedderBase):
                     fill_value=fill_value,
                 )
             else:
-                if input_chw.ndim != 3 or int(input_chw.shape[0]) != len(
-                    _S2_SR_12_BANDS
-                ):
+                if input_chw.ndim != 3 or int(input_chw.shape[0]) != len(_S2_SR_12_BANDS):
                     raise ModelError(
                         f"input_chw must be CHW with 12 bands for TerraMind, got {getattr(input_chw, 'shape', None)}"
                     )
@@ -589,20 +580,13 @@ class TerraMindEmbedder(EmbedderBase):
                 fill_value=fill_value,
                 meta=check_meta,
             )
-            if (
-                report is not None
-                and (not report.get("ok", True))
-                and checks_should_raise(sensor)
-            ):
+            if report is not None and (not report.get("ok", True)) and checks_should_raise(sensor):
                 raise ModelError(
-                    "Provider input inspection failed: "
-                    + "; ".join(report.get("issues", []))
+                    "Provider input inspection failed: " + "; ".join(report.get("issues", []))
                 )
 
             raw_chw = _resize_chw(raw_chw, size=image_size)
-            x_chw = _terramind_zscore_s2(
-                raw_chw, model_key=model_key, mode=normalize_mode
-            )
+            x_chw = _terramind_zscore_s2(raw_chw, model_key=model_key, mode=normalize_mode)
             x_bchw = x_chw[None, ...].astype(np.float32)
 
             sensor_meta = {
@@ -701,8 +685,7 @@ class TerraMindEmbedder(EmbedderBase):
         backend_l = backend.lower().strip()
         if backend_l == "tensor":
             raise ModelError(
-                "backend='tensor' batch inference requires "
-                "get_embeddings_batch_from_inputs(...)."
+                "backend='tensor' batch inference requires get_embeddings_batch_from_inputs(...)."
             )
 
         provider = self._get_provider(backend)
@@ -744,9 +727,7 @@ class TerraMindEmbedder(EmbedderBase):
         raw_inputs: List[np.ndarray] = []
         for i, raw in enumerate(prefetched_raw):
             if raw is None:
-                raise ModelError(
-                    f"Missing prefetched input at index={i} for terramind."
-                )
+                raise ModelError(f"Missing prefetched input at index={i} for terramind.")
             raw_inputs.append(raw)
 
         return self.get_embeddings_batch_from_inputs(
@@ -806,9 +787,7 @@ class TerraMindEmbedder(EmbedderBase):
             cloudy_pct = None
             composite = None
 
-        model_key = os.environ.get(
-            "RS_EMBED_TERRAMIND_MODEL_KEY", self.DEFAULT_MODEL_KEY
-        ).strip()
+        model_key = os.environ.get("RS_EMBED_TERRAMIND_MODEL_KEY", self.DEFAULT_MODEL_KEY).strip()
         modality = str(
             getattr(sensor, "modality", None)
             or os.environ.get("RS_EMBED_TERRAMIND_MODALITY", self.DEFAULT_MODALITY).strip()
@@ -816,13 +795,13 @@ class TerraMindEmbedder(EmbedderBase):
         )
         if modality.strip().lower().replace("-", "_") == "s2_l2a":
             modality = self.DEFAULT_MODALITY
-        normalize_mode = os.environ.get(
-            "RS_EMBED_TERRAMIND_NORMALIZE", "zscore"
-        ).strip()
+        normalize_mode = os.environ.get("RS_EMBED_TERRAMIND_NORMALIZE", "zscore").strip()
         layer_index = int(os.environ.get("RS_EMBED_TERRAMIND_LAYER_INDEX", "-1"))
-        pretrained = os.environ.get(
-            "RS_EMBED_TERRAMIND_PRETRAINED", "1"
-        ).strip() not in {"0", "false", "False"}
+        pretrained = os.environ.get("RS_EMBED_TERRAMIND_PRETRAINED", "1").strip() not in {
+            "0",
+            "false",
+            "False",
+        }
         image_size = self.DEFAULT_IMAGE_SIZE
 
         x_bchw = np.stack(

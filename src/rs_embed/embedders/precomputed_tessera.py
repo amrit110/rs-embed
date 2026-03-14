@@ -49,9 +49,7 @@ def _to_bbox_4326(spatial: SpatialSpec) -> BBox:
     raise ModelError(f"Unsupported SpatialSpec: {type(spatial)}")
 
 
-def _year_from_temporal(
-    temporal: Optional[TemporalSpec], default_year: int = 2021
-) -> int:
+def _year_from_temporal(temporal: Optional[TemporalSpec], default_year: int = 2021) -> int:
     if temporal is None:
         return default_year
     temporal.validate()
@@ -114,9 +112,7 @@ def _tile_bounds(transform, w: int, h: int) -> Tuple[float, float, float, float]
     return left, bottom, right, top
 
 
-def _reproject_bbox_4326_to(
-    tile_crs_str: str, bbox: BBox
-) -> Tuple[float, float, float, float]:
+def _reproject_bbox_4326_to(tile_crs_str: str, bbox: BBox) -> Tuple[float, float, float, float]:
     # returns (xmin, ymin, xmax, ymax) in tile CRS
     if str(tile_crs_str).upper() in ("EPSG:4326", "WGS84", "CRS:84"):
         return bbox.minlon, bbox.minlat, bbox.maxlon, bbox.maxlat
@@ -124,9 +120,7 @@ def _reproject_bbox_4326_to(
     try:
         from pyproj import Transformer
     except Exception as e:
-        raise ModelError(
-            f"Need pyproj for CRS={tile_crs_str}. Install: pip install pyproj"
-        ) from e
+        raise ModelError(f"Need pyproj for CRS={tile_crs_str}. Install: pip install pyproj") from e
 
     tfm = Transformer.from_crs("EPSG:4326", str(tile_crs_str), always_xy=True)
     x0, y0 = tfm.transform(bbox.minlon, bbox.minlat)
@@ -135,9 +129,7 @@ def _reproject_bbox_4326_to(
 
 
 def _mosaic_and_crop_strict_roi(
-    tiles_rows_factory: Callable[
-        [], Iterable[Tuple[int, float, float, np.ndarray, Any, Any]]
-    ],
+    tiles_rows_factory: Callable[[], Iterable[Tuple[int, float, float, np.ndarray, Any, Any]]],
     bbox_4326: BBox,
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
@@ -167,17 +159,12 @@ def _mosaic_and_crop_strict_roi(
         else:
             if crs != crs0:
                 raise ModelError("Tiles have different CRS; cannot mosaic.")
-            if (
-                abs(float(transform.a) - a0) > 1e-12
-                or abs(float(transform.e) - e0) > 1e-12
-            ):
+            if abs(float(transform.a) - a0) > 1e-12 or abs(float(transform.e) - e0) > 1e-12:
                 raise ModelError(
                     "Tiles have different resolution; cannot mosaic without resampling."
                 )
             if int(d) != int(d0):
-                raise ModelError(
-                    "Tiles have different embedding dimensions; cannot mosaic."
-                )
+                raise ModelError("Tiles have different embedding dimensions; cannot mosaic.")
 
         left = min(left, t_left)
         bottom = min(bottom, t_bottom)
@@ -329,11 +316,7 @@ class TesseraEmbedder(EmbedderBase):
         year = _year_from_temporal(temporal, default_year=2021)
 
         cache_dir = os.environ.get("RS_EMBED_TESSERA_CACHE")
-        if (
-            sensor
-            and isinstance(sensor.collection, str)
-            and sensor.collection.startswith("cache:")
-        ):
+        if sensor and isinstance(sensor.collection, str) and sensor.collection.startswith("cache:"):
             cache_dir = sensor.collection.replace("cache:", "", 1).strip() or cache_dir
 
         # GeoTessera cache keyed by cache_dir path (empty string for default).
@@ -370,9 +353,7 @@ class TesseraEmbedder(EmbedderBase):
             try:
                 import xarray as xr
             except Exception as e:
-                raise ModelError(
-                    "grid output requires xarray: pip install xarray"
-                ) from e
+                raise ModelError("grid output requires xarray: pip install xarray") from e
 
             da = xr.DataArray(
                 chw,

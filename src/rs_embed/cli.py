@@ -8,6 +8,7 @@ following subcommands:
 - ``export-npz``  — export raw inputs and/or embeddings for one or more
   models into ``.npz`` + JSON manifest files.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,9 +24,7 @@ from .export import export_npz
 def _parse_bands(s: str) -> Tuple[str, ...]:
     parts = [p.strip() for p in s.split(",") if p.strip()]
     if not parts:
-        raise argparse.ArgumentTypeError(
-            "--bands must be a comma-separated list, e.g. 'B4,B3,B2'"
-        )
+        raise argparse.ArgumentTypeError("--bands must be a comma-separated list, e.g. 'B4,B3,B2'")
     return tuple(parts)
 
 
@@ -45,9 +44,7 @@ def _parse_value_range(s: Optional[str]) -> Optional[Tuple[float, float]]:
         lo, hi = s.split(",")
         return (float(lo), float(hi))
     except Exception as e:
-        raise argparse.ArgumentTypeError(
-            "--value-range must be 'lo,hi' (floats)"
-        ) from e
+        raise argparse.ArgumentTypeError("--value-range must be 'lo,hi' (floats)") from e
 
 
 def _add_spatial_args(p: argparse.ArgumentParser) -> None:
@@ -77,9 +74,7 @@ def _parse_spatial(args) -> BBox | PointBuffer:
 
 def _add_temporal_args(p: argparse.ArgumentParser) -> None:
     tg = p.add_mutually_exclusive_group(required=False)
-    tg.add_argument(
-        "--year", type=int, help="Year mode (will use [year-01-01, year+1-01-01)"
-    )
+    tg.add_argument("--year", type=int, help="Year mode (will use [year-01-01, year+1-01-01)")
     tg.add_argument(
         "--range",
         metavar=("START", "END"),
@@ -108,12 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Download a patch from Google Earth Engine and output an input-inspection report (no model run).",
     )
 
-    ig.add_argument(
-        "--collection", required=True, help="GEE ImageCollection (or Image) id"
-    )
-    ig.add_argument(
-        "--bands", required=True, type=_parse_bands, help="Comma-separated band list"
-    )
+    ig.add_argument("--collection", required=True, help="GEE ImageCollection (or Image) id")
+    ig.add_argument("--bands", required=True, type=_parse_bands, help="Comma-separated band list")
     ig.add_argument("--scale-m", type=int, default=10, help="Pixel scale (meters)")
     ig.add_argument(
         "--cloudy-pct",
@@ -137,9 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_spatial_args(ig)
     _add_temporal_args(ig)
 
-    ig.add_argument(
-        "--value-range", default=None, help="Optional sanity range 'lo,hi' for values"
-    )
+    ig.add_argument("--value-range", default=None, help="Optional sanity range 'lo,hi' for values")
     ig.add_argument(
         "--save-dir",
         default=None,
@@ -153,18 +142,14 @@ def build_parser() -> argparse.ArgumentParser:
         "export-npz",
         help="Export raw GEE inputs + embeddings for one or more models into a .npz plus a JSON manifest.",
     )
-    ex.add_argument(
-        "--models", required=True, type=_parse_models, help="Comma-separated model IDs"
-    )
+    ex.add_argument("--models", required=True, type=_parse_models, help="Comma-separated model IDs")
     ex.add_argument("--out", required=True, help="Output .npz path")
 
     _add_spatial_args(ex)
     _add_temporal_args(ex)
 
     ex.add_argument("--backend", default="gee", help="Backend (default: gee)")
-    ex.add_argument(
-        "--device", default="auto", help="Device for model inference (default: auto)"
-    )
+    ex.add_argument("--device", default="auto", help="Device for model inference (default: auto)")
 
     ex.add_argument(
         "--output",
@@ -191,12 +176,8 @@ def build_parser() -> argparse.ArgumentParser:
         type=_parse_bands,
         help="Override sensor bands (comma-separated)",
     )
-    ex.add_argument(
-        "--scale-m", type=int, default=10, help="Override pixel scale (meters)"
-    )
-    ex.add_argument(
-        "--cloudy-pct", type=int, default=30, help="Override cloud filter percentage"
-    )
+    ex.add_argument("--scale-m", type=int, default=10, help="Override pixel scale (meters)")
+    ex.add_argument("--cloudy-pct", type=int, default=30, help="Override cloud filter percentage")
     ex.add_argument("--fill-value", type=float, default=0.0, help="Override fill value")
     ex.add_argument(
         "--composite",
@@ -211,17 +192,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional sanity range 'lo,hi' for input checks",
     )
 
-    ex.add_argument(
-        "--no-inputs", action="store_true", help="Do not save raw inputs into the npz"
-    )
+    ex.add_argument("--no-inputs", action="store_true", help="Do not save raw inputs into the npz")
     ex.add_argument(
         "--no-embeddings",
         action="store_true",
         help="Do not run models / save embeddings",
     )
-    ex.add_argument(
-        "--no-json", action="store_true", help="Do not write a sidecar .json manifest"
-    )
+    ex.add_argument("--no-json", action="store_true", help="Do not write a sidecar .json manifest")
     ex.add_argument(
         "--fail-on-bad-input",
         action="store_true",
@@ -280,9 +257,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         temporal = _parse_temporal(args)
         value_range = _parse_value_range(args.value_range)
         if value_range is not None:
-            raise SystemExit(
-                "--value-range is currently supported only for inspect-gee."
-            )
+            raise SystemExit("--value-range is currently supported only for inspect-gee.")
 
         output = (
             OutputSpec.pooled(pooling=args.pooling)
@@ -293,9 +268,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         sensor_override = None
         if args.collection is not None:
             if args.bands is None:
-                raise SystemExit(
-                    "--bands is required when --collection is provided for export-npz"
-                )
+                raise SystemExit("--bands is required when --collection is provided for export-npz")
             sensor_override = SensorSpec(
                 collection=args.collection,
                 bands=args.bands,

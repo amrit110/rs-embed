@@ -17,7 +17,7 @@ def load_json_dict(path: str) -> Optional[Dict[str, Any]]:
             payload = json.load(f)
         if isinstance(payload, dict):
             return payload
-    except Exception:
+    except Exception as _e:
         return None
     return None
 

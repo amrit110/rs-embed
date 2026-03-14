@@ -13,6 +13,7 @@ To add a new data source:
 
 Built-in providers are lazy-loaded so optional dependencies stay optional.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -35,7 +36,7 @@ def _register_builtin_providers() -> None:
         mod = importlib.import_module(f"{__name__}.gee")
         cls = getattr(mod, "GEEProvider")
         _PROVIDER_REGISTRY.setdefault("gee", cls)
-    except Exception:
+    except Exception as _e:
         # Keep registry usable even when optional backend deps are unavailable.
         pass
 
