@@ -81,7 +81,7 @@ Channel sanity:
    - S1: VV/VH raw -> shared S1 normalization helper -> `[0,1]`
 4. Optional input inspection on normalized provider input
 5. Resize to fixed `224x224`
-6. Load TerraFM-B from HF code + `.pth` weights
+6. Load TerraFM-B from vendored runtime + HF `.pth` weights
 7. Forward:
    - `pooled`: TerraFM forward returns CLS embedding `(D,)`
    - `grid`: adapter calls `extract_feature(...)` and uses last-layer feature map `(D,H,W)`
@@ -113,7 +113,8 @@ Related cache envs (used by HF asset download path):
 Adapter behavior notes:
 
 - image size is fixed to `224` in current implementation
-- weights/code are fetched from `MBZUAI/TerraFM` (`terrafm.py` + `TerraFM-B.pth`)
+- runtime code is vendored inside `rs-embed`
+- weights are fetched from `MBZUAI/TerraFM` (`TerraFM-B.pth`)
 
 ---
 
@@ -189,7 +190,7 @@ Notes:
 - tensor backend without `input_chw`
 - wrong channel count (`C` must be `2` or `12`)
 - S1/S2 modality mismatch between data and `modality`
-- HF asset download issues (code or `.pth` weights)
+- HF weight download issues (`.pth` weights)
 
 Recommended first checks:
 

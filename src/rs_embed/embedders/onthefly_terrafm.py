@@ -1,6 +1,7 @@
 # src/rs_embed/embedders/onthefly_terrafm.py
 from __future__ import annotations
 
+import importlib
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -26,7 +27,6 @@ from .runtime_utils import (
 
 
 HF_REPO_ID = "MBZUAI/TerraFM"
-HF_CODE_FILE = "terrafm.py"
 HF_WEIGHT_FILE_B = "TerraFM-B.pth"
 
 
@@ -168,31 +168,23 @@ def _prepare_tensor_input_chw(
 # HF asset management (strict)
 # -----------------------------
 @lru_cache(maxsize=8)
-def _ensure_hf_terrafm_assets(
+def _ensure_hf_terrafm_weights(
     repo_id: str,
     *,
     auto_download: bool = True,
     cache_dir: Optional[str] = None,
     min_bytes: int = 50 * 1024 * 1024,
-) -> Tuple[str, str]:
-    """
-    Returns (local_py_path, local_weight_path).
-    TerraFM HF uses .pth weights, not standard transformers files.
-    """
+) -> str:
+    """Returns local TerraFM weight path."""
     try:
         from huggingface_hub import hf_hub_download
     except Exception as e:
         raise ModelError("Install huggingface_hub: pip install huggingface_hub") from e
 
-    py_path = hf_hub_download(
-        repo_id=repo_id, filename=HF_CODE_FILE, cache_dir=cache_dir
-    )
     wt_path = hf_hub_download(
         repo_id=repo_id, filename=HF_WEIGHT_FILE_B, cache_dir=cache_dir
     )
 
-    if not os.path.exists(py_path):
-        raise ModelError(f"Failed to download '{HF_CODE_FILE}' from {repo_id}.")
     if not os.path.exists(wt_path):
         raise ModelError(f"Failed to download '{HF_WEIGHT_FILE_B}' from {repo_id}.")
 
@@ -207,20 +199,18 @@ def _ensure_hf_terrafm_assets(
             "Then delete the cached snapshot and re-run.\n"
         )
 
-    return py_path, wt_path
+    return wt_path
 
 
-@lru_cache(maxsize=8)
-def _load_terrafm_module(local_py_path: str):
-    """Dynamic import terrafm.py from downloaded file."""
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("terrafm_impl", local_py_path)
-    if spec is None or spec.loader is None:
-        raise ModelError("Failed to create import spec for TerraFM module.")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
-    return mod
+@lru_cache(maxsize=1)
+def _load_terrafm_module():
+    try:
+        return importlib.import_module("rs_embed.embedders._vendor.terrafm")
+    except Exception as e:
+        raise ModelError(
+            "Failed to import vendored TerraFM runtime. "
+            f"Import error: {type(e).__name__}: {e}"
+        ) from e
 
 
 def _assert_weights_loaded(model) -> Dict[str, float]:
@@ -257,13 +247,13 @@ def _load_terrafm_b(
     """
     import torch
 
-    py_path, wt_path = _ensure_hf_terrafm_assets(
+    wt_path = _ensure_hf_terrafm_weights(
         HF_REPO_ID, auto_download=auto_download, cache_dir=cache_dir
     )
-    mod = _load_terrafm_module(py_path)
+    mod = _load_terrafm_module()
 
     if not hasattr(mod, "terrafm_base"):
-        raise ModelError("Downloaded terrafm.py has no 'terrafm_base()' factory.")
+        raise ModelError("Vendored TerraFM runtime has no 'terrafm_base()' factory.")
 
     model = mod.terrafm_base()
     state = torch.load(wt_path, map_location="cpu")
@@ -272,7 +262,7 @@ def _load_terrafm_b(
 
     meta = {
         "hf_repo": HF_REPO_ID,
-        "code_file": py_path,
+        "model_source": "vendored_rs_embed_runtime",
         "weight_file": wt_path,
         "weight_file_size": os.path.getsize(wt_path),
         "weights_verified": True,

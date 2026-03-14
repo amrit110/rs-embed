@@ -78,7 +78,7 @@ Use this table for a first-pass side-by-side comparison of input assumptions and
 | `galileo` | `Encoder` from official `single_file_galileo.py` | S2 10-band TCHW (or CHW auto-expanded) | clip to `0..10000`; normalize mode default `unit_scale`; constructs Galileo tensors with configurable `T` + per-frame `months`, optional NDVI channel | default 64 with patch 8; bilinear resize; no pad | pooled token vector and S2-group token grid | Medium |
 | `wildsat` | WildSAT backbone + optional image head from checkpoint | S2 RGB CHW | clip to `0..10000` then `/10000`; default normalization `minmax`; convert to `uint8` then unit tensor | default 224; resize RGB; no pad | pooled branch output and optional grid (token or feature path) | Medium-Low |
 | `prithvi` | TerraTorch `BACKBONE_REGISTRY` Prithvi backbone | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) | raw SR -> `/10000` -> clamp `[0,1]`; prep mode from env | default mode `resize` to 224; optional `pad` to patch multiple (legacy) | token sequence -> pooled or patch-token grid | Medium |
-| `terrafm` | TerraFM-B from HF code/weights | S2 12-band or S1 VV/VH | S2: `/10000` to `[0,1]`; S1: `log1p` + p99 scaling to `[0,1]` | resize to 224; no pad | pooled embedding, optional feature-map grid | Medium |
+| `terrafm` | TerraFM-B from vendored runtime + HF weights | S2 12-band or S1 VV/VH | S2: `/10000` to `[0,1]`; S1: `log1p` + p99 scaling to `[0,1]` | resize to 224; no pad | pooled embedding, optional feature-map grid | Medium |
 | `terramind` | TerraTorch `BACKBONE_REGISTRY` TerraMind backbone | S2 SR 12-band | raw `0..10000`; resize 224; z-score with TerraMind v1/v01 pretrained mean/std | fixed 224; no pad | token sequence -> pooled or patch-token grid | High |
 | `dofa` | TorchGeo DOFA (`dofa_base_patch16_224` / `dofa_large_patch16_224`) | multi-band SR CHW + wavelengths | raw SR -> `/10000` to `[0,1]`; provide/infer wavelengths | bilinear resize to 224; explicitly no crop/pad | pooled vector or token grid (usually 14x14) | Medium-High |
 | `fomo` | FoMo `MultiSpectralViT` (FoMo-Bench) | S2 SR 12-band | clip `0..10000`; default `unit_scale` (optional minmax/none) | default 64; bilinear resize; no pad | token sequence pooled; grid as spectral-mean patch-token map | Medium |
@@ -161,7 +161,7 @@ This table only lists env vars that materially change model input construction o
 | `remoteclip` | fixed `image_size=224` in code path; no per-model preprocess env switch |
 | `satmae` | `RS_EMBED_SATMAE_IMG` |
 | `satmaepp` | `RS_EMBED_SATMAEPP_ID`, `RS_EMBED_SATMAEPP_IMG`, `RS_EMBED_SATMAEPP_CHANNEL_ORDER`, `RS_EMBED_SATMAEPP_BGR` |
-| `satmaepp_s2_10b` | `RS_EMBED_SATMAEPP_S2_CKPT_REPO`, `RS_EMBED_SATMAEPP_S2_CKPT_FILE`, `RS_EMBED_SATMAEPP_S2_CODE_REPO`, `RS_EMBED_SATMAEPP_S2_CODE_REF`, `RS_EMBED_SATMAEPP_S2_MODEL_FN`, `RS_EMBED_SATMAEPP_S2_IMG`, `RS_EMBED_SATMAEPP_S2_PATCH`, `RS_EMBED_SATMAEPP_S2_GRID_REDUCE`, `RS_EMBED_SATMAEPP_S2_WEIGHTS_ONLY` |
+| `satmaepp_s2_10b` | `RS_EMBED_SATMAEPP_S2_CKPT_REPO`, `RS_EMBED_SATMAEPP_S2_CKPT_FILE`, `RS_EMBED_SATMAEPP_S2_MODEL_FN`, `RS_EMBED_SATMAEPP_S2_IMG`, `RS_EMBED_SATMAEPP_S2_PATCH`, `RS_EMBED_SATMAEPP_S2_GRID_REDUCE`, `RS_EMBED_SATMAEPP_S2_WEIGHTS_ONLY` |
 | `scalemae` | `RS_EMBED_SCALEMAE_IMG` |
 | `anysat` | `RS_EMBED_ANYSAT_IMG`, `RS_EMBED_ANYSAT_NORM`, `RS_EMBED_ANYSAT_FRAMES` |
 | `galileo` | `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`, `RS_EMBED_GALILEO_NORM`, `RS_EMBED_GALILEO_INCLUDE_NDVI`, `RS_EMBED_GALILEO_FRAMES`, `RS_EMBED_GALILEO_MONTH` |

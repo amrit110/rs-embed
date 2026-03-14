@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | Model ID | `fomo` |
-| Family / Backbone | FoMo-Bench `MultiSpectralViT` (repo + checkpoint loader) |
+| Family / Backbone | FoMo-Bench `MultiSpectralViT` (vendored local code + checkpoint loader) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 12-band (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`) |
@@ -71,7 +71,7 @@ Default `SensorSpec` if omitted:
    - `none` / `raw`: keep raw `0..10000` (clipped)
 3. Resize to `RS_EMBED_FOMO_IMG` (default `64`)
 4. Build/load FoMo model from:
-   - FoMo-Bench repo code (local / auto-clone)
+   - vendored local FoMo runtime
    - checkpoint (local / auto-download)
 5. Forward with `(x, spectral_keys)` and `pool=False` to get tokens `[N,D]`
 6. Compute outputs:
@@ -103,21 +103,16 @@ Default `SensorSpec` if omitted:
 | `RS_EMBED_FOMO_MLP_DIM` | `2048` | MLP dim |
 | `RS_EMBED_FOMO_NUM_CLASSES` | `1000` | Class head size (config compatibility) |
 
-### Checkpoint / repo loading
+### Checkpoint loading
 
 | Env var | Default | Effect |
 |---|---|---|
 | `RS_EMBED_FOMO_CKPT` | unset | Local checkpoint path |
 | `RS_EMBED_FOMO_AUTO_DOWNLOAD` | `1` | Allow checkpoint auto-download |
-| `RS_EMBED_FOMO_CACHE_DIR` | repo cache default | Checkpoint cache dir |
+| `RS_EMBED_FOMO_CACHE_DIR` | `~/.cache/rs_embed/fomo` | Checkpoint cache dir |
 | `RS_EMBED_FOMO_CKPT_FILE` | default FoMo checkpoint filename | Cached ckpt filename |
 | `RS_EMBED_FOMO_CKPT_URL` | default Dropbox URL | Checkpoint download URL |
 | `RS_EMBED_FOMO_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
-| `RS_EMBED_FOMO_REPO_PATH` | unset | Local FoMo-Bench repo path |
-| `RS_EMBED_FOMO_REPO_URL` | FoMo-Bench GitHub URL | Repo clone source |
-| `RS_EMBED_FOMO_REPO_CACHE` | `~/.cache/rs_embed/fomo` | Repo cache root |
-| `RS_EMBED_FOMO_AUTO_DOWNLOAD_REPO` | `1` | Auto-clone FoMo-Bench repo |
-
 ---
 
 ## Output Semantics
@@ -175,7 +170,7 @@ emb = get_embedding(
 - backend mismatch (`fomo` is provider-only)
 - wrong `input_chw` shape (`C` must be `12`)
 - `RS_EMBED_FOMO_S2_KEYS` length mismatch (must be 12 values)
-- checkpoint/repo download/import failures
+- missing `torch` / `einops` dependency or checkpoint/import failures
 - changed model config envs incompatible with checkpoint architecture
 - grid returns `1x1` fallback because token layout is not modality-grid compatible
 
@@ -191,7 +186,7 @@ Recommended first checks:
 
 Keep fixed and record:
 
-- checkpoint source/path and FoMo-Bench repo source/path
+- checkpoint source/path and vendored FoMo runtime version
 - `IMG`, `PATCH`, normalization mode
 - `S2_KEYS` mapping
 - model config envs (`DIM/DEPTH/HEADS/MLP_DIM/NUM_CLASSES`)
@@ -203,4 +198,3 @@ Keep fixed and record:
 
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_fomo.py`
-

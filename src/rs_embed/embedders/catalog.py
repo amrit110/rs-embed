@@ -13,7 +13,6 @@ MODEL_SPECS: Dict[str, Tuple[str, str]] = {
     "satmaepp_s2_10b": ("onthefly_satmaepp_s2", "SatMAEPPSentinel10Embedder"),
     "scalemae": ("onthefly_scalemae", "ScaleMAERGBEmbedder"),
     "anysat": ("onthefly_anysat", "AnySatEmbedder"),
-    "dynamicvis": ("onthefly_dynamicvis", "DynamicVisEmbedder"),
     "galileo": ("onthefly_galileo", "GalileoEmbedder"),
     "wildsat": ("onthefly_wildsat", "WildSATEmbedder"),
     "prithvi": ("onthefly_prithvi", "PrithviEOV2S2_6B_Embedder"),

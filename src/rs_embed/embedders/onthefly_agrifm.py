@@ -4,7 +4,6 @@ import importlib
 import importlib.util
 import os
 import re
-import subprocess
 import sys
 import types
 import urllib.request
@@ -165,52 +164,6 @@ def _normalize_s2_for_agrifm(raw_tchw: np.ndarray, *, mode: str) -> np.ndarray:
         f"Unknown AgriFM normalization mode '{mode}'. "
         "Use one of: agrifm_stats, unit_scale, none."
     )
-
-
-@lru_cache(maxsize=4)
-def _ensure_agrifm_repo(*, repo_url: str, cache_root: str) -> str:
-    root = os.path.expanduser(cache_root)
-    os.makedirs(root, exist_ok=True)
-    dst = os.path.join(root, "AgriFM")
-
-    if os.path.isdir(os.path.join(dst, "AgriFM")) and os.path.isfile(
-        os.path.join(dst, "README.md")
-    ):
-        return dst
-
-    try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, dst],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    except Exception as e:
-        raise ModelError(
-            "Failed to clone AgriFM source code. "
-            f"Tried: git clone --depth 1 {repo_url} {dst}"
-        ) from e
-    return dst
-
-
-def _resolve_agrifm_repo(
-    *,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download: bool,
-) -> str:
-    if repo_path:
-        p = os.path.expanduser(repo_path)
-        if not os.path.isdir(p):
-            raise ModelError(f"RS_EMBED_AGRIFM_REPO_PATH does not exist: {p}")
-        return p
-    if not auto_download:
-        raise ModelError(
-            "AgriFM repository not provided. Set RS_EMBED_AGRIFM_REPO_PATH or enable auto download."
-        )
-    return _ensure_agrifm_repo(repo_url=repo_url, cache_root=repo_cache_root)
 
 
 def _install_agrifm_lightweight_shims() -> None:
@@ -393,41 +346,19 @@ def _install_agrifm_lightweight_shims() -> None:
             )
 
 
-@lru_cache(maxsize=8)
-def _import_agrifm_swin(repo_root: str):
-    repo_abs = os.path.abspath(os.path.expanduser(repo_root))
-    if repo_abs not in sys.path:
-        sys.path.insert(0, repo_abs)
+@lru_cache(maxsize=1)
+def _import_agrifm_swin():
     try:
-        return importlib.import_module("AgriFM.models.video_swin_transformer")
-    except Exception as first_error:
-        # Fallback: import file directly with lightweight shims for mmseg/mmengine.
-        mod_path = os.path.join(
-            repo_abs, "AgriFM", "models", "video_swin_transformer.py"
+        _install_agrifm_lightweight_shims()
+        return importlib.import_module(
+            "rs_embed.embedders._vendor.agrifm_video_swin_transformer"
         )
-        if not os.path.isfile(mod_path):
-            raise ModelError(
-                f"Failed to locate AgriFM backbone source file: {mod_path}"
-            ) from first_error
-        try:
-            _install_agrifm_lightweight_shims()
-            spec = importlib.util.spec_from_file_location(
-                "agrifm_video_swin_impl", mod_path
-            )
-            if spec is None or spec.loader is None:
-                raise RuntimeError(
-                    "Failed to create import spec for AgriFM video_swin_transformer.py"
-                )
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)  # type: ignore[attr-defined]
-            return mod
-        except Exception as second_error:
-            raise ModelError(
-                "Failed to import AgriFM backbone even with lightweight shims. "
-                "Install missing minimal deps: timm, einops (and torch). "
-                f"Original import error: {type(first_error).__name__}: {first_error}; "
-                f"fallback error: {type(second_error).__name__}: {second_error}"
-            ) from second_error
+    except Exception as e:
+        raise ModelError(
+            "Failed to import vendored AgriFM backbone. "
+            "Install missing minimal deps: timm, einops (and torch). "
+            f"Import error: {type(e).__name__}: {e}"
+        ) from e
 
 
 def _resolve_ckpt_path() -> str:
@@ -500,21 +431,10 @@ def _assert_weights_loaded(model) -> Dict[str, float]:
 def _load_agrifm_cached(
     *,
     ckpt_path: str,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
     dev: str,
 ) -> Tuple[Any, Dict[str, Any]]:
     ensure_torch()
-
-    repo_root = _resolve_agrifm_repo(
-        repo_path=repo_path,
-        repo_url=repo_url,
-        repo_cache_root=repo_cache_root,
-        auto_download=auto_download_repo,
-    )
-    mod = _import_agrifm_swin(repo_root)
+    mod = _import_agrifm_swin()
 
     cls = getattr(mod, "PretrainingSwinTransformer3DEncoder", None)
     if cls is None:
@@ -565,9 +485,8 @@ def _load_agrifm_cached(
     stats = _assert_weights_loaded(model)
     meta = {
         "device": dev,
-        "repo_root": repo_root,
-        "repo_url": repo_url,
         "checkpoint": ckpt_path,
+        "model_source": "vendored_rs_embed_runtime",
         "weights_verified": True,
         **stats,
     }
@@ -577,20 +496,12 @@ def _load_agrifm_cached(
 def _load_agrifm(
     *,
     ckpt_path: str,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
     device: str = "auto",
 ) -> Tuple[Any, Dict[str, Any], str]:
     (loaded, dev) = _load_cached_with_device(
         _load_agrifm_cached,
         device=device,
         ckpt_path=ckpt_path,
-        repo_path=repo_path,
-        repo_url=repo_url,
-        repo_cache_root=repo_cache_root,
-        auto_download_repo=auto_download_repo,
     )
     model, meta = loaded
     return model, meta, dev
@@ -678,8 +589,6 @@ class AgriFMEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_IMAGE_SIZE = 224
     DEFAULT_FRAMES = 8
-    DEFAULT_REPO_URL = "https://github.com/flyakon/AgriFM"
-    DEFAULT_REPO_CACHE_ROOT = "~/.cache/rs_embed"
     DEFAULT_NORM = "agrifm_stats"
 
     def describe(self) -> Dict[str, Any]:
@@ -753,17 +662,6 @@ class AgriFMEmbedder(EmbedderBase):
         norm_mode = os.environ.get("RS_EMBED_AGRIFM_NORM", self.DEFAULT_NORM).strip()
 
         ckpt_path = _resolve_ckpt_path()
-        repo_path = os.environ.get("RS_EMBED_AGRIFM_REPO_PATH", None)
-        repo_url = os.environ.get(
-            "RS_EMBED_AGRIFM_REPO_URL", self.DEFAULT_REPO_URL
-        ).strip()
-        repo_cache_root = os.environ.get(
-            "RS_EMBED_AGRIFM_REPO_CACHE", self.DEFAULT_REPO_CACHE_ROOT
-        ).strip()
-        auto_download_repo = os.environ.get(
-            "RS_EMBED_AGRIFM_AUTO_DOWNLOAD_REPO", "1"
-        ).strip() not in ("0", "false", "False")
-
         if input_chw is None:
             raw_tchw = _fetch_s2_10_raw_tchw(
                 self._get_provider(backend),
@@ -833,10 +731,6 @@ class AgriFMEmbedder(EmbedderBase):
 
         model, wmeta, dev = _load_agrifm(
             ckpt_path=ckpt_path,
-            repo_path=repo_path,
-            repo_url=repo_url,
-            repo_cache_root=repo_cache_root,
-            auto_download_repo=auto_download_repo,
             device=device,
         )
 

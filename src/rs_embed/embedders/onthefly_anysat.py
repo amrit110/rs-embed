@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import os
-import subprocess
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from functools import lru_cache
@@ -107,73 +105,44 @@ def _fetch_s2_10_raw_tchw(
     return np.clip(raw, 0.0, 10000.0).astype(np.float32)
 
 
-@lru_cache(maxsize=4)
-def _ensure_anysat_repo(
-    *,
-    repo_url: str,
-    cache_root: str,
-) -> str:
-    root = os.path.expanduser(cache_root)
-    os.makedirs(root, exist_ok=True)
-    dst = os.path.join(root, "AnySat")
-
-    if os.path.isdir(os.path.join(dst, "src")) and os.path.isfile(
-        os.path.join(dst, "hubconf.py")
-    ):
-        return dst
-
+@lru_cache(maxsize=8)
+def _load_anysat_hub_module():
     try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, dst],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        mod = importlib.import_module("rs_embed.embedders._vendor.anysat.hubconf")
+        getattr(mod, "AnySat")
     except Exception as e:
         raise ModelError(
-            "Failed to clone AnySat source code. "
-            f"Tried: git clone --depth 1 {repo_url} {dst}"
+            "Failed to import vendored AnySat runtime. "
+            "Install missing dependencies: torch, einops."
         ) from e
-    return dst
-
-
-@lru_cache(maxsize=8)
-def _load_anysat_hub_module(repo_root: str):
-    hub_path = os.path.join(repo_root, "hubconf.py")
-    if not os.path.exists(hub_path):
-        raise ModelError(f"AnySat hubconf not found: {hub_path}")
-
-    repo_abs = os.path.abspath(repo_root)
-    if repo_abs not in sys.path:
-        # AnySat hubconf imports use `from src...`; they require repo root on sys.path.
-        sys.path.insert(0, repo_abs)
-
-    spec = importlib.util.spec_from_file_location("anysat_hubconf", hub_path)
-    if spec is None or spec.loader is None:
-        raise ModelError("Failed to build import spec for AnySat hubconf.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
     return mod
 
 
-def _resolve_anysat_repo(
+@lru_cache(maxsize=4)
+def _download_anysat_ckpt(
     *,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download: bool,
+    hf_repo: str,
+    filename: str,
+    cache_dir: Optional[str],
+    min_bytes: int,
 ) -> str:
-    if repo_path:
-        p = os.path.expanduser(repo_path)
-        if not os.path.isdir(p):
-            raise ModelError(f"RS_EMBED_ANYSAT_REPO_PATH does not exist: {p}")
-        return p
-    if not auto_download:
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as e:
         raise ModelError(
-            "AnySat repository not provided. Set RS_EMBED_ANYSAT_REPO_PATH or enable auto download."
+            "AnySat checkpoint download requires huggingface_hub. "
+            "Install: pip install huggingface_hub"
+        ) from e
+
+    p = hf_hub_download(repo_id=hf_repo, filename=filename, cache_dir=cache_dir)
+    if not os.path.exists(p):
+        raise ModelError(f"Failed to download AnySat checkpoint: {hf_repo}/{filename}")
+    sz = os.path.getsize(p)
+    if sz < int(min_bytes):
+        raise ModelError(
+            f"Downloaded AnySat checkpoint looks too small ({sz} bytes): {p}"
         )
-    return _ensure_anysat_repo(repo_url=repo_url, cache_root=repo_cache_root)
+    return p
 
 
 def _load_ckpt_state_dict(ckpt_path: str) -> Dict[str, Any]:
@@ -199,24 +168,18 @@ def _load_anysat_cached(
     flash_attn: bool,
     pretrained: bool,
     ckpt_path: Optional[str],
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
+    hf_repo: str,
+    hf_filename: str,
+    hf_cache_dir: Optional[str],
+    hf_min_bytes: int,
     dev: str,
 ) -> Tuple[Any, Dict[str, Any]]:
     ensure_torch()
     import torch
 
-    repo_root = _resolve_anysat_repo(
-        repo_path=repo_path,
-        repo_url=repo_url,
-        repo_cache_root=repo_cache_root,
-        auto_download=auto_download_repo,
-    )
-    hub = _load_anysat_hub_module(repo_root)
+    hub = _load_anysat_hub_module()
     if not hasattr(hub, "AnySat"):
-        raise ModelError("AnySat hubconf.py does not expose class AnySat.")
+        raise ModelError("Vendored AnySat runtime does not expose class AnySat.")
 
     if ckpt_path:
         ckpt_local = os.path.expanduser(ckpt_path)
@@ -232,11 +195,18 @@ def _load_anysat_cached(
         loaded_from = ckpt_local
     else:
         if pretrained:
-            # AnySat hubconf handles download from HF.
-            model = hub.AnySat.from_pretrained(
+            ckpt_local = _download_anysat_ckpt(
+                hf_repo=hf_repo,
+                filename=hf_filename,
+                cache_dir=hf_cache_dir,
+                min_bytes=hf_min_bytes,
+            )
+            model = hub.AnySat(
                 model_size=model_size, flash_attn=bool(flash_attn), device=dev
             )
-            loaded_from = "hf://g-astruc/AnySat/models/AnySat.pth"
+            sd = _load_ckpt_state_dict(ckpt_local)
+            model.model.load_state_dict(sd, strict=True)
+            loaded_from = f"hf://{hf_repo}/{hf_filename}"
         else:
             model = hub.AnySat(
                 model_size=model_size, flash_attn=bool(flash_attn), device=dev
@@ -266,7 +236,7 @@ def _load_anysat_cached(
         "flash_attn": bool(flash_attn),
         "pretrained": bool(pretrained),
         "loaded_from": loaded_from,
-        "repo_root": repo_root,
+        "model_source": "vendored_rs_embed_runtime",
         "device": dev,
         "param_mean": float(p0f.mean().cpu()),
         "param_std": float(p0f.std().cpu()),
@@ -281,10 +251,10 @@ def _load_anysat(
     flash_attn: bool,
     pretrained: bool,
     ckpt_path: Optional[str],
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
+    hf_repo: str,
+    hf_filename: str,
+    hf_cache_dir: Optional[str],
+    hf_min_bytes: int,
     device: str,
 ) -> Tuple[Any, Dict[str, Any], str]:
     (loaded, dev) = _load_cached_with_device(
@@ -294,10 +264,10 @@ def _load_anysat(
         flash_attn=bool(flash_attn),
         pretrained=bool(pretrained),
         ckpt_path=(os.path.expanduser(ckpt_path) if ckpt_path else None),
-        repo_path=(os.path.expanduser(repo_path) if repo_path else None),
-        repo_url=str(repo_url),
-        repo_cache_root=str(repo_cache_root),
-        auto_download_repo=bool(auto_download_repo),
+        hf_repo=str(hf_repo),
+        hf_filename=str(hf_filename),
+        hf_cache_dir=(os.path.expanduser(hf_cache_dir) if hf_cache_dir else None),
+        hf_min_bytes=int(hf_min_bytes),
     )
     model, meta = loaded
     return model, meta, dev
@@ -408,6 +378,7 @@ class AnySatEmbedder(EmbedderBase):
             "notes": [
                 "AnySat expects S2 time-series + day-of-year dates.",
                 "This adapter builds T frames by splitting TemporalSpec.range into equal sub-windows.",
+                "Loads AnySat from a vendored local runtime and optional Hugging Face checkpoint.",
                 "grid output maps AnySat output='patch' to [D,H,W].",
             ],
         }
@@ -465,23 +436,21 @@ class AnySatEmbedder(EmbedderBase):
         norm_mode = os.environ.get("RS_EMBED_ANYSAT_NORM", "per_tile_zscore").strip()
         patch_size_m = int(getattr(output, "scale_m", 10))
 
-        repo_path = os.environ.get("RS_EMBED_ANYSAT_REPO_PATH")
-        repo_url = os.environ.get(
-            "RS_EMBED_ANYSAT_REPO_URL", "https://github.com/gastruc/AnySat.git"
-        )
-        repo_cache = os.environ.get(
-            "RS_EMBED_ANYSAT_REPO_CACHE",
-            os.path.join("~", ".cache", "rs_embed", "anysat"),
-        )
-        auto_download_repo = os.environ.get(
-            "RS_EMBED_ANYSAT_AUTO_DOWNLOAD_REPO", "1"
-        ).strip() not in {"0", "false", "False"}
         ckpt_path = os.environ.get("RS_EMBED_ANYSAT_CKPT")
         pretrained = os.environ.get("RS_EMBED_ANYSAT_PRETRAINED", "1").strip() not in {
             "0",
             "false",
             "False",
         }
+        hf_repo = os.environ.get("RS_EMBED_ANYSAT_HF_REPO", "g-astruc/AnySat").strip()
+        hf_filename = os.environ.get("RS_EMBED_ANYSAT_HF_FILE", "models/AnySat.pth").strip()
+        hf_cache_dir = os.environ.get(
+            "RS_EMBED_ANYSAT_CACHE_DIR",
+            os.path.join("~", ".cache", "rs_embed", "anysat"),
+        )
+        hf_min_bytes = int(
+            os.environ.get("RS_EMBED_ANYSAT_CKPT_MIN_BYTES", str(50 * 1024 * 1024))
+        )
 
         if input_chw is None:
             provider = self._get_provider(backend)
@@ -510,10 +479,10 @@ class AnySatEmbedder(EmbedderBase):
             flash_attn=flash_attn,
             pretrained=pretrained,
             ckpt_path=ckpt_path,
-            repo_path=repo_path,
-            repo_url=repo_url,
-            repo_cache_root=repo_cache,
-            auto_download_repo=auto_download_repo,
+            hf_repo=hf_repo,
+            hf_filename=hf_filename,
+            hf_cache_dir=hf_cache_dir,
+            hf_min_bytes=hf_min_bytes,
             device=device,
         )
 

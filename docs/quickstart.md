@@ -21,7 +21,7 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 ## Install
 
 ```bash
-git clone https://github.com/Dinghye/rs-embed.git
+git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
 conda env create -f environment.yml
 conda activate rs-embed
@@ -34,13 +34,13 @@ If you want on-the-fly models backed by GEE and torch wrappers, install the opti
 pip install -e ".[gee,torch,models]"
 ```
 
-Examples notebook: `examples/playground.ipynb`
+Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
 
 ---
 
 ## Run the Example Script
 
-The packaged example script is the fastest way to verify your environment.
+The repository example script is the fastest way to verify your environment after cloning this repo.
 
 ```bash
 python examples/quickstart.py --help

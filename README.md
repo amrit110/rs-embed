@@ -13,7 +13,7 @@
 
 
 
-[Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](./examples/playground.ipynb)  · [UseCase](./examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
+[Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](./examples/playground.ipynb) · [UseCase](./examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
 
 </div>
 
@@ -31,12 +31,10 @@ emb = get_embedding("tessera", spatial=..., temporal=..., output=...)
 ```
 
 
-## Install (temporary)
+## Install
 
-> We are actively refining and improving the codebase, and we will officially release version 0.1.0 later this week. If you are testing rs-embed, please remember to pull the latest changes from our repo. 🎉
 ```bash
-# temporary
-git clone git@github.com:cybergis/rs-embed.git
+git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
 conda env create -f environment.yml
 conda activate rs-embed
@@ -65,10 +63,10 @@ emb = get_embedding(
 )
 
 ```
-You can also visualize the embedding as follows:
+You can also visualize the embedding with the repository helper in `examples/plot_utils.py`:
 
 ```python
-from rs_embed import plot_embedding_pseudocolor
+from examples.plot_utils import plot_embedding_pseudocolor
 
 plot_embedding_pseudocolor(
     emb,
@@ -129,7 +127,7 @@ This is a convenience index with basic model info only (for quick scanning / lin
 
 📚 [Full documentation](https://cybergis.github.io/rs-embed/)
 
-🪄 [Get Started: Try `rs-embed` Now](/examples/playground.ipynb)
+🪄 [Get Started: Try `rs-embed` Now](./examples/playground.ipynb)
 
 🪀 [Use case: Maize yield mapping Illinois](./examples/demo.ipynb)
 

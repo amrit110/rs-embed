@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | Model ID | `galileo` |
-| Family / Backbone | Galileo `Encoder` from official `single_file_galileo.py` |
+| Family / Backbone | Galileo `Encoder` from vendored local runtime |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee` via public API) |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
@@ -87,12 +87,11 @@ Constraint:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `RS_EMBED_GALILEO_MODEL_SIZE` | `nano` | Galileo model size selector |
-| `RS_EMBED_GALILEO_MODEL_PATH` | unset | Local model/checkpoint path override |
-| `RS_EMBED_GALILEO_REPO_PATH` | unset | Local Galileo repo path |
-| `RS_EMBED_GALILEO_REPO_URL` | upstream Galileo repo | Repo clone source |
-| `RS_EMBED_GALILEO_REPO_CACHE` | `~/.cache/rs_embed/galileo` | Repo cache root |
-| `RS_EMBED_GALILEO_AUTO_DOWNLOAD_REPO` | `1` | Auto-clone repo if missing |
+| `RS_EMBED_GALILEO_MODEL_SIZE` | `nano` | Galileo model size selector (`models/<size>/`) |
+| `RS_EMBED_GALILEO_MODEL_PATH` | unset | Local model folder override containing `config.json` + `encoder.pt` |
+| `RS_EMBED_GALILEO_HF_REPO` | `nasaharvest/galileo` | Hugging Face repo used for snapshot download |
+| `RS_EMBED_GALILEO_CACHE_DIR` | `~/.cache/rs_embed/galileo` | Download cache dir for model snapshots |
+| `RS_EMBED_GALILEO_AUTO_DOWNLOAD` | `1` | Auto-download model folder from Hugging Face when `MODEL_PATH` is unset |
 | `RS_EMBED_GALILEO_IMG` | `64` | Frame resize target |
 | `RS_EMBED_GALILEO_PATCH` | `8` | Encoder patch size |
 | `RS_EMBED_GALILEO_FRAMES` | `8` | Number of temporal frames `T` |
@@ -154,7 +153,8 @@ emb = get_embedding(
 - `image_size` not divisible by `patch_size`
 - wrong `input_chw` channel count (must be 10)
 - unexpected effects from `RS_EMBED_GALILEO_MONTH` forcing a constant month
-- missing local repo/model path when auto-download is disabled
+- missing `huggingface_hub` / `einops` dependency
+- missing local model folder when auto-download is disabled
 
 Recommended first checks:
 
@@ -171,7 +171,7 @@ Record and keep fixed:
 - `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`
 - normalization mode / NDVI inclusion
 - month override (if any)
-- model source (repo/model path, model size)
+- model source (local model path or HF repo/model size)
 
 ---
 

@@ -115,10 +115,11 @@ Strict requirements:
 1. Fetch 10-band `CHW`, or reuse `input_chw`
 2. Apply source-style Sentinel statistics mapping (`mean ± 2*std`) to `uint8`
 3. Apply eval transforms: `ToTensor -> Resize(short side) -> CenterCrop(image_size)`
-4. Download or load runtime weights and source code
-5. Construct the grouped-channel model with channel groups `((0,1,2,6),(3,4,5,7),(8,9))`
-6. Run `forward_encoder(mask_ratio=0.0)` to extract grouped tokens
-7. Reduce grouped tokens for pooled or grid output
+4. Download or load runtime weights
+5. Import vendored grouped-channel runtime
+6. Construct the grouped-channel model with channel groups `((0,1,2,6),(3,4,5,7),(8,9))`
+7. Run `forward_encoder(mask_ratio=0.0)` to extract grouped tokens
+8. Reduce grouped tokens for pooled or grid output
 
 ### Key Environment Variables
 
@@ -126,8 +127,6 @@ Strict requirements:
 |---|---|
 | `RS_EMBED_SATMAEPP_S2_CKPT_REPO` | Checkpoint repo/source |
 | `RS_EMBED_SATMAEPP_S2_CKPT_FILE` | Checkpoint filename |
-| `RS_EMBED_SATMAEPP_S2_CODE_REPO` | Runtime code repo |
-| `RS_EMBED_SATMAEPP_S2_CODE_REF` | Runtime code revision/ref |
 | `RS_EMBED_SATMAEPP_S2_MODEL_FN` | Model constructor name |
 | `RS_EMBED_SATMAEPP_S2_IMG` | Eval image size |
 | `RS_EMBED_SATMAEPP_S2_PATCH` | Patch size |
@@ -139,7 +138,7 @@ Strict requirements:
 ### Common Failure Modes
 
 - `sensor.bands` order differs from the strict expected 10-band layout
-- runtime code repo or checkpoint download is unavailable
+- vendored runtime import fails or checkpoint download is unavailable
 - grouped-token reshape assumptions do not match the loaded checkpoint/config
 - `GRID_REDUCE` changes representation semantics across experiments
 
@@ -191,7 +190,7 @@ emb_s2 = get_embedding(
 Keep fixed and record:
 
 - which variant you used (`satmaepp` vs `satmaepp_s2_10b`)
-- checkpoint source and runtime code source
+- checkpoint source
 - image size, patch size, and channel/group reduction settings
 - temporal window and provider compositing settings
 - output mode (`pooled` vs `grid`) and pooling choice

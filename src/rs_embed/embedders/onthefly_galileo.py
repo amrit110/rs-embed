@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import os
-import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from functools import lru_cache
@@ -102,61 +101,27 @@ def _fetch_s2_10_raw_tchw(
     )
     return np.clip(raw, 0.0, 10000.0).astype(np.float32)
 
-
-@lru_cache(maxsize=4)
-def _ensure_galileo_repo(*, repo_url: str, cache_root: str) -> str:
-    root = os.path.expanduser(cache_root)
-    os.makedirs(root, exist_ok=True)
-    dst = os.path.join(root, "galileo")
-
-    if os.path.isfile(os.path.join(dst, "single_file_galileo.py")):
-        return dst
-
-    try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, dst],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    except Exception as e:
-        raise ModelError(
-            "Failed to clone Galileo source code. "
-            f"Tried: git clone --depth 1 {repo_url} {dst}"
-        ) from e
-    return dst
-
-
-def _resolve_repo(
-    *,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download: bool,
-) -> str:
-    if repo_path:
-        p = os.path.expanduser(repo_path)
-        if not os.path.isdir(p):
-            raise ModelError(f"RS_EMBED_GALILEO_REPO_PATH does not exist: {p}")
-        return p
-    if not auto_download:
-        raise ModelError(
-            "Galileo repository not provided. Set RS_EMBED_GALILEO_REPO_PATH or enable auto download."
-        )
-    return _ensure_galileo_repo(repo_url=repo_url, cache_root=repo_cache_root)
-
-
 def _resolve_model_folder(
     *,
-    repo_root: str,
     model_path: Optional[str],
     model_size: str,
+    hf_repo: str,
+    cache_dir: Optional[str],
+    auto_download: bool,
 ) -> str:
     if model_path:
         p = os.path.expanduser(model_path)
     else:
-        p = os.path.join(repo_root, "data", "models", str(model_size))
+        if not auto_download:
+            raise ModelError(
+                "Galileo model folder is required. Set RS_EMBED_GALILEO_MODEL_PATH "
+                "or enable RS_EMBED_GALILEO_AUTO_DOWNLOAD=1."
+            )
+        p = _download_galileo_model_folder(
+            model_size=model_size,
+            hf_repo=hf_repo,
+            cache_dir=cache_dir,
+        )
 
     cfg = os.path.join(p, "config.json")
     enc = os.path.join(p, "encoder.pt")
@@ -168,19 +133,50 @@ def _resolve_model_folder(
 
 
 @lru_cache(maxsize=8)
-def _load_galileo_single_file_module(repo_root: str):
-    sf_path = os.path.join(repo_root, "single_file_galileo.py")
-    if not os.path.exists(sf_path):
-        raise ModelError(f"Galileo single_file_galileo.py not found at {sf_path}")
-
-    spec = importlib.util.spec_from_file_location("galileo_single_file", sf_path)
-    if spec is None or spec.loader is None:
+def _load_galileo_module():
+    try:
+        mod = importlib.import_module("rs_embed.embedders._vendor.galileo_single_file")
+        getattr(mod, "Encoder")
+    except Exception as e:
         raise ModelError(
-            "Failed to build import spec for Galileo single_file_galileo.py"
-        )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+            "Failed to import vendored Galileo runtime. "
+            "Install missing dependencies: torch, einops."
+        ) from e
     return mod
+
+
+@lru_cache(maxsize=8)
+def _download_galileo_model_folder(
+    *,
+    model_size: str,
+    hf_repo: str,
+    cache_dir: Optional[str],
+) -> str:
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as e:
+        raise ModelError(
+            "Galileo auto-download requires huggingface_hub. "
+            "Install: pip install huggingface_hub"
+        ) from e
+
+    snap = snapshot_download(
+        repo_id=hf_repo,
+        cache_dir=cache_dir,
+        allow_patterns=[
+            f"models/{model_size}/config.json",
+            f"models/{model_size}/encoder.pt",
+        ],
+    )
+    model_root = os.path.join(snap, "models", str(model_size))
+    cfg = os.path.join(model_root, "config.json")
+    enc = os.path.join(model_root, "encoder.pt")
+    if not os.path.isfile(cfg) or not os.path.isfile(enc):
+        raise ModelError(
+            f"Downloaded Galileo snapshot for model_size={model_size!r} "
+            f"but expected files were not found under {model_root}."
+        )
+    return model_root
 
 
 def _month_from_iso(iso_date: str) -> int:
@@ -200,32 +196,25 @@ def _load_galileo_cached(
     *,
     model_size: str,
     model_path: Optional[str],
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
+    hf_repo: str,
+    cache_dir: Optional[str],
+    auto_download: bool,
     dev: str,
 ) -> Tuple[Any, Dict[str, Any], Any]:
     ensure_torch()
     import torch
 
-    repo_root = _resolve_repo(
-        repo_path=repo_path,
-        repo_url=repo_url,
-        repo_cache_root=repo_cache_root,
-        auto_download=auto_download_repo,
-    )
     model_root = _resolve_model_folder(
-        repo_root=repo_root,
         model_path=model_path,
         model_size=model_size,
+        hf_repo=hf_repo,
+        cache_dir=cache_dir,
+        auto_download=auto_download,
     )
 
-    mod = _load_galileo_single_file_module(repo_root)
+    mod = _load_galileo_module()
     if not hasattr(mod, "Encoder"):
-        raise ModelError(
-            "Galileo single_file_galileo.py does not expose Encoder class."
-        )
+        raise ModelError("Vendored Galileo runtime does not expose Encoder class.")
 
     model_folder = Path(model_root)
     load_fn = getattr(mod.Encoder, "load_from_folder", None)
@@ -256,8 +245,12 @@ def _load_galileo_cached(
 
     meta = {
         "model_size": str(model_size),
-        "repo_root": repo_root,
         "model_root": model_root,
+        "model_source": (
+            model_root
+            if model_path
+            else f"hf://{hf_repo}/models/{model_size}"
+        ),
         "device": str(dev),
         "param_mean": float(p0f.mean().cpu()),
         "param_std": float(p0f.std().cpu()),
@@ -270,10 +263,9 @@ def _load_galileo(
     *,
     model_size: str,
     model_path: Optional[str],
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
+    hf_repo: str,
+    cache_dir: Optional[str],
+    auto_download: bool,
     device: str,
 ) -> Tuple[Any, Dict[str, Any], Any, str]:
     (loaded, dev) = _load_cached_with_device(
@@ -281,10 +273,9 @@ def _load_galileo(
         device=device,
         model_size=str(model_size),
         model_path=(os.path.expanduser(model_path) if model_path else None),
-        repo_path=(os.path.expanduser(repo_path) if repo_path else None),
-        repo_url=str(repo_url),
-        repo_cache_root=str(repo_cache_root),
-        auto_download_repo=bool(auto_download_repo),
+        hf_repo=str(hf_repo),
+        cache_dir=(os.path.expanduser(cache_dir) if cache_dir else None),
+        auto_download=bool(auto_download),
     )
     encoder, meta, mod = loaded
     return encoder, meta, mod, dev
@@ -519,7 +510,8 @@ class GalileoEmbedder(EmbedderBase):
                 "normalization": "unit_scale",
             },
             "notes": [
-                "Loads Galileo Encoder from official single_file_galileo.py and model folder.",
+                "Loads Galileo Encoder from a vendored local runtime.",
+                "Defaults to Hugging Face model snapshots under nasaharvest/galileo/models/<size>/.",
                 "Builds T-frame S2 series by splitting TemporalSpec.range into equal sub-windows.",
                 "Uses Sentinel-2 10 bands; pooled output averages visible Galileo tokens.",
             ],
@@ -567,17 +559,12 @@ class GalileoEmbedder(EmbedderBase):
             "RS_EMBED_GALILEO_MODEL_SIZE", self.DEFAULT_MODEL_SIZE
         ).strip()
         model_path = os.environ.get("RS_EMBED_GALILEO_MODEL_PATH")
-        repo_path = os.environ.get("RS_EMBED_GALILEO_REPO_PATH")
-        repo_url = os.environ.get(
-            "RS_EMBED_GALILEO_REPO_URL", "https://github.com/nasaharvest/galileo.git"
-        ).strip()
-        repo_cache = os.environ.get(
-            "RS_EMBED_GALILEO_REPO_CACHE",
+        hf_repo = os.environ.get("RS_EMBED_GALILEO_HF_REPO", "nasaharvest/galileo").strip()
+        cache_dir = os.environ.get(
+            "RS_EMBED_GALILEO_CACHE_DIR",
             os.path.join("~", ".cache", "rs_embed", "galileo"),
         )
-        auto_download_repo = os.environ.get(
-            "RS_EMBED_GALILEO_AUTO_DOWNLOAD_REPO", "1"
-        ).strip() not in {
+        auto_download = os.environ.get("RS_EMBED_GALILEO_AUTO_DOWNLOAD", "1").strip() not in {
             "0",
             "false",
             "False",
@@ -636,10 +623,9 @@ class GalileoEmbedder(EmbedderBase):
         encoder, lmeta, mod, dev = _load_galileo(
             model_size=model_size,
             model_path=model_path,
-            repo_path=repo_path,
-            repo_url=repo_url,
-            repo_cache_root=repo_cache,
-            auto_download_repo=auto_download_repo,
+            hf_repo=hf_repo,
+            cache_dir=cache_dir,
+            auto_download=auto_download,
             device=device,
         )
 

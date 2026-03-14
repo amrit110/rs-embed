@@ -7,7 +7,7 @@
 | Field | Value |
 |---|---|
 | Model ID | `anysat` |
-| Family / Backbone | AnySat (loaded from upstream `hubconf.py`) |
+| Family / Backbone | AnySat (vendored local runtime) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee` via public API) |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
@@ -90,12 +90,12 @@ Important constraint:
 | `RS_EMBED_ANYSAT_NORM` | `per_tile_zscore` | Series normalization mode |
 | `RS_EMBED_ANYSAT_MODEL_SIZE` | `base` | AnySat model size |
 | `RS_EMBED_ANYSAT_FLASH_ATTN` | `0` | Enable flash attention path if supported |
-| `RS_EMBED_ANYSAT_PRETRAINED` | `1` | Use pretrained model |
+| `RS_EMBED_ANYSAT_PRETRAINED` | `1` | Load pretrained checkpoint weights |
 | `RS_EMBED_ANYSAT_CKPT` | unset | Local checkpoint override |
-| `RS_EMBED_ANYSAT_REPO_PATH` | unset | Local AnySat repo path (`hubconf.py`) |
-| `RS_EMBED_ANYSAT_REPO_URL` | upstream AnySat Git URL | Repo clone source when auto-downloading |
-| `RS_EMBED_ANYSAT_REPO_CACHE` | `~/.cache/rs_embed/anysat` | Repo cache root |
-| `RS_EMBED_ANYSAT_AUTO_DOWNLOAD_REPO` | `1` | Auto-clone AnySat repo if missing |
+| `RS_EMBED_ANYSAT_HF_REPO` | `g-astruc/AnySat` | Hugging Face repo used for checkpoint download |
+| `RS_EMBED_ANYSAT_HF_FILE` | `models/AnySat.pth` | Checkpoint file inside the Hugging Face repo |
+| `RS_EMBED_ANYSAT_CACHE_DIR` | `~/.cache/rs_embed/anysat` | Checkpoint cache dir |
+| `RS_EMBED_ANYSAT_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
 | `RS_EMBED_ANYSAT_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
 
 ---
@@ -147,7 +147,7 @@ emb = get_embedding(
 - backend is not provider-compatible
 - wrong channel count for `input_chw` (must be 10 channels)
 - `output.scale_m` is not a positive multiple of 10
-- AnySat repo unavailable and auto-download disabled (`RS_EMBED_ANYSAT_AUTO_DOWNLOAD_REPO=0`)
+- missing `torch` / `einops` / `huggingface_hub` dependency for vendored runtime + checkpoint path
 - local checkpoint missing / too small / invalid format
 - inconsistent results from untracked changes to `FRAMES`, `NORM`, or image size
 
@@ -166,7 +166,7 @@ For fair comparisons and stable reruns, record:
 - `RS_EMBED_ANYSAT_NORM`
 - `RS_EMBED_ANYSAT_IMG`
 - `output.scale_m` (patch size)
-- AnySat repo/ckpt source (`repo_path`, repo URL/cache, pretrained vs local ckpt)
+- AnySat checkpoint source (local path vs HF repo/file, pretrained flag)
 
 ---
 

@@ -7,14 +7,14 @@
 | Field | Value |
 |---|---|
 | Model ID | `agrifm` |
-| Family / Backbone | AgriFM (repo + checkpoint loader, lightweight shim path supported) |
+| Family / Backbone | AgriFM (vendored Video Swin runtime + checkpoint loader) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band time series (`T,10,H,W`) |
 | Temporal mode | `range` in practice (window split into `T` frames) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none required (adapter builds fixed frame stack) |
-| Training alignment (adapter path) | High when `n_frames`, normalization, and checkpoint/repo versions are fixed |
+| Training alignment (adapter path) | High when `n_frames`, normalization, and checkpoint version are fixed |
 
 ---
 
@@ -65,7 +65,6 @@ Default `SensorSpec` if omitted:
 1. Resolve runtime settings:
    - `n_frames`, `image_size`, normalization mode
    - checkpoint path (local or auto-download)
-   - AgriFM repo path (local or auto-clone)
 2. Fetch provider multi-frame raw `TCHW` or coerce `input_chw` (`CHW`/`TCHW`) to exact `T`
 3. Optional input inspection on frame 0 (temporarily scaled to `[0,1]`)
 4. Normalize with `RS_EMBED_AGRIFM_NORM`:
@@ -73,7 +72,7 @@ Default `SensorSpec` if omitted:
    - `unit_scale`: divide by `10000` and clip `[0,1]`
    - `none` / `raw`: keep raw `0..10000` (clipped)
 5. Resize all frames to `RS_EMBED_AGRIFM_IMG` (default `224`)
-6. Load AgriFM model (checkpoint + repo code)
+6. Load AgriFM model (checkpoint + vendored runtime)
 7. Forward to produce embedding grid `(D,H,W)`
 8. Return:
    - pooled vector = spatial mean/max over grid
@@ -102,17 +101,6 @@ Default `SensorSpec` if omitted:
 | `RS_EMBED_AGRIFM_CKPT_FILE` | `AgriFM.pth` | Cached checkpoint filename |
 | `RS_EMBED_AGRIFM_CKPT_URL` | project default URL | Checkpoint download URL |
 | `RS_EMBED_AGRIFM_CKPT_MIN_BYTES` | large-size threshold | Download validation threshold |
-
-### Repo loading (AgriFM source code)
-
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_AGRIFM_REPO_PATH` | unset | Local AgriFM repo path |
-| `RS_EMBED_AGRIFM_REPO_URL` | `https://github.com/flyakon/AgriFM` | Repo clone source |
-| `RS_EMBED_AGRIFM_REPO_CACHE` | `~/.cache/rs_embed` | Repo cache root |
-| `RS_EMBED_AGRIFM_AUTO_DOWNLOAD_REPO` | `1` | Auto-clone repo when missing |
-
----
 
 ## Output Semantics
 
@@ -164,14 +152,13 @@ emb = get_embedding(
 - wrong `input_chw` shape (must be `CHW`/`TCHW` with `C=10`)
 - silent temporal mismatch from `CHW` repeat-to-`T` behavior
 - checkpoint download failure or invalid local checkpoint path
-- AgriFM repo missing when auto-download is disabled
-- missing lightweight import deps (`torch`, `timm`, `einops`) for repo backbone import
+- missing lightweight import deps (`torch`, `timm`, `einops`) for vendored backbone import
 
 Recommended first checks:
 
 - inspect metadata for `n_frames`, `norm_mode`, `input_frames`, `grid_hw`
 - verify whether input came from provider fetch vs repeated `CHW`
-- pin checkpoint and repo path before benchmarking
+- pin checkpoint source/path before benchmarking
 
 ---
 
@@ -180,7 +167,7 @@ Recommended first checks:
 Keep fixed and record:
 
 - `RS_EMBED_AGRIFM_FRAMES`, `RS_EMBED_AGRIFM_IMG`, normalization mode
-- checkpoint source/path and repo source/path
+- checkpoint source/path
 - temporal window and compositing settings
 - output mode / pooling choice
 
@@ -195,4 +182,3 @@ Temporal note:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_agrifm.py`
 - Shared temporal fetch/coercion helpers: `src/rs_embed/embedders/runtime_utils.py`
-

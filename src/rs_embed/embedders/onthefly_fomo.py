@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import os
-import subprocess
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -101,8 +101,7 @@ _DEFAULT_CKPT_URL = (
     "https://www.dropbox.com/scl/fi/4ckmxlcbc0tcod8hknp7c/"
     "fomo_single_embedding_layer_weights.pt?rlkey=26tlf3yaz93vvcosr0qrvklub&dl=1"
 )
-_DEFAULT_REPO_URL = "https://github.com/RolnickLab/FoMo-Bench.git"
-_DEFAULT_REPO_CACHE = "~/.cache/rs_embed/fomo"
+_DEFAULT_CKPT_CACHE_DIR = "~/.cache/rs_embed/fomo"
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -170,7 +169,7 @@ def _resolve_fomo_ckpt_path() -> str:
             "or enable RS_EMBED_FOMO_AUTO_DOWNLOAD=1."
         )
 
-    cache_dir = os.environ.get("RS_EMBED_FOMO_CACHE_DIR", _DEFAULT_REPO_CACHE)
+    cache_dir = os.environ.get("RS_EMBED_FOMO_CACHE_DIR", _DEFAULT_CKPT_CACHE_DIR)
     filename = (
         os.environ.get("RS_EMBED_FOMO_CKPT_FILE", _DEFAULT_CKPT_FILENAME).strip()
         or _DEFAULT_CKPT_FILENAME
@@ -186,68 +185,16 @@ def _resolve_fomo_ckpt_path() -> str:
         url=url, cache_dir=cache_dir, filename=filename, min_bytes=min_bytes
     )
 
-
-@lru_cache(maxsize=4)
-def _ensure_fomo_repo(*, repo_url: str, cache_root: str) -> str:
-    root = os.path.expanduser(cache_root)
-    os.makedirs(root, exist_ok=True)
-    dst = os.path.join(root, "FoMo-Bench")
-    mm = os.path.join(dst, "model_zoo", "multimodal_mae.py")
-    if os.path.isfile(mm):
-        return dst
-
+@lru_cache(maxsize=8)
+def _load_fomo_module():
     try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, dst],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        mod = importlib.import_module("rs_embed.embedders._vendor.fomo_multimodal_mae")
+        getattr(mod, "MultiSpectralViT")
     except Exception as e:
         raise ModelError(
-            "Failed to clone FoMo-Bench source code. "
-            f"Tried: git clone --depth 1 {repo_url} {dst}"
+            "Failed to import vendored FoMo runtime. "
+            "Install missing dependencies: torch, einops."
         ) from e
-    return dst
-
-
-def _resolve_fomo_repo(
-    *,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download: bool,
-) -> str:
-    if repo_path:
-        p = os.path.expanduser(repo_path)
-        mm = os.path.join(p, "model_zoo", "multimodal_mae.py")
-        if not os.path.isdir(p):
-            raise ModelError(f"RS_EMBED_FOMO_REPO_PATH does not exist: {p}")
-        if not os.path.isfile(mm):
-            raise ModelError(
-                f"FoMo repo path is missing model_zoo/multimodal_mae.py: {p}"
-            )
-        return p
-    if not auto_download:
-        raise ModelError(
-            "FoMo-Bench repository is required. Set RS_EMBED_FOMO_REPO_PATH "
-            "or enable RS_EMBED_FOMO_AUTO_DOWNLOAD_REPO=1."
-        )
-    return _ensure_fomo_repo(repo_url=repo_url, cache_root=repo_cache_root)
-
-
-@lru_cache(maxsize=8)
-def _load_fomo_module(repo_root: str):
-    mm_path = os.path.join(repo_root, "model_zoo", "multimodal_mae.py")
-    if not os.path.isfile(mm_path):
-        raise ModelError(f"FoMo module not found: {mm_path}")
-
-    spec = importlib.util.spec_from_file_location("fomo_multimodal_mae", mm_path)
-    if spec is None or spec.loader is None:
-        raise ModelError("Failed to create import spec for FoMo multimodal_mae.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
     return mod
 
 
@@ -296,10 +243,6 @@ def _build_fomo_model_config(
 def _load_fomo_cached(
     *,
     ckpt_path: str,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
     image_size: int,
     patch_size: int,
     dim: int,
@@ -315,15 +258,9 @@ def _load_fomo_cached(
     if importlib.util.find_spec("einops") is None:
         raise ModelError("FoMo requires einops. Install: pip install einops")
 
-    repo_root = _resolve_fomo_repo(
-        repo_path=repo_path,
-        repo_url=repo_url,
-        repo_cache_root=repo_cache_root,
-        auto_download=auto_download_repo,
-    )
-    mod = _load_fomo_module(repo_root)
+    mod = _load_fomo_module()
     if not hasattr(mod, "MultiSpectralViT"):
-        raise ModelError("FoMo module does not expose MultiSpectralViT.")
+        raise ModelError("Vendored FoMo runtime does not expose MultiSpectralViT.")
 
     cfg = _build_fomo_model_config(
         image_size=image_size,
@@ -371,9 +308,9 @@ def _load_fomo_cached(
     p0f = p0.float()
 
     meta = {
-        "repo_root": repo_root,
         "ckpt_path": ckpt_path,
         "ckpt_size": int(os.path.getsize(ckpt_path)),
+        "model_source": "vendored_rs_embed_runtime",
         "image_size": int(image_size),
         "patch_size": int(patch_size),
         "dim": int(dim),
@@ -394,10 +331,6 @@ def _load_fomo_cached(
 def _load_fomo(
     *,
     ckpt_path: str,
-    repo_path: Optional[str],
-    repo_url: str,
-    repo_cache_root: str,
-    auto_download_repo: bool,
     image_size: int,
     patch_size: int,
     dim: int,
@@ -411,10 +344,6 @@ def _load_fomo(
         _load_fomo_cached,
         device=device,
         ckpt_path=os.path.expanduser(ckpt_path),
-        repo_path=(os.path.expanduser(repo_path) if repo_path else None),
-        repo_url=str(repo_url),
-        repo_cache_root=str(repo_cache_root),
-        auto_download_repo=bool(auto_download_repo),
         image_size=int(image_size),
         patch_size=int(patch_size),
         dim=int(dim),
@@ -590,7 +519,7 @@ class FoMoEmbedder(EmbedderBase):
                 "auto_download_ckpt": True,
             },
             "notes": [
-                "Loads FoMo MultiSpectralViT from the official FoMo-Bench repository.",
+                "Loads FoMo MultiSpectralViT from a vendored local runtime.",
                 "Default checkpoint source is the FoMo-Net_1 weights link provided by FoMo-Bench README.",
                 "Grid output averages patch tokens across the provided S2 spectral modalities.",
             ],
@@ -649,10 +578,6 @@ class FoMoEmbedder(EmbedderBase):
         )
         norm_mode = os.environ.get("RS_EMBED_FOMO_NORM", "unit_scale").strip()
 
-        repo_path = os.environ.get("RS_EMBED_FOMO_REPO_PATH")
-        repo_url = os.environ.get("RS_EMBED_FOMO_REPO_URL", _DEFAULT_REPO_URL).strip()
-        repo_cache = os.environ.get("RS_EMBED_FOMO_REPO_CACHE", _DEFAULT_REPO_CACHE)
-        auto_download_repo = _env_flag("RS_EMBED_FOMO_AUTO_DOWNLOAD_REPO", True)
         ckpt_path = _resolve_fomo_ckpt_path()
         spectral_keys = _resolve_s2_modality_keys()
 
@@ -688,10 +613,6 @@ class FoMoEmbedder(EmbedderBase):
 
         model, lmeta, dev = _load_fomo(
             ckpt_path=ckpt_path,
-            repo_path=repo_path,
-            repo_url=repo_url,
-            repo_cache_root=repo_cache,
-            auto_download_repo=auto_download_repo,
             image_size=image_size,
             patch_size=patch_size,
             dim=dim,
