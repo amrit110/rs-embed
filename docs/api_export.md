@@ -1,6 +1,8 @@
 # API: Export
 
-This page documents dataset export APIs and export-specific runtime behavior.
+This page covers dataset export APIs.
+
+If you only remember one function, remember `export_batch(...)`.
 
 Related pages:
 
@@ -18,109 +20,202 @@ export_batch(
     spatials: List[SpatialSpec],
     temporal: Optional[TemporalSpec],
     models: List[str | ExportModelRequest],
-    target: Optional[ExportTarget] = None,
-    config: Optional[ExportConfig] = None,
-    out_dir: Optional[str] = None,
-    out_path: Optional[str] = None,
-    out: Optional[str] = None,
-    layout: Optional[str] = None,
-    names: Optional[List[str]] = None,
+    target: ExportTarget,
+    config: ExportConfig,
     backend: str = "auto",
     device: str = "auto",
     output: OutputSpec = OutputSpec.pooled(),
     sensor: Optional[SensorSpec] = None,
     modality: Optional[str] = None,
-    per_model_sensors: Optional[Dict[str, SensorSpec]] = None,
-    per_model_modalities: Optional[Dict[str, str]] = None,
-    format: str = "npz",
-    save_inputs: bool = True,
-    save_embeddings: bool = True,
-    save_manifest: bool = True,
-    fail_on_bad_input: bool = False,
-    chunk_size: int = 16,
-    infer_batch_size: Optional[int] = None,
-    num_workers: int = 8,
-    continue_on_error: bool = False,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.0,
-    async_write: bool = True,
-    writer_workers: int = 2,
-    resume: bool = False,
-    show_progress: bool = True,
-    input_prep: InputPrepSpec | str = "resize",
 ) -> Any
 ```
 
-**Recommended export entry point**: export `inputs + embeddings + manifest` for **single or multiple ROIs × one or multiple models** in one go.
+Use `export_batch(...)` when you want to export:
 
-For new code, prefer the object-style export request:
+- one or many ROIs
+- one or many models
+- inputs, embeddings, and manifests together
 
-- `target=ExportTarget(...)`: choose output layout/location
-- `config=ExportConfig(...)`: choose runtime and write behavior
-- `models=[..., ExportModelRequest(...)]`: add per-model overrides only when needed
+Although the public function still exposes many keyword arguments, the actual implementation first normalizes requests into:
 
-Legacy `out + layout`, `out_dir` / `out_path`, and the many config-like keyword arguments remain supported for backward compatibility.
+- `ExportTarget`
+- `ExportConfig`
+- `ExportModelRequest` entries
 
-**Parameters**
+That is the real shape of the API internally, and it is the shape new code should follow.
 
-- `spatials`: non-empty list
-- `temporal`: can be `None` (some models don’t require time)
-- `models`: non-empty list of model IDs or `ExportModelRequest(...)` objects
-- `target`: preferred output target object for new code. Use `ExportTarget.per_item(...)` or `ExportTarget.combined(...)`
-- `config`: preferred runtime config object for new code. Use `ExportConfig(...)`
-- `backend`: recommended to pass `backend="auto"` unless you need an explicit provider override (for example `"gee"`)
-- `sensor`: a shared `SensorSpec` for all models (if models are on-the-fly)
-- `modality`: optional shared modality override for models that expose public modality switching
-- `per_model_sensors` / `per_model_modalities`: legacy per-model overrides keyed by model string
+### Mental Model
 
-`ExportTarget(...)`
+Think about `export_batch(...)` as 4 decisions:
 
-- `ExportTarget.per_item("exports", names=[...])`: one file per ROI
-- `ExportTarget.combined("exports/run")`: one merged output file
+1. What to export: `spatials`, `temporal`, `models`
+2. Where to write: `target=ExportTarget(...)`
+3. How to run: `config=ExportConfig(...)`
+4. Any shared model settings: `backend`, `sensor`, `modality`, `output`
 
-`ExportConfig(...)`
+For new code, prefer the object-style API:
+
+- `target=ExportTarget(...)`
+- `config=ExportConfig(...)`
+- `models=[..., ExportModelRequest(...)]` only when one model needs special overrides
+
+### Start Here
+
+If you are not sure what to pass, this is the default pattern:
+
+```python
+from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
+
+export_batch(
+    spatials=[PointBuffer(121.5, 31.2, 2048)],
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=["remoteclip"],
+    target=ExportTarget.combined("exports/run"),
+    config=ExportConfig(),
+)
+```
+
+That gives you:
+
+- one combined export artifact
+- default `.npz` format
+- inputs + embeddings + manifest
+- default runtime behavior
+
+---
+
+## Parameters, Grouped by Job
+
+### 1. Required dataset definition
+
+These are the inputs most users always set:
+
+- `spatials`: non-empty list of `BBox` or `PointBuffer`
+- `temporal`: `TemporalSpec` or `None`
+- `models`: non-empty list of model IDs or `ExportModelRequest(...)`
+
+### 2. Output location and layout
+
+Prefer `target=ExportTarget(...)` in new code.
+
+```python
+from rs_embed import ExportTarget
+
+ExportTarget.per_item("exports", names=["p1", "p2"])
+ExportTarget.combined("exports/run")
+```
+
+- `ExportTarget.per_item(...)`: one file per ROI
+- `ExportTarget.combined(...)`: one merged file for the whole run
+
+### 3. Shared model/runtime settings
+
+These usually apply to all models in the call:
+
+- `backend`: keep `backend="auto"` unless you need a specific provider such as `"gee"`
+- `device`: `"auto"` is the normal choice
+- `output`: usually `OutputSpec.pooled()`
+- `sensor`: shared `SensorSpec` for on-the-fly models
+- `modality`: shared modality override for models that expose multiple public branches
+
+Use per-model overrides only when one model needs different settings.
+
+### 4. ExportConfig: the knobs that matter most
+
+`config=ExportConfig(...)` is the recommended place for runtime settings.
+
+In the implementation, flat config keywords are folded into an `ExportConfig` object anyway, so new code should construct that object directly.
+
+The most important ones are:
 
 - `format`: `"npz"` or `"netcdf"`
-- `save_inputs`: whether to save model input patches (CHW numpy)
-- `save_embeddings`: whether to save embedding arrays
-- `save_manifest`: whether to save JSON manifests (each export artifact will have an accompanying `.json`)
-- `fail_on_bad_input`: whether to raise immediately if input checks fail
-- `chunk_size`: process points in chunks (controls export memory/throughput). In `per_item` mode with GEE prefetch enabled, rs-embed uses a one-slot prefetch pipeline (double buffering), so input-cache peak memory can be roughly up to 2 chunks to overlap `prefetch(chunk k+1)` with `infer/write(chunk k)`.
-- `infer_batch_size`: batched inference size when model batch APIs are used; defaults to `chunk_size`
-- `num_workers`: concurrency for GEE patch prefetching (ThreadPool)
-- `continue_on_error`: keep exporting remaining points/models even if one item fails
-- `max_retries`: retry count for provider fetch/write operations
-- `retry_backoff_s`: sleep seconds between retries
-- `async_write`: write output files asynchronously in per-item mode
-- `writer_workers`: writer thread count when `async_write=True`
-- `resume`: skip already-exported outputs and continue from remaining items
-- `show_progress`: show progress during batch export (overall progress + per-model inference progress)
-- `input_prep`: large-ROI input policy (`"resize"` default, `"tile"`, `"auto"`, or `InputPrepSpec(...)`)
+- `save_inputs`: save model-ready input patches
+- `save_embeddings`: save embedding arrays
+- `save_manifest`: save JSON manifest metadata
+- `resume`: skip items already exported
+- `input_prep`: large-ROI policy, usually `"resize"` or `"tile"`
 
-`ExportModelRequest(...)`
+You can usually ignore the rest until you need performance tuning or failure recovery.
 
-- `ExportModelRequest("remoteclip")`: plain model entry
-- `ExportModelRequest("terrafm", modality="s1", sensor=s1_sensor)`: per-model overrides without global dicts
+### 5. Advanced runtime controls
 
-Modality contract:
+These matter mainly for larger runs:
 
-- `export_batch(...)` accepts a global `modality` and optional per-model overrides via `ExportModelRequest(...)` or legacy `per_model_modalities`.
-- Only models that explicitly expose a given modality can use it.
-- Unsupported modality selections raise a `ModelError` during per-model config resolution.
+- `chunk_size`: how many ROIs to process at a time
+- `infer_batch_size`: batch size for models that implement batch inference
+- `num_workers`: provider fetch concurrency
+- `continue_on_error`: keep going if one item/model fails
+- `max_retries`, `retry_backoff_s`: retry policy
+- `async_write`, `writer_workers`: asynchronous writing in per-item mode
+- `show_progress`: enable progress display
+- `fail_on_bad_input`: fail immediately on invalid inputs
 
-**Automatic inference behavior**
+If you do not know what these mean, leave them at defaults.
 
-- In **per-item output mode** (`target=ExportTarget.per_item(...)`, `out_dir`, or `layout="per_item"`), `device="cpu"` (or auto-resolved CPU) defaults to per-item inference.
-- In **per-item output mode** (`target=ExportTarget.per_item(...)`, `out_dir`, or `layout="per_item"`), `device="cuda"` / `mps` / other accelerators (or auto-resolved GPU) prefers batched inference when the embedder implements batch APIs.
-- In **combined output mode** (`target=ExportTarget.combined(...)`, `out_path`, or `layout="combined"`), rs-embed keeps the historical behavior of attempting batched model APIs (with fallback to single-item inference if batched execution fails)
-- Model-level scheduling remains serial (one model at a time)
+Example:
 
-**Returns**
+```python
+from rs_embed import ExportConfig
 
-- `target=ExportTarget.per_item(...)` / `layout="per_item"` / `out_dir` mode: `List[dict]` (manifest for each point)
-- `target=ExportTarget.combined(...)` / `layout="combined"` / `out_path` mode: `dict` (combined manifest)
+config = ExportConfig(
+    format="npz",
+    save_inputs=True,
+    save_embeddings=True,
+    save_manifest=True,
+    resume=True,
+    input_prep="resize",
+)
+```
 
-**Example: recommended object-style export**
+---
+
+## Per-Model Overrides
+
+Most runs should pass plain model IDs:
+
+```python
+models=["remoteclip", "prithvi"]
+```
+
+Use `ExportModelRequest(...)` only when a specific model needs its own sensor or modality:
+
+```python
+from rs_embed import ExportModelRequest
+
+models=[
+    "remoteclip",
+    ExportModelRequest("terrafm", modality="s1"),
+]
+```
+
+Typical use cases:
+
+- one model needs `modality="s1"`
+- one model needs a different `SensorSpec`
+- one model should override the shared export settings
+
+This also matches the implementation path: string model IDs are first converted into `ExportModelRequest(name=...)`, then resolved.
+
+Modality rules:
+
+- `export_batch(...)` accepts a global `modality`
+- one model can override it via `ExportModelRequest(...)`
+- unsupported modality choices raise `ModelError`
+
+---
+
+## What Gets Returned
+
+- `ExportTarget.per_item(...)`: returns `List[dict]`
+- `ExportTarget.combined(...)`: returns `dict`
+
+In both cases, the return value is manifest-style metadata describing what was exported.
+
+---
+
+## Common Patterns
+
+### One combined export file
 
 ```python
 from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
@@ -134,7 +229,30 @@ export_batch(
 )
 ```
 
-**Example: per-model modality selection**
+### One file per ROI
+
+```python
+from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
+
+spatials = [
+    PointBuffer(121.5, 31.2, 2048),
+    PointBuffer(120.5, 30.2, 2048),
+]
+
+export_batch(
+    spatials=spatials,
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=["remoteclip", "prithvi"],
+    target=ExportTarget.per_item("exports", names=["p1", "p2"]),
+    config=ExportConfig(
+        input_prep="tile",
+        chunk_size=32,
+        num_workers=8,
+    ),
+)
+```
+
+### One model needs its own modality
 
 ```python
 from rs_embed import (
@@ -154,118 +272,28 @@ export_batch(
 )
 ```
 
-**Example: recommended per-item export**
-
-```python
-from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
-
-spatials = [
-    PointBuffer(121.5, 31.2, 2048),
-    PointBuffer(120.5, 30.2, 2048),
-]
-export_batch(
-    spatials=spatials,
-    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    models=["remoteclip", "prithvi"],
-    target=ExportTarget.per_item("exports", names=["p1", "p2"]),
-    config=ExportConfig(
-        input_prep="tile",
-        save_inputs=True,
-        save_embeddings=True,
-        chunk_size=32,
-        num_workers=8,
-    ),
-)
-```
-
-**Example: legacy-compatible `out_dir` (per-item files)**
-
-```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
-
-spatials = [
-    PointBuffer(121.5, 31.2, 2048),
-    PointBuffer(120.5, 30.2, 2048),
-]
-export_batch(
-    spatials=spatials,
-    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    models=["remoteclip", "prithvi"],
-    out_dir="exports",
-    names=["p1", "p2"],
-    input_prep="tile",  # optional: API-side tiled inference for large ROIs
-    save_inputs=True,
-    save_embeddings=True,
-    chunk_size=32,
-    num_workers=8,
-)
-```
-
-**Example: legacy-compatible `out_path` (single merged file)**
-
-```python
-from rs_embed import export_batch, PointBuffer, TemporalSpec
-
-export_batch(
-    spatials=[PointBuffer(121.5, 31.2, 2048)],
-    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    models=["remoteclip"],
-    out_path="combined.npz",
-)
-```
-
-!!! tip "Key performance feature: avoid duplicate downloads"
-    When backend resolves to a provider path (for example `backend="gee"`, or `backend="auto"` on provider-backed models),
-    and `save_inputs=True` and `save_embeddings=True`, `export_batch` **prefetches the raw patch once**,
-    and passes that same patch into the embedder via `input_chw` to compute embeddings—avoiding the pattern of “download once to save inputs + download again for embeddings”.
-
-!!! warning "About parallelism"
-    `export_batch` currently has two levels of execution behavior:
-    - **IO level**: GEE prefetching is parallelized (ThreadPool, controlled by `num_workers`).
-    - In **per-item mode**, rs-embed uses a **one-slot double buffer**: while chunk `k` is running inference / writing outputs, chunk `k+1` can be prefetched in the background (after the first chunk).
-    - This improves throughput when fetch and inference times are comparable, at the cost of a higher input-cache peak (roughly up to 2 chunks).
-    - In **combined mode**, prefetch still runs as a distinct stage before model execution (to keep checkpoint/resume semantics simpler and memory behavior predictable).
-    - **Inference level, model level**: models are executed serially (one model at a time), to keep runtime/GPU behavior stable.
-    - **Inference level, batch level**: for a single model, rs-embed can run batched inference when the embedder implements batch APIs (for example `get_embeddings_batch` / `get_embeddings_batch_from_inputs`). This is used in combined mode and, on GPU/accelerators, also in per-item mode.
-    In short: rs-embed supports batch-level inference acceleration, while keeping model-level scheduling serial by design.
-
 ---
 
-## export_npz (compatibility / convenience wrapper) { #export_npz }
+## Runtime Behavior You Usually Need to Know
 
-```python
-export_npz(
-    *,
-    spatial: SpatialSpec,
-    temporal: Optional[TemporalSpec],
-    models: List[str],
-    out_path: str,
-    backend: str = "auto",
-    device: str = "auto",
-    output: OutputSpec = OutputSpec.pooled(),
-    sensor: Optional[SensorSpec] = None,
-    per_model_sensors: Optional[Dict[str, SensorSpec]] = None,
-    save_inputs: bool = True,
-    save_embeddings: bool = True,
-    save_manifest: bool = True,
-    fail_on_bad_input: bool = False,
-    infer_batch_size: Optional[int] = None,
-    continue_on_error: bool = False,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.0,
-    input_prep: InputPrepSpec | str = "resize",
-) -> Dict[str, Any]
-```
+### Inference scheduling
 
-Convenience wrapper around `export_batch(...)` for a single `spatial` query that always writes a single `.npz` file.
-New code should usually prefer `export_batch(...)` so you only need to learn one export API.
+- model scheduling is serial: one model at a time
+- batch inference is used when the embedder supports it
+- GPU or accelerator backends benefit the most from batch inference
 
-- Creates parent directory if needed
-- Appends `.npz` suffix if missing
-- Delegates to `export_batch(..., out_path=..., format="npz")`
+### Per-item vs combined mode
 
-Use `export_batch(...)` directly when you need:
+- `per_item` mode writes one artifact per ROI
+- `combined` mode writes one merged artifact for the run
+- combined mode keeps the older behavior of preferring batch model APIs when possible
 
-- multiple spatials
-- non-`npz` formats (for example `netcdf`)
-- output layout control (`target=ExportTarget(...)` / `out + layout` / `out_dir` / `out_path`)
+### Input reuse
+
+If provider-backed export is used and both `save_inputs=True` and `save_embeddings=True`, rs-embed reuses the fetched input patch for both writing and embedding inference instead of downloading it twice.
+
+!!! tip "Simple rule"
+    Start with `ExportTarget.combined(...)` + `ExportConfig()`.
+    Add `ExportModelRequest(...)` only for the few models that need per-model sensor or modality overrides.
+
+---

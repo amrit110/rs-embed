@@ -4,20 +4,6 @@
 
 ---
 
-The goal of `rs-embed` is simple:
-
-- give users one consistent way to query remote sensing embeddings
-- hide model-specific glue code behind a small public API
-- make cross-model experiments easier to set up and compare
-
-The main public path is built around three functions:
-
-- `get_embedding(...)`
-- `get_embeddings_batch(...)`
-- `export_batch(...)`
-
----
-
 ## Why This Exists
 
 ![rs-embed background](assets/background.png)
@@ -39,19 +25,19 @@ RS-Embed aims to fix this.
 
 ## Start Here
 
-### I want to get something running
+### Get something running
 
 - [Quickstart](quickstart.md): install the package, run a first example, and learn the three core APIs
 
-### I want to choose a model
+### Choose a model
 
 - [Models](models.md): shortlist model IDs by task, input type, and temporal behavior
 
-### I want exact signatures
+### Exact signatures
 
 - [API](api.md): exact signatures for specs, embedding, export, and inspection
 
-### I want to add support for a new model
+### Support for a new model
 
 - [Extending](extending.md): add a new model adapter or integrate with the registry/export flow
 
@@ -61,8 +47,11 @@ RS-Embed aims to fix this.
 
 - **Unified interface** for diverse embedding models (on-the-fly models and precomputed products).
 - **Spatial + temporal specs** to describe what you want, not how to fetch it.
-- **Batch export as a first-class workflow** via `export_batch`.
-- **Compatibility wrappers preserved** (for example `export_npz`, `inspect_gee_patch`) without changing the main learning path.
+- **Scale from single regions to massive datasets** built around three functions:
+
+    - `get_embedding(...)`
+    - `get_embeddings_batch(...)`   
+    - `export_batch(...)`
 
 ---
 

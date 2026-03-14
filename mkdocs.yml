@@ -47,15 +47,35 @@ extra_css:
 not_in_nav: |
   /concepts.md
   /workflows.md
-  /models_reference.md
   /limitations.md
   /model_detail_template.md
-  /models/*.md
 
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - Models: models.md
+  - Models:
+    - Overview: models.md
+    - Advanced Reference: models_reference.md
+    - Precomputed:
+      - Tessera: models/tessera.md
+      - Google Satellite Embedding: models/gse.md
+      - Copernicus Embed: models/copernicus.md
+    - On-the-fly:
+      - RemoteCLIP: models/remoteclip.md
+      - SatMAE RGB: models/satmae.md
+      - SatMAE++ Family: models/satmaepp.md
+      - ScaleMAE RGB: models/scalemae.md
+      - WildSAT: models/wildsat.md
+      - Prithvi-EO v2: models/prithvi.md
+      - TerraFM-B: models/terrafm.md
+      - TerraMind: models/terramind.md
+      - DOFA: models/dofa.md
+      - FoMo: models/fomo.md
+      - THOR 1.0 Base: models/thor.md
+      - SatVision-TOA: models/satvision.md
+      - AnySat: models/anysat.md
+      - Galileo: models/galileo.md
+      - AgriFM: models/agrifm.md
   - API:
     - Overview: api.md
     - Specs & Data Structures: api_specs.md
