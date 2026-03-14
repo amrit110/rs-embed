@@ -23,6 +23,7 @@ from .core.types import (
     ModelConfig,
 )
 from .api import export_batch, get_embedding, get_embeddings_batch, list_models
+from ._version import __version__
 from .model import Model
 from .pipelines.exporter import BatchExporter
 from .inspect import inspect_gee_patch, inspect_provider_patch
@@ -56,5 +57,5 @@ __all__ = [
     "inspect_provider_patch",
     # Backward-compatible alias for inspect_provider_patch
     "inspect_gee_patch",
+    "__version__",
 ]
-__version__ = "0.1.0"

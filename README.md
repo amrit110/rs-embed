@@ -1,6 +1,6 @@
 <div align="center">
 
-# <img src="./docs/assets/icon.png" width="35" alt="icon" />  rs-embed
+# <img src="https://raw.githubusercontent.com/cybergis/rs-embed/main/docs/assets/icon.png" width="35" alt="icon" />  rs-embed
 **One line code to get Any Remote Sensing Foundation Model (RSFM) embeddings for Any Place and Any Time**
 
 
@@ -13,13 +13,13 @@
 
 
 
-[Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](./examples/playground.ipynb) · [UseCase](./examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
+[Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb) · [UseCase](https://github.com/cybergis/rs-embed/blob/main/examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
 
 </div>
 
 > Get Start on [I-GUIDE](https://platform.i-guide.io/notebooks/a013ce97-d963-4262-9f21-edd09976181a) Today!
 
-<img src="./docs/assets/background.png" /> 
+<img src="https://raw.githubusercontent.com/cybergis/rs-embed/main/docs/assets/background.png" /> 
 
 
 
@@ -32,17 +32,21 @@ emb = get_embedding("tessera", spatial=..., temporal=..., output=...)
 
 
 ## Install
-
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
 conda env create -f environment.yml
 conda activate rs-embed
 pip install -e .
+```
 
-# If you are using GEE for the first time, run:
+
+If this is your first time using Google Earth Engine, authenticate once:
+
+```bash
 earthengine authenticate
 ```
+
 
 ## Quick Example
 ```python
@@ -63,21 +67,14 @@ emb = get_embedding(
 )
 
 ```
-You can also visualize the embedding with the repository helper in `examples/plot_utils.py`:
+See the visualization helper and end-to-end notebook in the repository:
 
-```python
-from examples.plot_utils import plot_embedding_pseudocolor
+- [`examples/plot_utils.py`](https://github.com/cybergis/rs-embed/blob/main/examples/plot_utils.py)
+- [`examples/playground.ipynb`](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb)
 
-plot_embedding_pseudocolor(
-    emb,
-    title="prithvi grid PCA pseudocolor",
-)
-```
+<img src="https://raw.githubusercontent.com/cybergis/rs-embed/main/docs/assets/vis.png" width=650 /> 
 
-
-<img src="./docs/assets/vis.png" width=650 /> 
-
-## Recommended API Entry Points
+## Main API
 
 For new users, start with these primary APIs:
 
@@ -87,7 +84,7 @@ For new users, start with these primary APIs:
 - `inspect_provider_patch(...)`: inspect raw provider patches before inference
 
 
-## Supported Models (Quick Reference)
+## Supported Models
 
 This is a convenience index with basic model info only (for quick scanning / links). For detailed I/O behavior and preprocessing notes, see [Supported Models](https://cybergis.github.io/rs-embed/models/).
 
@@ -127,9 +124,9 @@ This is a convenience index with basic model info only (for quick scanning / lin
 
 📚 [Full documentation](https://cybergis.github.io/rs-embed/)
 
-🪄 [Get Started: Try `rs-embed` Now](./examples/playground.ipynb)
+🪄 [Get Started: Try `rs-embed` Now](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb)
 
-🪀 [Use case: Maize yield mapping Illinois](./examples/demo.ipynb)
+🪀 [Use case: Maize yield mapping Illinois](https://github.com/cybergis/rs-embed/blob/main/examples/demo.ipynb)
 
 ## Extending
 
@@ -159,4 +156,4 @@ This library also builds upon the incredible work of the Remote Sensing communit
 ```
 
 ## License
-This project is released under the [Apache-2.0](LICENSE)
+This project is released under the [Apache-2.0](https://github.com/cybergis/rs-embed/blob/main/LICENSE)

@@ -312,7 +312,7 @@ except Exception as e:
 
 def _require_torch():
     if torch is None:
-        raise ModelError('Torch is required. Install with: pip install "rs-embed[torch]"')
+        raise ModelError('Torch is required. Install with: pip install "rs-embed[models]"')
 ```
 
 ---

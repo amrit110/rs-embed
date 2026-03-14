@@ -20,6 +20,7 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 
 ## Install
 
+
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
@@ -28,13 +29,15 @@ conda activate rs-embed
 pip install -e .
 ```
 
-If you want on-the-fly models backed by GEE and torch wrappers, install the optional extras too:
+Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
+
+
+
+If this is your first time using Google Earth Engine:
 
 ```bash
-pip install -e ".[gee,torch,models]"
+earthengine authenticate
 ```
-
-Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
 
 ---
 
