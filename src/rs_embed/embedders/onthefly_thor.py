@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -254,6 +255,16 @@ def _pool_thor_tokens(
         raise ModelError(f"Unknown pooling='{pooling}' (expected 'mean' or 'max').")
     return pool_from_tokens(tokens, pooling)
 
+
+@lru_cache(maxsize=1)
+def _load_thor_module():
+    try:
+        return importlib.import_module("rs_embed.embedders._vendor.thor_vit")
+    except Exception as e:
+        raise ModelError(
+            f"Failed to import vendored THOR runtime: {type(e).__name__}: {e}"
+        ) from e
+
 @lru_cache(maxsize=8)
 def _load_thor_cached(
     model_key: str,
@@ -268,51 +279,36 @@ def _load_thor_cached(
     import torch
 
     try:
-        from terratorch.registry import BACKBONE_REGISTRY
+        mod = _load_thor_module()
+        build_kwargs: dict[str, Any] = {
+            "model_name": str(model_key),
+            "model_bands": list(model_bands),
+            "out_indices": [-1],
+            "return_channel_params": True,
+            "pretrained": bool(pretrained),
+            "input_params": {
+                "ground_covers": [int(ground_cover)],
+                "flexivit_patch_size_seqs": [int(patch_size)],
+            },
+        }
+        if ckpt_path:
+            build_kwargs["ckpt"] = os.path.expanduser(str(ckpt_path))
+        model = mod.load_thor_model(**build_kwargs)
     except ModuleNotFoundError as e:
-        if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError("THOR requires terratorch. Install: pip install terratorch") from e
         raise ModelError(
-            "Failed to import terratorch registry while loading THOR. "
+            "Failed to import vendored THOR runtime while loading THOR. "
             f"Missing dependency: {getattr(e, 'name', None) or e}. "
-            "Check optional mmseg/mmengine deps or process-level shim/module conflicts."
+            "Check project runtime dependencies like torch/timm/einops."
         ) from e
     except Exception as e:
         raise ModelError(
-            f"Failed to import terratorch registry while loading THOR: {type(e).__name__}: {e}"
-        ) from e
-
-    try:
-        import thor_terratorch_ext  # noqa: F401
-    except Exception as e:
-        raise ModelError(
-            "THOR extension not found. Install: pip install git+https://github.com/FM4CS/thor_terratorch_ext.git"
-        ) from e
-
-    build_kwargs: dict[str, Any] = {
-        "pretrained": bool(pretrained),
-        "model_bands": list(model_bands),
-        "out_indices": [-1],
-        "return_channel_params": True,
-        "input_params": {
-            "ground_covers": [int(ground_cover)],
-            "flexivit_patch_size_seqs": [int(patch_size)],
-        },
-    }
-    if ckpt_path:
-        build_kwargs["ckpt"] = os.path.expanduser(str(ckpt_path))
-
-    try:
-        model = BACKBONE_REGISTRY.build(str(model_key), **build_kwargs)
-    except Exception as e:
-        raise ModelError(
-            f"Failed to build THOR backbone '{model_key}'. "
-            "Check terratorch/thor_terratorch_ext installation and model key."
+            f"Failed to build vendored THOR backbone '{model_key}'. "
+            "Check the THOR package installation and model key."
         ) from e
 
     try:
         model = model.to(dev).eval()
-    except Exception as _e:
+    except Exception:
         pass
 
     p0 = None
@@ -474,7 +470,7 @@ class THORBaseEmbedder(EmbedderBase):
                 "group_merge": "mean",
             },
             "notes": [
-                "Loads THOR backbone via terratorch + thor_terratorch_ext.",
+                "Loads THOR through a fully vendored local runtime.",
                 "Default weights come from Hugging Face FM4CS/THOR-1.0-base when pretrained=true.",
             ],
         }
@@ -615,6 +611,7 @@ class THORBaseEmbedder(EmbedderBase):
             input_time=temporal_midpoint_str(t),
             extra={
                 "hf_id": "FM4CS/THOR-1.0-base",
+                "model_source": "vendored_rs_embed_runtime",
                 "normalization": normalize_mode,
                 "group_merge": group_merge,
                 "ground_cover_m": ground_cover,

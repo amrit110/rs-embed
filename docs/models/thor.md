@@ -8,7 +8,7 @@
 |---|---|
 | Model ID | `thor` |
 | Aliases | `thor_1_0_base` |
-| Family / Backbone | THOR via TerraTorch + `thor_terratorch_ext` (`thor_v1_base`) |
+| Family / Backbone | Fully vendored THOR runtime (`thor_v1_base`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band `CHW` |
@@ -68,7 +68,7 @@ Default `SensorSpec` if omitted:
    - `unit_scale`: `/10000` and clip `[0,1]`
    - `none` / `raw`: keep raw `0..10000` (clipped)
 4. Resize to `RS_EMBED_THOR_IMG` (default `288`)
-5. Build/load THOR backbone via TerraTorch + THOR extension
+5. Build/load THOR backbone via vendored THOR runtime wrapper
    - `ground_cover_m = sensor.scale_m * image_size`
    - `patch_size` passed into THOR build params
 6. Forward model, extract token sequence `[N,D]`
@@ -145,7 +145,7 @@ emb = get_embedding(
 
 ## Common Failure Modes / Debugging
 
-- missing optional deps (`terratorch`, `thor_terratorch_ext`)
+- broken runtime deps (`torch`, `timm`, `einops`)
 - wrong `input_chw` shape (`C` must be `10`)
 - invalid `RS_EMBED_THOR_GROUP_MERGE` (must be `mean` / `sum` / `concat`)
 - grid unavailable for chosen config (token layout not square and group parsing failed)
