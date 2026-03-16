@@ -18,6 +18,7 @@ from ..providers import ProviderBase
 from ..tools.temporal import temporal_frame_midpoints
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
+from .config_utils import model_config_value
 from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
 from .runtime_utils import (
     coerce_input_to_tchw as _coerce_input_to_tchw,
@@ -70,6 +71,88 @@ def _doy0_from_iso(iso_date: str) -> int:
     # AnySat docs: 01/01 -> 0 ; 31/12 -> 364
     doy0 = int(d.timetuple().tm_yday) - 1
     return max(0, min(364, doy0))
+
+
+def _normalize_anysat_model_size(model_size: Any) -> str:
+    raw = str(model_size).strip().lower()
+    aliases = {
+        "t": "tiny",
+        "tiny": "tiny",
+        "s": "small",
+        "small": "small",
+        "b": "base",
+        "base": "base",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown AnySat model_size='{model_size}' "
+            "(expected one of: tiny, small, base)."
+        )
+    return resolved
+
+
+def _resolve_anysat_runtime_config(
+    *,
+    model_config: dict[str, Any] | None,
+    default_frames: int,
+) -> dict[str, Any]:
+    model_size_v = model_config_value(model_config, "variant")
+    if model_size_v is None:
+        model_size_v = os.environ.get("RS_EMBED_ANYSAT_MODEL_SIZE", "base")
+    model_size = _normalize_anysat_model_size(model_size_v)
+
+    flash_attn = os.environ.get("RS_EMBED_ANYSAT_FLASH_ATTN", "0").strip() in {
+        "1",
+        "true",
+        "True",
+    }
+
+    pretrained = os.environ.get("RS_EMBED_ANYSAT_PRETRAINED", "1").strip() not in {
+        "0",
+        "false",
+        "False",
+    }
+
+    image_size = int(os.environ.get("RS_EMBED_ANYSAT_IMG", "24"))
+
+    n_frames = max(1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(default_frames))))
+
+    norm_mode = os.environ.get("RS_EMBED_ANYSAT_NORM", "per_tile_zscore").strip()
+
+    ckpt_path = os.environ.get("RS_EMBED_ANYSAT_CKPT")
+    ckpt_path = ckpt_path or None
+
+    hf_repo = os.environ.get("RS_EMBED_ANYSAT_HF_REPO", "g-astruc/AnySat").strip()
+
+    hf_filename = os.environ.get("RS_EMBED_ANYSAT_HF_FILE", "models/AnySat.pth").strip()
+
+    hf_cache_dir = os.environ.get(
+        "RS_EMBED_ANYSAT_CACHE_DIR",
+        os.path.join("~", ".cache", "rs_embed", "anysat"),
+    )
+
+    hf_min_bytes = int(os.environ.get("RS_EMBED_ANYSAT_CKPT_MIN_BYTES", str(50 * 1024 * 1024)))
+
+    if model_size != "base":
+        raise ModelError(
+            "AnySat currently exposes only variant='base' in rs-embed, because the "
+            "published Hugging Face weights wired by this adapter are base-only."
+        )
+
+    return {
+        "model_size": model_size,
+        "flash_attn": bool(flash_attn),
+        "pretrained": bool(pretrained),
+        "image_size": int(image_size),
+        "n_frames": int(n_frames),
+        "norm_mode": norm_mode,
+        "ckpt_path": ckpt_path,
+        "hf_repo": hf_repo,
+        "hf_filename": hf_filename,
+        "hf_cache_dir": hf_cache_dir,
+        "hf_min_bytes": int(hf_min_bytes),
+    }
 
 def _frame_doy0_sequence(temporal: TemporalSpec, *, n_frames: int) -> np.ndarray:
     mids = temporal_frame_midpoints(temporal, max(1, int(n_frames)))
@@ -383,37 +466,23 @@ class AnySatEmbedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=False):
             raise ModelError("anysat expects a provider backend.")
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
-        n_frames = max(1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES))))
-
-        model_size = os.environ.get("RS_EMBED_ANYSAT_MODEL_SIZE", "base").strip().lower()
-        flash_attn = os.environ.get("RS_EMBED_ANYSAT_FLASH_ATTN", "0").strip() in {
-            "1",
-            "true",
-            "True",
-        }
-        image_size = int(os.environ.get("RS_EMBED_ANYSAT_IMG", "24"))
-        norm_mode = os.environ.get("RS_EMBED_ANYSAT_NORM", "per_tile_zscore").strip()
-        patch_size_m = int(getattr(output, "scale_m", 10))
-
-        ckpt_path = os.environ.get("RS_EMBED_ANYSAT_CKPT")
-        pretrained = os.environ.get("RS_EMBED_ANYSAT_PRETRAINED", "1").strip() not in {
-            "0",
-            "false",
-            "False",
-        }
-        hf_repo = os.environ.get("RS_EMBED_ANYSAT_HF_REPO", "g-astruc/AnySat").strip()
-        hf_filename = os.environ.get("RS_EMBED_ANYSAT_HF_FILE", "models/AnySat.pth").strip()
-        hf_cache_dir = os.environ.get(
-            "RS_EMBED_ANYSAT_CACHE_DIR",
-            os.path.join("~", ".cache", "rs_embed", "anysat"),
+        runtime_cfg = _resolve_anysat_runtime_config(
+            model_config=model_config,
+            default_frames=self.DEFAULT_FRAMES,
         )
-        hf_min_bytes = int(os.environ.get("RS_EMBED_ANYSAT_CKPT_MIN_BYTES", str(50 * 1024 * 1024)))
+        n_frames = int(runtime_cfg["n_frames"])
+        model_size = str(runtime_cfg["model_size"])
+        flash_attn = bool(runtime_cfg["flash_attn"])
+        image_size = int(runtime_cfg["image_size"])
+        norm_mode = str(runtime_cfg["norm_mode"])
+        patch_size_m = int(getattr(output, "scale_m", 10))
 
         if input_chw is None:
             provider = self._get_provider(backend)
@@ -440,12 +509,12 @@ class AnySatEmbedder(EmbedderBase):
         model, lmeta, dev = _load_anysat(
             model_size=model_size,
             flash_attn=flash_attn,
-            pretrained=pretrained,
-            ckpt_path=ckpt_path,
-            hf_repo=hf_repo,
-            hf_filename=hf_filename,
-            hf_cache_dir=hf_cache_dir,
-            hf_min_bytes=hf_min_bytes,
+            pretrained=bool(runtime_cfg["pretrained"]),
+            ckpt_path=runtime_cfg["ckpt_path"],
+            hf_repo=str(runtime_cfg["hf_repo"]),
+            hf_filename=str(runtime_cfg["hf_filename"]),
+            hf_cache_dir=str(runtime_cfg["hf_cache_dir"]),
+            hf_min_bytes=int(runtime_cfg["hf_min_bytes"]),
             device=device,
         )
 
@@ -487,6 +556,8 @@ class AnySatEmbedder(EmbedderBase):
                 "n_frames": int(raw_tchw.shape[0]),
                 "doy0_values": tuple(int(v) for v in doy0_values.tolist()),
                 "device": dev,
+                "hf_repo": str(runtime_cfg["hf_repo"]),
+                "hf_filename": str(runtime_cfg["hf_filename"]),
                 **lmeta,
                 **fmeta,
             },
@@ -532,6 +603,7 @@ class AnySatEmbedder(EmbedderBase):
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -545,7 +617,11 @@ class AnySatEmbedder(EmbedderBase):
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()
         provider = self._get_provider(backend)
-        n_frames = max(1, int(os.environ.get("RS_EMBED_ANYSAT_FRAMES", str(self.DEFAULT_FRAMES))))
+        runtime_cfg = _resolve_anysat_runtime_config(
+            model_config=model_config,
+            default_frames=self.DEFAULT_FRAMES,
+        )
+        n_frames = int(runtime_cfg["n_frames"])
 
         n = len(spatials)
         prefetched_raw: list[np.ndarray | None] = [None] * n
@@ -589,6 +665,7 @@ class AnySatEmbedder(EmbedderBase):
                     backend=backend,
                     device=device,
                     input_chw=raw,
+                    model_config=model_config,
                 )
             )
         return out

@@ -15,6 +15,7 @@ from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers.base import ProviderBase
 from ._vit_mae_utils import base_meta, ensure_torch, temporal_to_range
 from .base import EmbedderBase
+from .config_utils import model_config_value
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
@@ -78,6 +79,77 @@ _S2_10_CHANNEL_GROUPS: tuple[tuple[int, ...], ...] = (
     (3, 4, 5, 7),
     (8, 9),
 )
+
+_SATMAEPP_S2_MODEL_FN_BY_VARIANT = {
+    "base": "mae_vit_base_patch16",
+    "large": "mae_vit_large_patch16",
+}
+
+
+def _normalize_satmaepp_s2_variant(variant: Any) -> str:
+    raw = str(variant).strip().lower()
+    aliases = {
+        "b": "base",
+        "base": "base",
+        "l": "large",
+        "large": "large",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown satmaepp_s2_10b variant='{variant}' "
+            "(expected one of: base, large)."
+        )
+    return resolved
+
+
+def _variant_from_satmaepp_s2_model_fn(model_fn: str) -> str | None:
+    for variant, candidate in _SATMAEPP_S2_MODEL_FN_BY_VARIANT.items():
+        if candidate == model_fn:
+            return variant
+    return None
+
+
+def _resolve_satmaepp_s2_runtime_config(
+    *,
+    model_config: dict[str, Any] | None,
+    default_ckpt_repo: str,
+    default_ckpt_file: str,
+    default_model_fn: str,
+    default_image_size: int,
+    default_patch_size: int,
+) -> dict[str, Any]:
+    variant_v = model_config_value(model_config, "variant")
+    if variant_v is not None:
+        variant = _normalize_satmaepp_s2_variant(variant_v)
+        variant_model_fn = _SATMAEPP_S2_MODEL_FN_BY_VARIANT[variant]
+        model_fn = variant_model_fn
+    else:
+        model_fn = os.environ.get("RS_EMBED_SATMAEPP_S2_MODEL_FN", default_model_fn).strip()
+        variant = _variant_from_satmaepp_s2_model_fn(model_fn)
+
+    ckpt_repo = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_REPO", default_ckpt_repo).strip()
+
+    ckpt_file = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_FILE", default_ckpt_file).strip()
+
+    image_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_IMG", str(default_image_size)))
+
+    patch_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_PATCH", str(default_patch_size)))
+
+    if model_fn == _SATMAEPP_S2_MODEL_FN_BY_VARIANT["base"]:
+        raise ModelError(
+            "satmaepp_s2_10b currently exposes only variant='large' in rs-embed, "
+            "because this adapter is wired to the published ViT-Large Sentinel checkpoint."
+        )
+
+    return {
+        "variant": variant,
+        "ckpt_repo": ckpt_repo,
+        "ckpt_file": ckpt_file,
+        "model_fn": model_fn,
+        "image_size": int(image_size),
+        "patch_size": int(patch_size),
+    }
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = str(os.environ.get(name, "")).strip().lower()
@@ -534,6 +606,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=True):
             raise ModelError("satmaepp_s2_10b expects a provider backend (or 'auto').")
@@ -547,11 +620,19 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 f"{_S2_SR_10_BANDS}; got {tuple(sensor.bands)}"
             )
 
-        ckpt_repo = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_REPO", self.DEFAULT_CKPT_REPO).strip()
-        ckpt_file = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_FILE", self.DEFAULT_CKPT_FILE).strip()
-        model_fn = os.environ.get("RS_EMBED_SATMAEPP_S2_MODEL_FN", self.DEFAULT_MODEL_FN).strip()
-        image_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_IMG", str(self.DEFAULT_IMAGE_SIZE)))
-        patch_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_PATCH", str(self.DEFAULT_PATCH_SIZE)))
+        runtime_cfg = _resolve_satmaepp_s2_runtime_config(
+            model_config=model_config,
+            default_ckpt_repo=self.DEFAULT_CKPT_REPO,
+            default_ckpt_file=self.DEFAULT_CKPT_FILE,
+            default_model_fn=self.DEFAULT_MODEL_FN,
+            default_image_size=self.DEFAULT_IMAGE_SIZE,
+            default_patch_size=self.DEFAULT_PATCH_SIZE,
+        )
+        ckpt_repo = str(runtime_cfg["ckpt_repo"])
+        ckpt_file = str(runtime_cfg["ckpt_file"])
+        model_fn = str(runtime_cfg["model_fn"])
+        image_size = int(runtime_cfg["image_size"])
+        patch_size = int(runtime_cfg["patch_size"])
         cache_dir = _resolve_hf_cache_dir()
 
         t = temporal_to_range(temporal)
@@ -613,6 +694,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 "ckpt_repo": ckpt_repo,
                 "ckpt_file": ckpt_file,
                 "model_fn": model_fn,
+                "variant": runtime_cfg["variant"],
                 **wmeta,
             },
         )
@@ -665,6 +747,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -682,11 +765,19 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 f"{_S2_SR_10_BANDS}; got {tuple(sensor.bands)}"
             )
 
-        ckpt_repo = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_REPO", self.DEFAULT_CKPT_REPO).strip()
-        ckpt_file = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_FILE", self.DEFAULT_CKPT_FILE).strip()
-        model_fn = os.environ.get("RS_EMBED_SATMAEPP_S2_MODEL_FN", self.DEFAULT_MODEL_FN).strip()
-        image_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_IMG", str(self.DEFAULT_IMAGE_SIZE)))
-        patch_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_PATCH", str(self.DEFAULT_PATCH_SIZE)))
+        runtime_cfg = _resolve_satmaepp_s2_runtime_config(
+            model_config=model_config,
+            default_ckpt_repo=self.DEFAULT_CKPT_REPO,
+            default_ckpt_file=self.DEFAULT_CKPT_FILE,
+            default_model_fn=self.DEFAULT_MODEL_FN,
+            default_image_size=self.DEFAULT_IMAGE_SIZE,
+            default_patch_size=self.DEFAULT_PATCH_SIZE,
+        )
+        ckpt_repo = str(runtime_cfg["ckpt_repo"])
+        ckpt_file = str(runtime_cfg["ckpt_file"])
+        model_fn = str(runtime_cfg["model_fn"])
+        image_size = int(runtime_cfg["image_size"])
+        patch_size = int(runtime_cfg["patch_size"])
         cache_dir = _resolve_hf_cache_dir()
         t = temporal_to_range(temporal)
 
@@ -777,6 +868,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                         "ckpt_repo": ckpt_repo,
                         "ckpt_file": ckpt_file,
                         "model_fn": model_fn,
+                        "variant": runtime_cfg["variant"],
                         **wmeta,
                     },
                 )
@@ -829,6 +921,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
         input_chws: list[np.ndarray],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -850,11 +943,19 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 f"{_S2_SR_10_BANDS}; got {tuple(sensor.bands)}"
             )
 
-        ckpt_repo = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_REPO", self.DEFAULT_CKPT_REPO).strip()
-        ckpt_file = os.environ.get("RS_EMBED_SATMAEPP_S2_CKPT_FILE", self.DEFAULT_CKPT_FILE).strip()
-        model_fn = os.environ.get("RS_EMBED_SATMAEPP_S2_MODEL_FN", self.DEFAULT_MODEL_FN).strip()
-        image_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_IMG", str(self.DEFAULT_IMAGE_SIZE)))
-        patch_size = int(os.environ.get("RS_EMBED_SATMAEPP_S2_PATCH", str(self.DEFAULT_PATCH_SIZE)))
+        runtime_cfg = _resolve_satmaepp_s2_runtime_config(
+            model_config=model_config,
+            default_ckpt_repo=self.DEFAULT_CKPT_REPO,
+            default_ckpt_file=self.DEFAULT_CKPT_FILE,
+            default_model_fn=self.DEFAULT_MODEL_FN,
+            default_image_size=self.DEFAULT_IMAGE_SIZE,
+            default_patch_size=self.DEFAULT_PATCH_SIZE,
+        )
+        ckpt_repo = str(runtime_cfg["ckpt_repo"])
+        ckpt_file = str(runtime_cfg["ckpt_file"])
+        model_fn = str(runtime_cfg["model_fn"])
+        image_size = int(runtime_cfg["image_size"])
+        patch_size = int(runtime_cfg["patch_size"])
         cache_dir = _resolve_hf_cache_dir()
         t = temporal_to_range(temporal)
 
@@ -926,6 +1027,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                         "ckpt_repo": ckpt_repo,
                         "ckpt_file": ckpt_file,
                         "model_fn": model_fn,
+                        "variant": runtime_cfg["variant"],
                         **wmeta,
                     },
                 )

@@ -98,7 +98,6 @@ Important constraint:
 | `RS_EMBED_ANYSAT_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
 | `RS_EMBED_ANYSAT_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
 
----
 
 ## Output Semantics
 
@@ -139,6 +138,7 @@ emb = get_embedding(
 # export RS_EMBED_ANYSAT_NORM=per_tile_zscore
 # export RS_EMBED_ANYSAT_IMG=24
 ```
+
 
 ---
 

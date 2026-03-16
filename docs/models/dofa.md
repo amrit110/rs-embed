@@ -107,6 +107,13 @@ Non-env model selection knobs:
 
 If `model_config["variant"]` is omitted, rs-embed uses the `base` DOFA checkpoint by default. Set `model_config={"variant": "large"}` to switch to the larger model.
 
+Quick reminder:
+
+- DOFA supports `variant` directly through `model_config`
+- current public usage is:
+  - `model_config={"variant": "base"}`
+  - `model_config={"variant": "large"}`
+
 ---
 
 ## Output Semantics
@@ -144,6 +151,8 @@ emb = get_embedding(
 ### Switch to the large checkpoint
 
 ```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
 emb = get_embedding(
     "dofa",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),

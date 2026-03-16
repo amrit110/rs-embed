@@ -194,7 +194,6 @@ def get_embedding(
         spatials=[spatial],
         temporal=temporal,
         sensor=sensor_eff,
-        model_config=model_config,
         output=output,
         ctx=ctx,
     )[0]
@@ -272,7 +271,6 @@ def get_embeddings_batch(
         spatials=spatials,
         temporal=temporal,
         sensor=sensor_eff,
-        model_config=model_config,
         output=output,
         ctx=ctx,
     )

@@ -3,11 +3,11 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from models.networks.encoder.utils.utils import trunc_normal_, PatchDropout
+from .utils.utils import trunc_normal_, PatchDropout
 import itertools
 
-from models.networks.encoder.utils.utils_ViT import Block, CrossBlockMulti
-from models.networks.encoder.utils.pos_embed import get_2d_sincos_pos_embed_with_scale
+from .utils.utils_ViT import Block, CrossBlockMulti
+from .utils.pos_embed import get_2d_sincos_pos_embed_with_scale
 
 class AnyModule(nn.Module):
     """

@@ -115,6 +115,7 @@ Adapter behavior notes:
 - image size is fixed to `224` in current implementation
 - runtime code is vendored inside `rs-embed`
 - weights are fetched from `MBZUAI/TerraFM` (`TerraFM-B.pth`)
+- although the vendored runtime also exposes a `large` factory, the current adapter only wires up the `TerraFM-B` weight path, so `model_config` variant switching is not exposed yet
 
 ---
 

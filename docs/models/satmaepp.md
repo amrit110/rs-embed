@@ -183,6 +183,24 @@ emb_s2 = get_embedding(
 # export RS_EMBED_SATMAEPP_S2_GRID_REDUCE=mean
 ```
 
+### Example with `model_config`
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+spatial = PointBuffer(lon=121.5, lat=31.2, buffer_m=2048)
+temporal = TemporalSpec.range("2022-06-01", "2022-09-01")
+
+emb_s2 = get_embedding(
+    "satmaepp_s2_10b",
+    spatial=spatial,
+    temporal=temporal,
+    output=OutputSpec.grid(),
+    backend="gee",
+    model_config={"variant": "large"},
+)
+```
+
 ---
 
 ## Reproducibility Notes

@@ -16,6 +16,7 @@ from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
+from .config_utils import model_config_value
 from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
@@ -74,6 +75,117 @@ _THOR_S2_STD = np.array(
     ],
     dtype=np.float32,
 )
+
+_THOR_VARIANT_TO_MODEL_KEY = {
+    "tiny": "thor_v1_tiny",
+    "small": "thor_v1_small",
+    "base": "thor_v1_base",
+    "large": "thor_v1_large",
+}
+
+
+def _normalize_thor_variant(variant: Any) -> str:
+    raw = str(variant).strip().lower()
+    aliases = {
+        "t": "tiny",
+        "tiny": "tiny",
+        "s": "small",
+        "small": "small",
+        "b": "base",
+        "base": "base",
+        "l": "large",
+        "large": "large",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown THOR variant='{variant}' "
+            "(expected one of: tiny, small, base, large)."
+        )
+    return resolved
+
+
+def _normalize_thor_model_key(value: Any) -> str:
+    raw = str(value).strip().lower()
+    aliases = {
+        "thor_v1_tiny": "thor_v1_tiny",
+        "thor_1_0_tiny": "thor_v1_tiny",
+        "thor_v1_small": "thor_v1_small",
+        "thor_1_0_small": "thor_v1_small",
+        "thor_v1_base": "thor_v1_base",
+        "thor_1_0_base": "thor_v1_base",
+        "thor_v1_large": "thor_v1_large",
+        "thor_1_0_large": "thor_v1_large",
+        "tiny": "thor_v1_tiny",
+        "small": "thor_v1_small",
+        "base": "thor_v1_base",
+        "large": "thor_v1_large",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown THOR model_key='{value}' "
+            "(expected one of: thor_v1_tiny, thor_v1_small, thor_v1_base, thor_v1_large)."
+        )
+    return resolved
+
+
+def _thor_variant_from_model_key(model_key: str) -> str:
+    for variant, candidate in _THOR_VARIANT_TO_MODEL_KEY.items():
+        if candidate == model_key:
+            return variant
+    return model_key
+
+
+def _thor_hf_id_from_model_key(model_key: str) -> str | None:
+    variant = _thor_variant_from_model_key(model_key)
+    if variant in _THOR_VARIANT_TO_MODEL_KEY:
+        return f"FM4CS/THOR-1.0-{variant}"
+    return None
+
+
+def _resolve_thor_runtime_config(
+    *,
+    model_config: dict[str, Any] | None,
+    default_model_key: str,
+    default_image_size: int,
+) -> dict[str, Any]:
+    variant_v = model_config_value(model_config, "variant")
+    if variant_v is not None:
+        model_key = _THOR_VARIANT_TO_MODEL_KEY[_normalize_thor_variant(variant_v)]
+    else:
+        model_key = _normalize_thor_model_key(
+            os.environ.get("RS_EMBED_THOR_MODEL_KEY", default_model_key).strip() or default_model_key
+        )
+
+    image_size = int(os.environ.get("RS_EMBED_THOR_IMG", str(default_image_size)))
+
+    ckpt_path = os.environ.get("RS_EMBED_THOR_CKPT")
+    ckpt_path = ckpt_path or None
+
+    pretrained = os.environ.get("RS_EMBED_THOR_PRETRAINED", "1").strip() not in {
+        "0",
+        "false",
+        "False",
+    }
+
+    normalize_mode = os.environ.get("RS_EMBED_THOR_NORMALIZE", "thor_stats").strip()
+
+    group_merge = os.environ.get("RS_EMBED_THOR_GROUP_MERGE", "mean").strip().lower()
+
+    patch_size = int(os.environ.get("RS_EMBED_THOR_PATCH_SIZE", "16"))
+
+    return {
+        "model_key": model_key,
+        "variant": _thor_variant_from_model_key(model_key),
+        "image_size": int(image_size),
+        "ckpt_path": ckpt_path,
+        "pretrained": bool(pretrained),
+        "normalize_mode": normalize_mode,
+        "group_merge": group_merge,
+        "patch_size": int(patch_size),
+        "hf_id": _thor_hf_id_from_model_key(model_key),
+    }
 
 def _resize_chw(x_chw: np.ndarray, *, out_hw: int) -> np.ndarray:
     ensure_torch()
@@ -506,27 +618,25 @@ class THORBaseEmbedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=True):
-            raise ModelError("thor_1_0_base expects a provider backend (or 'auto').")
+            raise ModelError("thor expects a provider backend (or 'auto').")
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
-
-        image_size = int(os.environ.get("RS_EMBED_THOR_IMG", str(self.DEFAULT_IMAGE_SIZE)))
-        model_key = (
-            os.environ.get("RS_EMBED_THOR_MODEL_KEY", self.DEFAULT_MODEL_KEY).strip()
-            or self.DEFAULT_MODEL_KEY
+        runtime_cfg = _resolve_thor_runtime_config(
+            model_config=model_config,
+            default_model_key=self.DEFAULT_MODEL_KEY,
+            default_image_size=self.DEFAULT_IMAGE_SIZE,
         )
-        ckpt_path = os.environ.get("RS_EMBED_THOR_CKPT")
-        pretrained = os.environ.get("RS_EMBED_THOR_PRETRAINED", "1").strip() not in {
-            "0",
-            "false",
-            "False",
-        }
-        normalize_mode = os.environ.get("RS_EMBED_THOR_NORMALIZE", "thor_stats").strip()
-        group_merge = os.environ.get("RS_EMBED_THOR_GROUP_MERGE", "mean").strip().lower()
-        patch_size = int(os.environ.get("RS_EMBED_THOR_PATCH_SIZE", "16"))
+        image_size = int(runtime_cfg["image_size"])
+        model_key = str(runtime_cfg["model_key"])
+        ckpt_path = runtime_cfg["ckpt_path"]
+        pretrained = bool(runtime_cfg["pretrained"])
+        normalize_mode = str(runtime_cfg["normalize_mode"])
+        group_merge = str(runtime_cfg["group_merge"])
+        patch_size = int(runtime_cfg["patch_size"])
         ground_cover = int(round(float(getattr(ss, "scale_m", 10)) * float(image_size)))
 
         source = str(getattr(ss, "collection", "COPERNICUS/S2_SR_HARMONIZED"))
@@ -610,8 +720,9 @@ class THORBaseEmbedder(EmbedderBase):
             image_size=image_size,
             input_time=temporal_midpoint_str(t),
             extra={
-                "hf_id": "FM4CS/THOR-1.0-base",
+                "hf_id": runtime_cfg["hf_id"],
                 "model_source": "vendored_rs_embed_runtime",
+                "variant": str(runtime_cfg["variant"]),
                 "normalization": normalize_mode,
                 "group_merge": group_merge,
                 "ground_cover_m": ground_cover,
@@ -666,6 +777,7 @@ class THORBaseEmbedder(EmbedderBase):
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -675,7 +787,7 @@ class THORBaseEmbedder(EmbedderBase):
 
         backend_l = backend.lower().strip()
         if not is_provider_backend(backend_l, allow_auto=True):
-            raise ModelError("thor_1_0_base expects a provider backend (or 'auto').")
+            raise ModelError("thor expects a provider backend (or 'auto').")
 
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()
@@ -727,6 +839,7 @@ class THORBaseEmbedder(EmbedderBase):
                     backend=backend,
                     device=device,
                     input_chw=raw,
+                    model_config=model_config,
                 )
             )
         return out

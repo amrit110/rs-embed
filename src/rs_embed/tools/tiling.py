@@ -28,6 +28,9 @@ from .runtime import (
     call_embedder_get_embedding as _call_embedder_get_embedding,
 )
 from .runtime import (
+    embedder_accepts_model_config as _embedder_accepts_model_config,
+)
+from .runtime import (
     embedder_accepts_input_chw as _embedder_accepts_input_chw,
 )
 from .runtime import (
@@ -521,15 +524,22 @@ def _call_embedder_get_embedding_tiled(
 
     if _supports_prefetched_batch_api(embedder):
         try:
+            batch_kwargs: dict[str, Any] = {
+                "spatials": tile_spatials,
+                "input_chws": tiles,
+                "temporal": temporal,
+                "sensor": sensor,
+                "output": output,
+                "backend": backend,
+                "device": device,
+            }
+            if model_config is not None and _embedder_accepts_model_config(
+                type(embedder),
+                "get_embeddings_batch_from_inputs",
+            ):
+                batch_kwargs["model_config"] = model_config
             tile_embs = embedder.get_embeddings_batch_from_inputs(
-                spatials=tile_spatials,
-                input_chws=tiles,
-                temporal=temporal,
-                sensor=sensor,
-                model_config=model_config,
-                output=output,
-                backend=backend,
-                device=device,
+                **batch_kwargs,
             )
             if len(tile_embs) != len(tiles):
                 raise ModelError(

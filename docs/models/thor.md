@@ -1,4 +1,4 @@
-# THOR 1.0 Base (`thor`)
+# THOR (`thor`)
 
 > TerraTorch-backed THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
 
@@ -8,7 +8,7 @@
 |---|---|
 | Model ID | `thor` |
 | Aliases | `thor_1_0_base` |
-| Family / Backbone | Fully vendored THOR runtime (`thor_v1_base`) |
+| Family / Backbone | Fully vendored THOR runtime (`thor_v1_tiny` / `thor_v1_small` / `thor_v1_base` / `thor_v1_large`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band `CHW` |
@@ -97,6 +97,25 @@ Notes:
 - `RS_EMBED_THOR_PATCH_SIZE` and `RS_EMBED_THOR_IMG` jointly affect token layout and `ground_cover_m`.
 - Changing `group_merge` changes grid channel semantics and dimensionality (especially `concat`).
 
+## `model_config`
+
+- `model_config["variant"]`: `tiny` / `small` / `base` / `large`
+
+Example:
+
+```python
+from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
+
+emb = get_embedding(
+    "thor",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    output=OutputSpec.pooled(),
+    backend="gee",
+    model_config={"variant": "large"},
+)
+```
+
 ---
 
 ## Output Semantics
@@ -140,6 +159,25 @@ emb = get_embedding(
 # export RS_EMBED_THOR_IMG=288
 # export RS_EMBED_THOR_PATCH_SIZE=16
 ```
+
+### Example with `model_config`
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+emb = get_embedding(
+    "thor",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    output=OutputSpec.grid(pooling="mean"),
+    backend="gee",
+    model_config={"variant": "small"},
+)
+```
+
+Use `variant` only for backbone size selection.
+Other THOR runtime knobs such as image size, normalization, patch size, and checkpoint override
+still use the existing environment-variable path.
 
 ---
 
