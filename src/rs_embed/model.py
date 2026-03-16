@@ -32,8 +32,8 @@ from .tools.normalization import (
 )
 from .tools.runtime import (
     _EmbeddingRequestContext,
-    require_model_config_support,
     get_embedder_bundle_cached,
+    require_model_config_support,
     run_embedding_request,
     sensor_key,
 )
