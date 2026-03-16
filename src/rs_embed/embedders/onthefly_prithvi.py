@@ -21,6 +21,7 @@ from ._vit_mae_utils import (
     tokens_to_grid_dhw,
 )
 from .base import EmbedderBase
+from .config_utils import model_config_value
 from .meta_utils import temporal_midpoint_str
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
@@ -37,6 +38,42 @@ from .runtime_utils import (
 # -------------------------
 PRITHVI_S2_BANDS_SRC = ["B2", "B3", "B4", "B8", "B11", "B12"]
 PRITHVI_S2_BANDS_DST = ["BLUE", "GREEN", "RED", "NIR_NARROW", "SWIR_1", "SWIR_2"]
+_PRITHVI_VARIANT_TO_MODEL_KEY = {
+    "prithvi_eo_v2_100_tl": "prithvi_eo_v2_100_tl",
+    "100_tl": "prithvi_eo_v2_100_tl",
+    "100m_tl": "prithvi_eo_v2_100_tl",
+    "prithvi_eo_v2_300_tl": "prithvi_eo_v2_300_tl",
+    "300_tl": "prithvi_eo_v2_300_tl",
+    "300m_tl": "prithvi_eo_v2_300_tl",
+    "prithvi_eo_v2_600_tl": "prithvi_eo_v2_600_tl",
+    "600_tl": "prithvi_eo_v2_600_tl",
+    "600m_tl": "prithvi_eo_v2_600_tl",
+}
+
+
+def _normalize_prithvi_variant(variant: Any) -> str:
+    raw = str(variant).strip().lower()
+    resolved = _PRITHVI_VARIANT_TO_MODEL_KEY.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown Prithvi variant='{variant}' "
+            "(expected one of: prithvi_eo_v2_100_tl, prithvi_eo_v2_300_tl, prithvi_eo_v2_600_tl)."
+        )
+    return resolved
+
+
+def _resolve_prithvi_model_key(
+    *,
+    model_config: dict[str, Any] | None,
+    default_model_key: str,
+) -> tuple[str, str]:
+    variant_v = model_config_value(model_config, "variant")
+    if variant_v is not None:
+        model_key = _normalize_prithvi_variant(variant_v)
+        return model_key, model_key
+
+    model_key = os.environ.get("RS_EMBED_PRITHVI_KEY", default_model_key).strip() or default_model_key
+    return str(model_key), str(model_key)
 
 def _fetch_s2_prithvi6_chw(
     provider: ProviderBase,
@@ -379,11 +416,23 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             "output": ["pooled", "grid"],
             "defaults": {
                 "model_key": self.DEFAULT_MODEL_KEY,
+                "variant": self.DEFAULT_MODEL_KEY,
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "scale_m": self.DEFAULT_IMAGE_SCALE_M,
                 "cloudy_pct": self.DEFAULT_CLOUDY_PCT,
                 "composite": self.DEFAULT_COMPOSITE,
                 "fill_value": 0.0,
+            },
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": self.DEFAULT_MODEL_KEY,
+                    "choices": [
+                        "prithvi_eo_v2_100_tl",
+                        "prithvi_eo_v2_300_tl",
+                        "prithvi_eo_v2_600_tl",
+                    ],
+                }
             },
             "notes": [
                 "Uses TerraTorch BACKBONE_REGISTRY.build(...)",
@@ -431,6 +480,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=True):
             raise ModelError("prithvi_eo_v2_s2_6b expects a provider backend (or 'auto').")
@@ -442,7 +492,10 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         t = temporal_to_range(temporal)  # normalize to range
 
         # Load model
-        model_key = os.environ.get("RS_EMBED_PRITHVI_KEY", self.DEFAULT_MODEL_KEY)
+        model_key, variant = _resolve_prithvi_model_key(
+            model_config=model_config,
+            default_model_key=self.DEFAULT_MODEL_KEY,
+        )
         pretrained = os.environ.get("RS_EMBED_PRITHVI_PRETRAINED", "1").strip() not in (
             "0",
             "false",
@@ -561,6 +614,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 "coords_lonlat": (float(lon), float(lat)),
                 "tokens_shape": tuple(tokens.shape),
                 "model_key": model_key,
+                "variant": variant,
                 "pretrained": bool(pretrained),
                 "coords_encoding": coords_encoding,
                 "num_frames": num_frames,
@@ -611,6 +665,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -664,6 +719,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             input_chws=raw_inputs,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -676,6 +732,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         input_chws: list[np.ndarray],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -693,7 +750,10 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
             sensor = self._default_sensor()
 
         t = temporal_to_range(temporal)
-        model_key = os.environ.get("RS_EMBED_PRITHVI_KEY", self.DEFAULT_MODEL_KEY)
+        model_key, variant = _resolve_prithvi_model_key(
+            model_config=model_config,
+            default_model_key=self.DEFAULT_MODEL_KEY,
+        )
         pretrained = os.environ.get("RS_EMBED_PRITHVI_PRETRAINED", "1").strip() not in (
             "0",
             "false",
@@ -781,6 +841,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                             "coords_lonlat": (float(lon), float(lat)),
                             "tokens_shape": tuple(tokens.shape),
                             "model_key": model_key,
+                            "variant": variant,
                             "pretrained": bool(pretrained),
                             "coords_encoding": coords_encoding,
                             "num_frames": num_frames,
