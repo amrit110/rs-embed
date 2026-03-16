@@ -430,6 +430,7 @@ def _call_embedder_get_embedding_tiled(
     device: str,
     input_chw: np.ndarray,
     input_prep: _ResolvedInputPrepSpec,
+    model_config: dict[str, Any] | None = None,
 ) -> Embedding:
     x = np.asarray(input_chw, dtype=np.float32)
     h, w = _input_hw(x)
@@ -456,6 +457,7 @@ def _call_embedder_get_embedding_tiled(
                 spatial=spatial,
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -510,6 +512,7 @@ def _call_embedder_get_embedding_tiled(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -523,6 +526,7 @@ def _call_embedder_get_embedding_tiled(
                 input_chws=tiles,
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -539,6 +543,7 @@ def _call_embedder_get_embedding_tiled(
                     spatial=tile_spatials[i],
                     temporal=temporal,
                     sensor=sensor,
+                    model_config=model_config,
                     output=output,
                     backend=backend,
                     device=device,
@@ -553,6 +558,7 @@ def _call_embedder_get_embedding_tiled(
                 spatial=tile_spatials[i],
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -592,6 +598,7 @@ def _call_embedder_get_embedding_with_input_prep(
     device: str,
     input_chw: np.ndarray | None,
     input_prep: InputPrepSpec | str | None,
+    model_config: dict[str, Any] | None = None,
 ) -> Embedding:
     """Dispatch to resize (pass-through) or tiled embedding based on input_prep.
 
@@ -608,6 +615,7 @@ def _call_embedder_get_embedding_with_input_prep(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -624,6 +632,7 @@ def _call_embedder_get_embedding_with_input_prep(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -634,6 +643,7 @@ def _call_embedder_get_embedding_with_input_prep(
         spatial=spatial,
         temporal=temporal,
         sensor=sensor,
+        model_config=model_config,
         output=output,
         backend=backend,
         device=device,

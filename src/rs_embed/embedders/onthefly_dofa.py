@@ -15,6 +15,7 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
+from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
 from .base import EmbedderBase
 from .runtime_utils import (
     coerce_single_input_chw,
@@ -168,28 +169,192 @@ def _fetch_gee_multiband_sr_chw(
 # DOFA model + forward adapters
 # -----------------------------
 
-@lru_cache(maxsize=4)
-def _load_dofa_model_cached(variant: str, dev: str):
-    try:
-        import torch
-        from torchgeo.models import (
-            DOFABase16_Weights,
-            DOFALarge16_Weights,
-            dofa_base_patch16_224,
-            dofa_large_patch16_224,
-        )
-    except Exception as e:
-        raise ModelError("DOFA requires torchgeo. Install: pip install torchgeo") from e
+_DOFA_HF_REPO_ID_DEFAULT = "earthflow/DOFA"
+_DOFA_HF_REVISION_DEFAULT = "main"
+_DOFA_WEIGHT_SPECS = {
+    "base": {
+        "filename": "DOFA_ViT_base_e100.pth",
+        "env_var": "RS_EMBED_DOFA_BASE_WEIGHTS",
+    },
+    "large": {
+        "filename": "DOFA_ViT_large_e100.pth",
+        "env_var": "RS_EMBED_DOFA_LARGE_WEIGHTS",
+    },
+}
 
+
+def _resolve_dofa_weight_spec(variant: str) -> dict[str, str]:
     variant_l = str(variant).lower().strip()
-    if variant_l in ("base", "b"):
-        weights = DOFABase16_Weights.DOFA_MAE
-        model = dofa_base_patch16_224(weights=weights)
-    elif variant_l in ("large", "l"):
-        weights = DOFALarge16_Weights.DOFA_MAE
-        model = dofa_large_patch16_224(weights=weights)
+    if variant_l in ("b", "base"):
+        variant_l = "base"
+    elif variant_l in ("l", "large"):
+        variant_l = "large"
     else:
         raise ModelError(f"Unknown DOFA variant='{variant}' (expected 'base' or 'large').")
+
+    spec = dict(_DOFA_WEIGHT_SPECS[variant_l])
+    spec["variant"] = variant_l
+    spec["repo_id"] = os.environ.get("RS_EMBED_DOFA_HF_REPO_ID", _DOFA_HF_REPO_ID_DEFAULT)
+    spec["revision"] = os.environ.get(
+        "RS_EMBED_DOFA_HF_REVISION",
+        _DOFA_HF_REVISION_DEFAULT,
+    )
+    return spec
+
+
+def _model_config_value(
+    model_config: dict[str, Any] | None,
+    key: str,
+) -> Any | None:
+    if model_config is None:
+        return None
+    if isinstance(model_config, dict):
+        return model_config.get(key)
+    return getattr(model_config, key, None)
+
+
+def _resolve_dofa_variant(
+    *,
+    model_config: dict[str, Any] | None,
+) -> str:
+    variant = _model_config_value(model_config, "variant")
+    if variant is not None:
+        return str(variant)
+    return "base"
+
+
+def _build_dofa_model(variant: str):
+    variant_l = str(variant).lower().strip()
+    if variant_l == "base":
+        return vit_base_patch16(global_pool=True)
+    if variant_l == "large":
+        return vit_large_patch16(global_pool=True)
+    raise ModelError(f"Unknown DOFA variant='{variant}' (expected 'base' or 'large').")
+
+
+def _strip_state_dict_prefix_if_present(
+    state_dict: dict[str, Any],
+    prefix: str,
+) -> dict[str, Any]:
+    keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    if keys and all(k.startswith(prefix) for k in keys):
+        return {k[len(prefix) :]: v for k, v in state_dict.items()}
+    return state_dict
+
+
+def _unwrap_dofa_state_dict(payload: Any) -> dict[str, Any]:
+    obj = payload
+    for _ in range(4):
+        if not isinstance(obj, dict):
+            break
+        nested = None
+        for key in ("state_dict", "model_state_dict", "model", "teacher", "student"):
+            if key in obj and isinstance(obj[key], dict):
+                nested = obj[key]
+                break
+        if nested is None:
+            break
+        obj = nested
+
+    if not isinstance(obj, dict):
+        raise ModelError("Unexpected DOFA checkpoint payload; expected a state dict.")
+
+    state_dict = dict(obj)
+    for prefix in ("module.", "backbone.", "encoder.", "vit_model.", "model."):
+        state_dict = _strip_state_dict_prefix_if_present(state_dict, prefix)
+    return state_dict
+
+
+def _prepare_dofa_state_dict_for_model(
+    model,
+    state_dict: dict[str, Any],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    model_state = model.state_dict()
+    prepared = dict(state_dict)
+
+    fc_norm_weight_missing = (
+        "fc_norm.weight" not in prepared
+        or getattr(prepared.get("fc_norm.weight"), "shape", None)
+        != getattr(model_state.get("fc_norm.weight"), "shape", None)
+    )
+    if "fc_norm.weight" in model_state and fc_norm_weight_missing and "norm.weight" in prepared:
+        prepared["fc_norm.weight"] = prepared["norm.weight"].detach().clone()
+
+    fc_norm_bias_missing = (
+        "fc_norm.bias" not in prepared
+        or getattr(prepared.get("fc_norm.bias"), "shape", None)
+        != getattr(model_state.get("fc_norm.bias"), "shape", None)
+    )
+    if "fc_norm.bias" in model_state and fc_norm_bias_missing and "norm.bias" in prepared:
+        prepared["fc_norm.bias"] = prepared["norm.bias"].detach().clone()
+
+    filtered: dict[str, Any] = {}
+    dropped_mismatched: list[str] = []
+    for key, value in prepared.items():
+        if key not in model_state:
+            filtered[key] = value
+            continue
+        target = model_state[key]
+        if getattr(value, "shape", None) == getattr(target, "shape", None):
+            filtered[key] = value
+        else:
+            dropped_mismatched.append(key)
+
+    load_result = model.load_state_dict(filtered, strict=False)
+    missing = list(getattr(load_result, "missing_keys", []))
+    unexpected = list(getattr(load_result, "unexpected_keys", []))
+    return filtered, missing, unexpected + dropped_mismatched
+
+
+def _resolve_dofa_weights_path(spec: dict[str, str]) -> tuple[str, str]:
+    override = os.environ.get(spec["env_var"])
+    if override:
+        return override, override
+
+    weights_dir = os.environ.get("RS_EMBED_DOFA_WEIGHTS_DIR")
+    if weights_dir:
+        local_path = os.path.join(weights_dir, spec["filename"])
+        if os.path.exists(local_path):
+            return local_path, local_path
+
+    try:
+        from huggingface_hub import hf_hub_download, hf_hub_url
+    except Exception as e:
+        raise ModelError(
+            "DOFA requires huggingface-hub to download weights, or set "
+            f"{spec['env_var']} / RS_EMBED_DOFA_WEIGHTS_DIR to a local checkpoint."
+        ) from e
+
+    try:
+        local_path = hf_hub_download(
+            repo_id=spec["repo_id"],
+            filename=spec["filename"],
+            revision=spec["revision"],
+        )
+        remote_url = hf_hub_url(
+            repo_id=spec["repo_id"],
+            filename=spec["filename"],
+            revision=spec["revision"],
+        )
+        return local_path, remote_url
+    except Exception as e:
+        raise ModelError(
+            "Failed to fetch DOFA weights from Hugging Face. Set "
+            f"{spec['env_var']} or RS_EMBED_DOFA_WEIGHTS_DIR to a local checkpoint."
+        ) from e
+
+@lru_cache(maxsize=4)
+def _load_dofa_model_cached(variant: str, dev: str):
+    import torch
+
+    spec = _resolve_dofa_weight_spec(variant)
+    variant_l = spec["variant"]
+    model = _build_dofa_model(variant_l)
+    weights_path, weights_url = _resolve_dofa_weights_path(spec)
+
+    checkpoint = torch.load(weights_path, map_location="cpu")
+    state_dict = _unwrap_dofa_state_dict(checkpoint)
+    _, missing_keys, unexpected_keys = _prepare_dofa_state_dict_for_model(model, state_dict)
 
     model = model.to(dev).eval()
 
@@ -208,10 +373,15 @@ def _load_dofa_model_cached(variant: str, dev: str):
         "variant": variant_l,
         "device": dev,
         "device_resolved": dev,
-        "weights_url": str(weights.url),
-        "weights_meta": (
-            dict(weights.meta) if isinstance(weights.meta, dict) else str(weights.meta)
-        ),
+        "weights_url": str(weights_url),
+        "weights_meta": {
+            "repo_id": spec["repo_id"],
+            "revision": spec["revision"],
+            "filename": spec["filename"],
+            "path": weights_path,
+            "missing_keys": missing_keys,
+            "unexpected_keys": unexpected_keys,
+        },
         "img_size": int(getattr(model, "img_size", 224)),
         "patch_size": int(getattr(model, "patch_size", 16)),
         "embed_dim": int(getattr(model, "embed_dim", -1)),
@@ -353,7 +523,7 @@ def _dofa_forward_tokens_and_pooled_batch(
 @register("dofa")
 class DOFAEmbedder(EmbedderBase):
     """
-    DOFA (TorchGeo) embeddings.
+    DOFA embeddings.
 
     - backend="provider"/"auto": ROI -> S2 SR -> resize to 224 -> DOFA -> pooled/grid
     - backend="tensor": input_chw (CHW) -> resize to 224 -> DOFA
@@ -428,9 +598,10 @@ class DOFAEmbedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         backend_l = backend.lower().strip()
-        variant = getattr(sensor, "variant", "base") if sensor else "base"
+        variant = _resolve_dofa_variant(model_config=model_config)
         image_size = 224
 
         # For optional on-the-fly input inspection
@@ -614,6 +785,7 @@ class DOFAEmbedder(EmbedderBase):
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -681,6 +853,7 @@ class DOFAEmbedder(EmbedderBase):
             input_chws=raw_inputs,
             temporal=temporal,
             sensor=ss,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -693,6 +866,7 @@ class DOFAEmbedder(EmbedderBase):
         input_chws: list[np.ndarray],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -711,6 +885,7 @@ class DOFAEmbedder(EmbedderBase):
                 input_chws=input_chws,
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -723,7 +898,7 @@ class DOFAEmbedder(EmbedderBase):
             raise ModelError("dofa provider backend requires TemporalSpec.range in v0.1.")
 
         ss = sensor or self._default_sensor()
-        variant = getattr(ss, "variant", "base")
+        variant = _resolve_dofa_variant(model_config=model_config)
         bands = list(getattr(ss, "bands", _S2_SR_12_BANDS))
         wavelengths_um = getattr(ss, "wavelengths", None)
         if wavelengths_um is None:

@@ -22,18 +22,28 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 
 
 ```bash
+pip install rs-embed
+```
+
+This install includes the runtime needed for
+`examples/playground.ipynb`.
+
+Its pip constraints are aligned with the tested `environment.yml`.
+If you want the exact conda-based environment, use `environment.yml`.
+
+For local development from the repository:
+
+```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
-conda env create -f environment.yml
-conda activate rs-embed
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
 
 
 
-If this is your first time using Google Earth Engine:
+If you plan to use Google Earth Engine and this is your first time:
 
 ```bash
 earthengine authenticate

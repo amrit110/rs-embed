@@ -54,6 +54,8 @@ class Model:
         Target device (``"auto"`` / ``"cpu"`` / ``"cuda"`` / …).
     sensor : SensorSpec or None
         Sensor spec override.
+    model_config : dict[str, Any] or None
+        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -70,6 +72,7 @@ class Model:
         backend: str = "auto",
         device: str = "auto",
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         modality: str | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         input_prep: InputPrepSpec | str | None = "resize",
@@ -80,6 +83,7 @@ class Model:
         )
         self._device = normalize_device_name(device)
         self._output = output
+        self._model_config = model_config
         self._input_prep = input_prep
         self._input_prep_resolved = _resolve_input_prep_spec(input_prep)
 
@@ -107,6 +111,7 @@ class Model:
             backend_n=self._backend_n,
             device=self._device,
             sensor_eff=self._sensor,
+            model_config=self._model_config,
             input_prep=self._input_prep,
             input_prep_resolved=self._input_prep_resolved,
             embedder=self._embedder,
