@@ -46,14 +46,9 @@ dependencies = [
   "Pillow>=10",
   "pandas>=2.3",
   "xarray>=2024.06.0",
-  # Keep direct dependency explicit because multiple embedders import terratorch directly.
-  "terratorch==1.2.1",
+
 ]
 
-[project.optional-dependencies]
-copernicus = [
-  "tifffile>=2025.1.10",
-]
 plot = [
   "matplotlib>=3.10",
 ]

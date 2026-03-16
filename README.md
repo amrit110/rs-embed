@@ -7,9 +7,11 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2602.23678-b31b1b.svg)](https://arxiv.org/abs/2602.23678)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://cybergis.github.io/rs-embed/)
 ![Python](https://img.shields.io/badge/python-3.12-blue?logo=python)
+[![PyTorch 2.2](https://img.shields.io/badge/torch-2.2-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=cybergis.rs-embed)
-![License](https://img.shields.io/github/license/cybergis/rs-embed)
 ![Last Commit](https://img.shields.io/github/last-commit/cybergis/rs-embed)
+![License](https://img.shields.io/github/license/cybergis/rs-embed)
 
 
 
@@ -27,7 +29,7 @@
 ## TL;DR
 
 ```python
-emb = get_embedding("tessera", spatial=..., temporal=..., output=...)
+emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 ```
 
 
@@ -63,7 +65,7 @@ temporal = TemporalSpec.range(
 )
 
 emb = get_embedding(
-    "tessera",
+    "prithvi",
     spatial=spatial,
     temporal=temporal,
     output=OutputSpec.pooled(),

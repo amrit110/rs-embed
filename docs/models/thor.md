@@ -1,6 +1,6 @@
 # THOR (`thor`)
 
-> TerraTorch-backed THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
+> Vendored THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
 
 ## Quick Facts
 
@@ -83,7 +83,7 @@ Default `SensorSpec` if omitted:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `RS_EMBED_THOR_MODEL_KEY` | `thor_v1_base` | THOR backbone key for TerraTorch registry |
+| `RS_EMBED_THOR_MODEL_KEY` | `thor_v1_base` | THOR backbone key for the vendored runtime |
 | `RS_EMBED_THOR_CKPT` | unset | Local checkpoint path override |
 | `RS_EMBED_THOR_PRETRAINED` | `1` | Use pretrained weights (HF default path) |
 | `RS_EMBED_THOR_IMG` | `288` | Resize target image size |
@@ -100,6 +100,7 @@ Notes:
 ## `model_config`
 
 - `model_config["variant"]`: `tiny` / `small` / `base` / `large`
+- for export jobs, pass it via `ExportModelRequest("thor", model_config={"variant": ...})`
 
 Example:
 

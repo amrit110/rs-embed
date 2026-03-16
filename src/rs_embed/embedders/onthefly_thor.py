@@ -574,12 +574,20 @@ class THORBaseEmbedder(EmbedderBase):
             "output": ["pooled", "grid"],
             "defaults": {
                 "model_key": self.DEFAULT_MODEL_KEY,
+                "variant": _thor_variant_from_model_key(self.DEFAULT_MODEL_KEY),
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "normalization": "thor_stats",
                 "scale_m": 10,
                 "cloudy_pct": 30,
                 "composite": "median",
                 "group_merge": "mean",
+            },
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": _thor_variant_from_model_key(self.DEFAULT_MODEL_KEY),
+                    "choices": ["tiny", "small", "base", "large"],
+                }
             },
             "notes": [
                 "Loads THOR through a fully vendored local runtime.",

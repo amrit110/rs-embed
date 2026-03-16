@@ -110,6 +110,9 @@ class ModelConfig:
         Effective backend selected for this model.
     sensor : SensorSpec or None
         Sensor override for provider-backed models.
+    model_config : dict[str, Any] or None
+        Optional user-facing model-specific runtime settings such as
+        ``{"variant": "large"}``.
     model_type : str
         Lower-level model family/type hint.
     """
@@ -117,6 +120,7 @@ class ModelConfig:
     name: str
     backend: str
     sensor: SensorSpec | None = None
+    model_config: dict[str, Any] | None = None
     model_type: str = ""
 
     @property
@@ -146,11 +150,14 @@ class ExportModelRequest:
         Optional per-model sensor override for provider-backed models.
     modality : str or None
         Optional per-model modality selector.
+    model_config : dict[str, Any] or None
+        Optional per-model runtime settings such as ``{"variant": "large"}``.
     """
 
     name: str
     sensor: SensorSpec | None = None
     modality: str | None = None
+    model_config: dict[str, Any] | None = None
 
 # ── Export target ──────────────────────────────────────────────────
 

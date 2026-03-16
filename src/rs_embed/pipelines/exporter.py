@@ -105,6 +105,9 @@ class BatchExporter:
         self.resolved_sensor: dict[str, SensorSpec | None] = {
             mc.name: mc.sensor for mc in models
         }
+        self.resolved_model_config: dict[str, dict[str, Any] | None] = {
+            mc.name: mc.model_config for mc in models
+        }
         self.model_type: dict[str, str] = {mc.name: mc.model_type for mc in models}
 
         # Derived extension
@@ -316,6 +319,7 @@ class BatchExporter:
             temporal=self.temporal,
             output=self.output,
             resolved_sensor=self.resolved_sensor,
+            resolved_model_config=self.resolved_model_config,
             model_type=self.model_type,
             backend=self.backend,
             resolved_backend=self.resolved_backend,
@@ -503,6 +507,7 @@ class BatchExporter:
                         device=self.device,
                         output=self.output,
                         resolved_sensor=self.resolved_sensor,
+                        resolved_model_config=self.resolved_model_config,
                         model_type=self.model_type,
                         inputs_cache=prefetch.cache,
                         input_reports=prefetch.input_reports,

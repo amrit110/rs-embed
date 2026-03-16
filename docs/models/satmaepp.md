@@ -201,6 +201,9 @@ emb_s2 = get_embedding(
 )
 ```
 
+For export jobs, the same setting goes through
+`ExportModelRequest("satmaepp_s2_10b", model_config={"variant": "large"})`.
+
 ---
 
 ## Reproducibility Notes

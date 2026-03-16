@@ -32,6 +32,7 @@ from .tools.normalization import (
 )
 from .tools.runtime import (
     _EmbeddingRequestContext,
+    require_model_config_support,
     get_embedder_bundle_cached,
     run_embedding_request,
     sensor_key,
@@ -99,6 +100,11 @@ class Model:
         sensor_k = sensor_key(self._sensor)
         self._embedder, self._lock = get_embedder_bundle_cached(
             self._model_n, self._backend_n, self._device, sensor_k
+        )
+        require_model_config_support(
+            embedder=self._embedder,
+            model_config=self._model_config,
+            method_name="get_embedding",
         )
         assert_supported(
             self._embedder,

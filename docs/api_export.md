@@ -188,10 +188,22 @@ models=[
 ]
 ```
 
+`ExportModelRequest(...)` also carries per-model `model_config`, for example:
+
+```python
+from rs_embed import ExportModelRequest
+
+models=[
+    "remoteclip",
+    ExportModelRequest("thor", model_config={"variant": "large"}),
+]
+```
+
 Typical use cases:
 
 - one model needs `modality="s1"`
 - one model needs a different `SensorSpec`
+- one model needs a different `model_config` such as `{"variant": "large"}`
 - one model should override the shared export settings
 
 This also matches the implementation path: string model IDs are first converted into `ExportModelRequest(name=...)`, then resolved.
@@ -201,6 +213,12 @@ Modality rules:
 - `export_batch(...)` accepts a global `modality`
 - one model can override it via `ExportModelRequest(...)`
 - unsupported modality choices raise `ModelError`
+
+`model_config` rules:
+
+- `export_batch(...)` does not have one global `model_config` shared across all models
+- pass per-model runtime settings through `ExportModelRequest(..., model_config=...)`
+- unsupported `model_config` usage raises `ModelError`
 
 ---
 
@@ -272,6 +290,26 @@ export_batch(
 )
 ```
 
+### One model needs its own variant
+
+```python
+from rs_embed import (
+    export_batch,
+    ExportModelRequest,
+    ExportTarget,
+    PointBuffer,
+    TemporalSpec,
+)
+
+export_batch(
+    spatials=[PointBuffer(121.5, 31.2, 2048)],
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=[ExportModelRequest("thor", model_config={"variant": "large"})],
+    target=ExportTarget.combined("exports/thor_large_run"),
+    backend="gee",
+)
+```
+
 ---
 
 ## Runtime Behavior You Usually Need to Know
@@ -294,6 +332,6 @@ If provider-backed export is used and both `save_inputs=True` and `save_embeddin
 
 !!! tip "Simple rule"
     Start with `ExportTarget.combined(...)` + `ExportConfig()`.
-    Add `ExportModelRequest(...)` only for the few models that need per-model sensor or modality overrides.
+    Add `ExportModelRequest(...)` only for the few models that need per-model sensor, modality, or `model_config` overrides.
 
 ---

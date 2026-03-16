@@ -558,6 +558,13 @@ class DOFAEmbedder(EmbedderBase):
                 "composite": "median",
                 "preprocess": "resize_to_224_bilinear",
             },
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": "base",
+                    "choices": ["base", "large"],
+                }
+            },
         }
 
     @staticmethod

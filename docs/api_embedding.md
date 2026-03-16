@@ -80,7 +80,8 @@ Modality contract:
   - `anysat`: `{"variant": "base"}`
   - `thor`: `{"variant": "tiny" | "small" | "base" | "large"}`
   - `satmaepp_s2_10b`: `{"variant": "large"}`
-- if a model does not document `model_config`, prefer leaving it unset
+- if a model does not document `model_config`, leave it unset; unsupported usage raises `ModelError`
+- when available, `describe()["model_config"]` is the machine-readable schema for supported keys and values
 
 **Returns**
 
@@ -186,5 +187,6 @@ embs = get_embeddings_batch(
 ```
 
 For model-specific keys and caveats, use the model detail pages as the source of truth.
+For export-time usage of the same settings, see [API: Export](api_export.md).
 
 ---

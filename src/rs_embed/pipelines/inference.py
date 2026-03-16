@@ -17,7 +17,9 @@ from ..core.types import ExportConfig, ModelConfig, TaskResult
 from ..tools.output import normalize_embedding_output
 from ..tools.runtime import (
     call_embedder_get_embedding,
+    embedder_accepts_model_config,
     get_embedder_bundle_cached,
+    require_model_config_support,
     sensor_key,
     supports_batch_api,
     supports_prefetched_batch_api,
@@ -83,6 +85,7 @@ class InferenceEngine:
         sensor: SensorSpec | None,
         backend: str,
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         """Run a single embedding with retry + optional tiling."""
         cfg = self.config
@@ -97,6 +100,7 @@ class InferenceEngine:
                 device=self.device,
                 input_chw=input_chw,
                 input_prep=cfg.input_prep,
+                model_config=model_config,
             ),
             retries=cfg.max_retries,
             backoff_s=cfg.retry_backoff_s,
@@ -179,6 +183,7 @@ class InferenceEngine:
         on_done: Callable[[int], None],
         use_lock: bool,
         model_name: str,
+        model_config: dict[str, Any] | None = None,
     ) -> tuple[dict[int, TaskResult], bool]:
         """Run tier-1 batch inference using prefetched provider inputs."""
         cfg = self.config
@@ -204,26 +209,30 @@ class InferenceEngine:
                 sub_inp = [t[2] for t in sub]
 
                 def _infer_prefetched(_sp=sub_sp, _inp=sub_inp):
+                    if model_config is not None:
+                        require_model_config_support(
+                            embedder=embedder,
+                            model_config=model_config,
+                            method_name="get_embeddings_batch_from_inputs",
+                        )
+                    batch_kwargs: dict[str, Any] = {
+                        "spatials": _sp,
+                        "input_chws": _inp,
+                        "temporal": temporal,
+                        "sensor": sensor,
+                        "output": self.output,
+                        "backend": backend,
+                        "device": self.device,
+                    }
+                    if model_config is not None and embedder_accepts_model_config(
+                        type(embedder),
+                        "get_embeddings_batch_from_inputs",
+                    ):
+                        batch_kwargs["model_config"] = model_config
                     if use_lock:
                         with lock:
-                            return embedder.get_embeddings_batch_from_inputs(
-                                spatials=_sp,
-                                input_chws=_inp,
-                                temporal=temporal,
-                                sensor=sensor,
-                                output=self.output,
-                                backend=backend,
-                                device=self.device,
-                            )
-                    return embedder.get_embeddings_batch_from_inputs(
-                        spatials=_sp,
-                        input_chws=_inp,
-                        temporal=temporal,
-                        sensor=sensor,
-                        output=self.output,
-                        backend=backend,
-                        device=self.device,
-                    )
+                            return embedder.get_embeddings_batch_from_inputs(**batch_kwargs)
+                    return embedder.get_embeddings_batch_from_inputs(**batch_kwargs)
 
                 batch_out = run_with_retry(
                     _infer_prefetched,
@@ -256,6 +265,7 @@ class InferenceEngine:
         on_done: Callable[[int], None],
         use_lock: bool,
         model_name: str,
+        model_config: dict[str, Any] | None = None,
     ) -> tuple[dict[int, TaskResult], bool]:
         """Run tier-2 batch inference that does not require provider inputs."""
         cfg = self.config
@@ -266,24 +276,29 @@ class InferenceEngine:
                 sub_sp = [spatials[i] for i in sub_idx]
 
                 def _infer_batch(_sp=sub_sp):
+                    if model_config is not None:
+                        require_model_config_support(
+                            embedder=embedder,
+                            model_config=model_config,
+                            method_name="get_embeddings_batch",
+                        )
+                    batch_kwargs: dict[str, Any] = {
+                        "spatials": _sp,
+                        "temporal": temporal,
+                        "sensor": sensor,
+                        "output": self.output,
+                        "backend": backend,
+                        "device": self.device,
+                    }
+                    if model_config is not None and embedder_accepts_model_config(
+                        type(embedder),
+                        "get_embeddings_batch",
+                    ):
+                        batch_kwargs["model_config"] = model_config
                     if use_lock:
                         with lock:
-                            return embedder.get_embeddings_batch(
-                                spatials=_sp,
-                                temporal=temporal,
-                                sensor=sensor,
-                                output=self.output,
-                                backend=backend,
-                                device=self.device,
-                            )
-                    return embedder.get_embeddings_batch(
-                        spatials=_sp,
-                        temporal=temporal,
-                        sensor=sensor,
-                        output=self.output,
-                        backend=backend,
-                        device=self.device,
-                    )
+                            return embedder.get_embeddings_batch(**batch_kwargs)
+                    return embedder.get_embeddings_batch(**batch_kwargs)
 
                 batch_out = run_with_retry(
                     _infer_batch,
@@ -377,6 +392,7 @@ class InferenceEngine:
                     sensor=mc.sensor,
                     backend=mc.backend,
                     input_chw=inp,
+                    model_config=mc.model_config,
                 )
 
             def _mark_done(_: int) -> None:
@@ -412,6 +428,7 @@ class InferenceEngine:
                     on_done=_mark_done,
                     use_lock=False,
                     model_name=mc.name,
+                    model_config=mc.model_config,
                 )
                 for i, rec in prefetched_out.items():
                     out[(i, mc.name)] = rec
@@ -429,6 +446,7 @@ class InferenceEngine:
                     on_done=_mark_done,
                     use_lock=False,
                     model_name=mc.name,
+                    model_config=mc.model_config,
                 )
                 for i, rec in batch_out.items():
                     out[(i, mc.name)] = rec
@@ -472,6 +490,7 @@ class InferenceEngine:
         sensor: SensorSpec | None,
         is_precomputed: bool,
         provider_enabled: bool,
+        model_config: dict[str, Any] | None,
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None,
         inference_strategy: str,
@@ -520,15 +539,20 @@ class InferenceEngine:
             if ctx.needs_provider_input and ctx.skey is not None and sensor is not None:
                 inp = get_input_fn(i, ctx.skey, sensor)
             with ctx.lock:
+                kwargs: dict[str, Any] = {
+                    "embedder": ctx.embedder,
+                    "spatial": spatials[i],
+                    "temporal": temporal,
+                    "sensor": sensor,
+                    "output": self.output,
+                    "backend": model_backend,
+                    "device": self.device,
+                    "input_chw": inp,
+                }
+                if model_config is not None:
+                    kwargs["model_config"] = model_config
                 return call_embedder_get_embedding(
-                    embedder=ctx.embedder,
-                    spatial=spatials[i],
-                    temporal=temporal,
-                    sensor=sensor,
-                    output=self.output,
-                    backend=model_backend,
-                    device=self.device,
-                    input_chw=inp,
+                    **kwargs,
                 )
 
         def _infer_one_with_retry(i: int) -> Embedding:
@@ -569,6 +593,7 @@ class InferenceEngine:
                 on_done=_mark_done,
                 use_lock=True,
                 model_name=model_name,
+                model_config=model_config,
             )
             out.update(prefetched_out)
 
@@ -587,6 +612,7 @@ class InferenceEngine:
                 on_done=_mark_done,
                 use_lock=True,
                 model_name=model_name,
+                model_config=model_config,
             )
             out.update(batch_out)
 

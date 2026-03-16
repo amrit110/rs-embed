@@ -546,6 +546,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 "ckpt_repo": self.DEFAULT_CKPT_REPO,
                 "ckpt_file": self.DEFAULT_CKPT_FILE,
                 "model_fn": self.DEFAULT_MODEL_FN,
+                "variant": "large",
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "patch_size": self.DEFAULT_PATCH_SIZE,
                 "channel_groups": tuple(
@@ -555,6 +556,13 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                 "cloudy_pct": 30,
                 "composite": "median",
                 "normalization": "sentinel_normalize_source",
+            },
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": "large",
+                    "choices": ["large"],
+                }
             },
         }
 

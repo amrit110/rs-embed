@@ -120,6 +120,25 @@ def embedder_accepts_model_config(
 ) -> bool:
     return _embedder_method_accepts_parameter(embedder_cls, method_name, "model_config")
 
+def _display_model_name(embedder: Any) -> str:
+    return str(getattr(embedder, "model_name", type(embedder).__name__))
+
+def require_model_config_support(
+    *,
+    embedder: Any,
+    model_config: dict[str, Any] | None,
+    method_name: str = "get_embedding",
+) -> None:
+    if model_config is None:
+        return
+    if embedder_accepts_model_config(type(embedder), method_name):
+        return
+    keys = sorted(str(k) for k in model_config.keys())
+    raise ModelError(
+        f"Model {_display_model_name(embedder)} does not support model_config"
+        f" for {method_name}(); got keys {keys}."
+    )
+
 def call_embedder_get_embedding(
     *,
     embedder: Any,
@@ -132,6 +151,11 @@ def call_embedder_get_embedding(
     input_chw: np.ndarray | None = None,
     model_config: dict[str, Any] | None = None,
 ) -> Embedding:
+    require_model_config_support(
+        embedder=embedder,
+        model_config=model_config,
+        method_name="get_embedding",
+    )
     kwargs: dict[str, Any] = {
         "spatial": spatial,
         "temporal": temporal,
@@ -141,7 +165,7 @@ def call_embedder_get_embedding(
         "backend": backend,
         "device": device,
     }
-    if model_config is None or not embedder_accepts_model_config(type(embedder), "get_embedding"):
+    if model_config is None:
         kwargs.pop("model_config", None)
     if input_chw is not None and embedder_accepts_input_chw(type(embedder)):
         kwargs["input_chw"] = input_chw
@@ -322,6 +346,26 @@ def run_embedding_request(
                 device=ctx.device,
             )
         return [emb]
+
+    if ctx.model_config is not None and not embedder_accepts_model_config(
+        type(ctx.embedder),
+        "get_embeddings_batch",
+    ):
+        out: list[Embedding] = []
+        for spatial in spatials:
+            with ctx.lock:
+                emb = call_embedder_get_embedding(
+                    embedder=ctx.embedder,
+                    spatial=spatial,
+                    temporal=temporal,
+                    sensor=sensor,
+                    model_config=ctx.model_config,
+                    output=output,
+                    backend=ctx.backend_n,
+                    device=ctx.device,
+                )
+            out.append(emb)
+        return out
 
     with ctx.lock:
         kwargs: dict[str, Any] = {

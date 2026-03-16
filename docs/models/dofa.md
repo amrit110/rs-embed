@@ -113,6 +113,7 @@ Quick reminder:
 - current public usage is:
   - `model_config={"variant": "base"}`
   - `model_config={"variant": "large"}`
+- for export jobs, pass the same setting via `ExportModelRequest("dofa", model_config={"variant": ...})`
 
 ---
 

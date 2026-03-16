@@ -37,6 +37,7 @@ def run_pending_models(
     temporal: TemporalSpec | None,
     output: OutputSpec,
     resolved_sensor: dict[str, SensorSpec | None],
+    resolved_model_config: dict[str, dict[str, Any] | None] | None = None,
     model_type: dict[str, str],
     backend: str,
     resolved_backend: dict[str, str] | None = None,
@@ -89,6 +90,7 @@ def run_pending_models(
         )
 
     _resolved_backend = resolved_backend or {}
+    _resolved_model_config = resolved_model_config or {}
     create_progress_fn = progress_factory or create_progress
     for m in pending_models:
         drop_model_arrays(arrays, m, sanitize_key=sanitize_key)
@@ -151,6 +153,7 @@ def run_pending_models(
                     sensor=sspec,
                     is_precomputed=is_precomputed,
                     provider_enabled=provider_enabled,
+                    model_config=_resolved_model_config.get(m),
                     spatials=spatials,
                     temporal=temporal,
                     inference_strategy=inference_strategy,

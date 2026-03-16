@@ -18,6 +18,7 @@ from .checkpoint_utils import is_incomplete_combined_manifest
 from .manifest import combined_resume_manifest, load_json_dict
 from .model_defaults import resolve_sensor_for_model
 from .normalization import _resolve_embedding_api_backend, normalize_model_name
+from .runtime import require_model_config_support
 
 
 def normalize_export_layout(layout: str) -> ExportLayout:
@@ -227,6 +228,11 @@ def resolve_export_model_configs(
         try:
             emb_check = cls()
             assert_supported(emb_check, backend=eff_backend, output=output, temporal=temporal)
+            require_model_config_support(
+                embedder=emb_check,
+                model_config=req.model_config,
+                method_name="get_embedding",
+            )
             desc = emb_check.describe() or {}
         except ModelError:
             raise
@@ -251,6 +257,7 @@ def resolve_export_model_configs(
                     modality=modality_eff,
                     default_when_missing=True,
                 ),
+                model_config=req.model_config,
                 model_type=str(desc.get("type", "")).lower(),
             )
         )

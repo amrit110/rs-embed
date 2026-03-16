@@ -419,6 +419,7 @@ class AnySatEmbedder(EmbedderBase):
             "output": ["pooled", "grid"],
             "defaults": {
                 "model_size": "base",
+                "variant": "base",
                 "patch_size_m": 10,
                 "image_size": 24,
                 "n_frames": self.DEFAULT_FRAMES,
@@ -426,6 +427,13 @@ class AnySatEmbedder(EmbedderBase):
                 "cloudy_pct": 30,
                 "composite": "median",
                 "normalization": "per_tile_zscore",
+            },
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": "base",
+                    "choices": ["base"],
+                }
             },
             "notes": [
                 "AnySat expects S2 time-series + day-of-year dates.",
