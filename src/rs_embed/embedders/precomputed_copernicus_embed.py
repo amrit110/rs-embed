@@ -17,9 +17,9 @@ from ..core.specs import (
     SpatialSpec,
     TemporalSpec,
 )
+from ._vendor.copernicus_embed import CopernicusEmbedGeoTiff
 from .base import EmbedderBase
 from .meta_utils import build_meta
-from ._vendor.copernicus_embed import CopernicusEmbedGeoTiff
 
 SUPPORTED_YEARS = {2021}
 

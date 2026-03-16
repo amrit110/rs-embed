@@ -28,10 +28,10 @@ from .runtime import (
     call_embedder_get_embedding as _call_embedder_get_embedding,
 )
 from .runtime import (
-    embedder_accepts_model_config as _embedder_accepts_model_config,
+    embedder_accepts_input_chw as _embedder_accepts_input_chw,
 )
 from .runtime import (
-    embedder_accepts_input_chw as _embedder_accepts_input_chw,
+    embedder_accepts_model_config as _embedder_accepts_model_config,
 )
 from .runtime import (
     supports_prefetched_batch_api as _supports_prefetched_batch_api,
