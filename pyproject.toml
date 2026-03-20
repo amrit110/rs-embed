@@ -46,6 +46,9 @@ dependencies = [
   "Pillow>=10",
   "pandas>=2.3",
   "xarray>=2024.06.0",
+  
+  # Keep direct dependency explicit because multiple embedders import terratorch directly.
+  "terratorch==1.2.1", 
 
 ]
 

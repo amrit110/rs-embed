@@ -25,12 +25,6 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 pip install rs-embed
 ```
 
-This install includes the runtime needed for
-`examples/playground.ipynb`.
-
-Its pip constraints are aligned with the tested `environment.yml`.
-If you want the exact conda-based environment, use `environment.yml`.
-
 For local development from the repository:
 
 ```bash
