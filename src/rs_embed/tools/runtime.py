@@ -68,6 +68,8 @@ def sensor_key(sensor: SensorSpec | None) -> tuple:
         getattr(sensor, "modality", None),
         getattr(sensor, "orbit", None),
         bool(getattr(sensor, "use_float_linear", True)),
+        bool(getattr(sensor, "s1_require_iw", True)),
+        bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
         bool(getattr(sensor, "check_input", False)),
         bool(getattr(sensor, "check_raise", True)),
         getattr(sensor, "check_save_dir", None),

@@ -27,6 +27,9 @@ from .runtime_utils import (
     fetch_s1_vvvh_raw_chw as _fetch_s1_vvvh_raw_chw_shared,
 )
 from .runtime_utils import (
+    fetch_s1_vvvh_raw_chw_with_meta as _fetch_s1_vvvh_raw_chw_with_meta_shared,
+)
+from .runtime_utils import (
     normalize_s1_vvvh_chw as _normalize_s1_vvvh_chw,
 )
 from .runtime_utils import (
@@ -100,9 +103,10 @@ def _fetch_s1_vvvh_chw(
     temporal: TemporalSpec,
     *,
     scale_m: int = 10,
-    orbit: str | None = None,  # "ASCENDING" | "DESCENDING"
     use_float_linear: bool = True,
     composite: str = "median",
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
 ) -> np.ndarray:
     """Returns normalized S1 VV/VH CHW float32 [2,H,W] in [0,1]."""
     raw = _fetch_s1_vvvh_raw_chw_shared(
@@ -110,10 +114,11 @@ def _fetch_s1_vvvh_chw(
         spatial=spatial,
         temporal=temporal,
         scale_m=int(scale_m),
-        orbit=orbit,
         use_float_linear=bool(use_float_linear),
         composite=str(composite),
         fill_value=0.0,
+        require_iw=bool(require_iw),
+        relax_iw_on_empty=bool(relax_iw_on_empty),
     )
     return _normalize_s1_vvvh_chw(raw)
 
@@ -123,9 +128,10 @@ def _fetch_s1_vvvh_raw_chw(
     temporal: TemporalSpec,
     *,
     scale_m: int = 10,
-    orbit: str | None = None,
     use_float_linear: bool = True,
     composite: str = "median",
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
 ) -> np.ndarray:
     """Returns raw VV/VH CHW without log/normalization."""
     return _fetch_s1_vvvh_raw_chw_shared(
@@ -133,10 +139,35 @@ def _fetch_s1_vvvh_raw_chw(
         spatial=spatial,
         temporal=temporal,
         scale_m=int(scale_m),
-        orbit=orbit,
         use_float_linear=bool(use_float_linear),
         composite=str(composite),
         fill_value=0.0,
+        require_iw=bool(require_iw),
+        relax_iw_on_empty=bool(relax_iw_on_empty),
+    )
+
+
+def _fetch_s1_vvvh_raw_chw_with_meta(
+    provider: ProviderBase,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    *,
+    scale_m: int = 10,
+    use_float_linear: bool = True,
+    composite: str = "median",
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    return _fetch_s1_vvvh_raw_chw_with_meta_shared(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        scale_m=int(scale_m),
+        use_float_linear=bool(use_float_linear),
+        composite=str(composite),
+        fill_value=0.0,
+        require_iw=bool(require_iw),
+        relax_iw_on_empty=bool(relax_iw_on_empty),
     )
 
 def _prepare_tensor_input_chw(
@@ -379,8 +410,9 @@ class TerraFMBEmbedder(EmbedderBase):
                     "collection": "COPERNICUS/S1_GRD_FLOAT",
                     "bands": ["VV", "VH"],
                     "defaults": {
-                        "orbit": None,
                         "use_float_linear": True,
+                        "s1_require_iw": True,
+                        "s1_relax_iw_on_empty": True,
                     },
                 },
             },
@@ -391,8 +423,9 @@ class TerraFMBEmbedder(EmbedderBase):
                 "cloudy_pct": 30,
                 "composite": "median",
                 "modality": "s2",  # or "s1"
-                "orbit": None,
                 "use_float_linear": True,
+                "s1_require_iw": True,
+                "s1_relax_iw_on_empty": True,
                 "image_size": 224,
             },
             "notes": "grid output is model feature-map grid (not pixel grid).",
@@ -439,8 +472,11 @@ class TerraFMBEmbedder(EmbedderBase):
         scale_m = getattr(sensor, "scale_m", 10) if sensor else 10
         cloudy_pct = getattr(sensor, "cloudy_pct", 30) if sensor else 30
         composite = getattr(sensor, "composite", "median") if sensor else "median"
-        orbit = getattr(sensor, "orbit", None) if sensor else None
         use_float_linear = bool(getattr(sensor, "use_float_linear", True)) if sensor else True
+        s1_require_iw = bool(getattr(sensor, "s1_require_iw", True)) if sensor else True
+        s1_relax_iw_on_empty = (
+            bool(getattr(sensor, "s1_relax_iw_on_empty", True)) if sensor else True
+        )
 
         image_size = 224
         cache_dir = (
@@ -451,6 +487,7 @@ class TerraFMBEmbedder(EmbedderBase):
 
         # For optional on-the-fly input inspection
         check_meta: dict[str, Any] = {}
+        fetch_meta: dict[str, Any] = {}
 
         # -----------------
         # Build input tensor
@@ -485,15 +522,17 @@ class TerraFMBEmbedder(EmbedderBase):
                         composite=composite,
                     )  # [12,H,W]
                 elif modality == "s1":
-                    x_chw = _fetch_s1_vvvh_chw(
+                    raw_s1, fetch_meta = _fetch_s1_vvvh_raw_chw_with_meta(
                         provider,
                         spatial,
                         temporal,
                         scale_m=scale_m,
-                        orbit=orbit,
                         use_float_linear=use_float_linear,
                         composite=composite,
-                    )  # [2,H,W]
+                        require_iw=s1_require_iw,
+                        relax_iw_on_empty=s1_relax_iw_on_empty,
+                    )
+                    x_chw = _normalize_s1_vvvh_chw(raw_s1)
                 else:
                     raise ModelError("modality must be 's2' or 's1'.")
             else:
@@ -578,8 +617,9 @@ class TerraFMBEmbedder(EmbedderBase):
                     "scale_m": scale_m,
                     "cloudy_pct": cloudy_pct,
                     "composite": composite,
-                    "orbit": orbit,
                     "use_float_linear": use_float_linear,
+                    "s1_require_iw": s1_require_iw,
+                    "s1_relax_iw_on_empty": s1_relax_iw_on_empty,
                 }
                 source = sensor_meta["collection"]
 
@@ -597,15 +637,19 @@ class TerraFMBEmbedder(EmbedderBase):
                 "scale_m": scale_m if uses_provider else None,
                 "cloudy_pct": cloudy_pct if uses_provider else None,
                 "composite": composite if uses_provider else None,
-                "orbit": orbit if (uses_provider and modality == "s1") else None,
                 "use_float_linear": (
                     use_float_linear if (uses_provider and modality == "s1") else None
+                ),
+                "s1_require_iw": s1_require_iw if (uses_provider and modality == "s1") else None,
+                "s1_relax_iw_on_empty": (
+                    s1_relax_iw_on_empty if (uses_provider and modality == "s1") else None
                 ),
                 "start": getattr(temporal_used, "start", None),
                 "end": getattr(temporal_used, "end", None),
                 "image_size": image_size,
                 "device": device,
                 "hf_cache_dir": cache_dir,
+                **fetch_meta,
                 **check_meta,
                 **wmeta,
             },
@@ -670,13 +714,17 @@ class TerraFMBEmbedder(EmbedderBase):
         scale_m = int(getattr(sensor, "scale_m", 10) if sensor else 10)
         cloudy_pct = int(getattr(sensor, "cloudy_pct", 30) if sensor else 30)
         composite = str(getattr(sensor, "composite", "median") if sensor else "median")
-        orbit = getattr(sensor, "orbit", None) if sensor else None
         use_float_linear = bool(getattr(sensor, "use_float_linear", True)) if sensor else True
+        s1_require_iw = bool(getattr(sensor, "s1_require_iw", True)) if sensor else True
+        s1_relax_iw_on_empty = (
+            bool(getattr(sensor, "s1_relax_iw_on_empty", True)) if sensor else True
+        )
 
         n = len(spatials)
         prefetched_raw: list[np.ndarray | None] = [None] * n
+        prefetched_meta: list[dict[str, Any] | None] = [None] * n
 
-        def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray]:
+        def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray, dict[str, Any] | None]:
             if modality == "s2":
                 x_chw = _fetch_s2_sr_12_chw(
                     provider,
@@ -688,31 +736,34 @@ class TerraFMBEmbedder(EmbedderBase):
                 )
                 # get_embedding(input_chw=...) expects raw S2 SR in [0..10000]
                 raw = np.clip(x_chw * 10000.0, 0.0, 10000.0).astype(np.float32)
-                return i, raw
+                return i, raw, None
             if modality == "s1":
-                raw = _fetch_s1_vvvh_raw_chw(
+                raw, fetch_meta = _fetch_s1_vvvh_raw_chw_with_meta(
                     provider,
                     sp,
                     temporal,
                     scale_m=scale_m,
-                    orbit=orbit,
                     use_float_linear=use_float_linear,
                     composite=composite,
+                    require_iw=s1_require_iw,
+                    relax_iw_on_empty=s1_relax_iw_on_empty,
                 )
-                return i, raw
+                return i, raw, fetch_meta
             raise ModelError("modality must be 's2' or 's1'.")
 
         mw = self._resolve_fetch_workers(n)
         if mw == 1:
             for i, sp in enumerate(spatials):
-                ii, raw = _fetch_one(i, sp)
+                ii, raw, fetch_meta = _fetch_one(i, sp)
                 prefetched_raw[ii] = raw
+                prefetched_meta[ii] = fetch_meta
         else:
             with ThreadPoolExecutor(max_workers=mw) as ex:
                 futs = [ex.submit(_fetch_one, i, sp) for i, sp in enumerate(spatials)]
                 for fut in as_completed(futs):
-                    i, raw = fut.result()
+                    i, raw, fetch_meta = fut.result()
                     prefetched_raw[i] = raw
+                    prefetched_meta[i] = fetch_meta
 
         raw_inputs: list[np.ndarray] = []
         for i, raw in enumerate(prefetched_raw):
@@ -723,6 +774,7 @@ class TerraFMBEmbedder(EmbedderBase):
         return self.get_embeddings_batch_from_inputs(
             spatials=spatials,
             input_chws=raw_inputs,
+            input_meta_list=prefetched_meta,
             temporal=temporal,
             sensor=sensor,
             output=output,
@@ -735,6 +787,7 @@ class TerraFMBEmbedder(EmbedderBase):
         *,
         spatials: list[SpatialSpec],
         input_chws: list[np.ndarray],
+        input_meta_list: list[dict[str, Any] | None] | None = None,
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
         output: OutputSpec = OutputSpec.pooled(),
@@ -744,6 +797,10 @@ class TerraFMBEmbedder(EmbedderBase):
         if len(spatials) != len(input_chws):
             raise ModelError(
                 f"spatials/input_chws length mismatch: {len(spatials)} != {len(input_chws)}"
+            )
+        if input_meta_list is not None and len(input_meta_list) != len(input_chws):
+            raise ModelError(
+                f"input_meta_list/input_chws length mismatch: {len(input_meta_list)} != {len(input_chws)}"
             )
         if not spatials:
             return []
@@ -762,8 +819,11 @@ class TerraFMBEmbedder(EmbedderBase):
         scale_m = int(getattr(sensor, "scale_m", 10) if sensor else 10)
         cloudy_pct = int(getattr(sensor, "cloudy_pct", 30) if sensor else 30)
         composite = str(getattr(sensor, "composite", "median") if sensor else "median")
-        orbit = getattr(sensor, "orbit", None) if sensor else None
         use_float_linear = bool(getattr(sensor, "use_float_linear", True)) if sensor else True
+        s1_require_iw = bool(getattr(sensor, "s1_require_iw", True)) if sensor else True
+        s1_relax_iw_on_empty = (
+            bool(getattr(sensor, "s1_relax_iw_on_empty", True)) if sensor else True
+        )
 
         image_size = 224
         cache_dir = (
@@ -810,8 +870,9 @@ class TerraFMBEmbedder(EmbedderBase):
                 "scale_m": scale_m,
                 "cloudy_pct": cloudy_pct,
                 "composite": composite,
-                "orbit": orbit,
                 "use_float_linear": use_float_linear,
+                "s1_require_iw": s1_require_iw,
+                "s1_relax_iw_on_empty": s1_relax_iw_on_empty,
             }
             source = sensor_meta["collection"]
 
@@ -828,6 +889,11 @@ class TerraFMBEmbedder(EmbedderBase):
             )
             for j in range(s1 - s0):
                 i = s0 + j
+                fetch_meta = (
+                    dict(input_meta_list[i] or {})
+                    if input_meta_list is not None and i < len(input_meta_list)
+                    else {}
+                )
                 base_meta = build_meta(
                     model=self.model_name,
                     kind="on_the_fly",
@@ -842,9 +908,14 @@ class TerraFMBEmbedder(EmbedderBase):
                         "scale_m": scale_m if uses_provider else None,
                         "cloudy_pct": cloudy_pct if uses_provider else None,
                         "composite": composite if uses_provider else None,
-                        "orbit": orbit if (uses_provider and modality == "s1") else None,
                         "use_float_linear": (
                             use_float_linear if (uses_provider and modality == "s1") else None
+                        ),
+                        "s1_require_iw": (
+                            s1_require_iw if (uses_provider and modality == "s1") else None
+                        ),
+                        "s1_relax_iw_on_empty": (
+                            s1_relax_iw_on_empty if (uses_provider and modality == "s1") else None
                         ),
                         "start": getattr(temporal_used, "start", None),
                         "end": getattr(temporal_used, "end", None),
@@ -853,6 +924,7 @@ class TerraFMBEmbedder(EmbedderBase):
                         "hf_cache_dir": cache_dir,
                         "batch_infer": True,
                         "input_override": True,
+                        **fetch_meta,
                         **wmeta,
                     },
                 )

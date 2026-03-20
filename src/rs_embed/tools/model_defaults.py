@@ -47,6 +47,8 @@ def _mk_sensor(
         modality=_normalize_modality_name(modality),
         orbit=defaults.get("orbit"),
         use_float_linear=bool(defaults.get("use_float_linear", True)),
+        s1_require_iw=bool(defaults.get("s1_require_iw", True)),
+        s1_relax_iw_on_empty=bool(defaults.get("s1_relax_iw_on_empty", True)),
     )
 
 def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:

@@ -94,6 +94,8 @@ def sensor_cache_key(sensor: SensorSpec) -> str:
         "modality": getattr(sensor, "modality", None),
         "orbit": getattr(sensor, "orbit", None),
         "use_float_linear": bool(getattr(sensor, "use_float_linear", True)),
+        "s1_require_iw": bool(getattr(sensor, "s1_require_iw", True)),
+        "s1_relax_iw_on_empty": bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
     }
     data = json.dumps(obj, sort_keys=True).encode("utf-8")
     return sanitize_key(hashlib.sha1(data).hexdigest()[:12])

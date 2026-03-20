@@ -1,6 +1,6 @@
 import numpy as np
 
-from rs_embed.core.specs import BBox, SensorSpec
+from rs_embed.core.specs import BBox, SensorSpec, TemporalSpec
 from rs_embed.providers.gee_utils import (
     _stitch_bbox_split_arrays,
     fetch_provider_patch_raw,
@@ -141,6 +141,51 @@ def test_fetch_provider_patch_raw_recursively_splits_bbox_on_gee_pixel_limit():
     assert provider.build_calls == 1
     # One failed full fetch + two successful sub-fetches
     assert provider.fetch_calls >= 3
+
+
+def test_fetch_provider_patch_raw_uses_s1_specialized_provider_path():
+    class _FakeS1Provider(ProviderBase):
+        name = "fake_s1"
+
+        def __init__(self):
+            self.s1_calls = 0
+            self.build_calls = 0
+
+        def ensure_ready(self) -> None:  # pragma: no cover - unused
+            return None
+
+        def get_region(self, spatial):  # pragma: no cover - should not be called
+            raise AssertionError("generic region/image path should not be used for S1 VV/VH")
+
+        def build_image(self, *, sensor, temporal, region=None):  # noqa: ARG002
+            self.build_calls += 1
+            raise AssertionError("generic build_image path should not be used for S1 VV/VH")
+
+        def fetch_s1_vvvh_raw_chw(self, **kwargs):
+            self.s1_calls += 1
+            assert kwargs["require_iw"] is True
+            assert kwargs["relax_iw_on_empty"] is True
+            return np.ones((2, 3, 4), dtype=np.float32)
+
+    provider = _FakeS1Provider()
+    sensor = SensorSpec(
+        collection="COPERNICUS/S1_GRD_FLOAT",
+        bands=("VV", "VH"),
+        modality="s1",
+        s1_require_iw=True,
+        s1_relax_iw_on_empty=True,
+    )
+
+    arr = fetch_provider_patch_raw(
+        provider,
+        spatial=BBox(minlon=0.0, minlat=0.0, maxlon=1.0, maxlat=1.0),
+        temporal=TemporalSpec.range("2024-01-01", "2024-02-01"),
+        sensor=sensor,
+    )
+
+    assert arr.shape == (2, 3, 4)
+    assert provider.s1_calls == 1
+    assert provider.build_calls == 0
 
 
 def test_fetch_provider_patch_raw_flips_single_south_up_tile_before_return():

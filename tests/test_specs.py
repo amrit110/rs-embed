@@ -189,6 +189,8 @@ def test_sensor_spec_defaults():
     assert s.cloudy_pct == 30
     assert s.fill_value == 0.0
     assert s.composite == "median"
+    assert s.s1_require_iw is True
+    assert s.s1_relax_iw_on_empty is True
     assert s.check_input is False
     assert s.check_raise is True
     assert s.check_save_dir is None
@@ -202,12 +204,16 @@ def test_sensor_spec_custom():
         cloudy_pct=10,
         fill_value=-9999.0,
         composite="mosaic",
+        s1_require_iw=False,
+        s1_relax_iw_on_empty=False,
         check_input=True,
         check_raise=False,
         check_save_dir="/tmp/out",
     )
     assert s.scale_m == 20
     assert s.fill_value == -9999.0
+    assert s.s1_require_iw is False
+    assert s.s1_relax_iw_on_empty is False
     assert s.check_input is True
     assert s.check_raise is False
     assert s.check_save_dir == "/tmp/out"
