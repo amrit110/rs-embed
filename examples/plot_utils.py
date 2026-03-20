@@ -5,6 +5,25 @@ import json
 from pathlib import Path
 
 
+def _npz_keys(npz_obj):
+    return set(npz_obj.files) if hasattr(npz_obj, "files") else set(npz_obj.keys())
+
+
+def _iter_manifest_models(manifest: dict, models=None):
+    wanted = None if models is None else {str(name) for name in models}
+    for entry in (manifest or {}).get("models") or []:
+        model_name = str(entry.get("model") or "<unknown>")
+        if wanted is not None and model_name not in wanted:
+            continue
+        yield model_name, entry
+
+
+def _sensor_bands(sensor_meta) -> list[str]:
+    if not isinstance(sensor_meta, dict):
+        return []
+    return [str(b).upper() for b in (sensor_meta.get("bands") or [])]
+
+
 def _to_dhw(arr):
     if hasattr(arr, "values"):  # xarray
         arr = arr.values
@@ -229,21 +248,14 @@ def plot_embedding_pseudocolor(
 
 def percentile_stretch(rgb_hwc: np.ndarray, p_low=1.0, p_high=99.0, gamma=1.0) -> np.ndarray:
     """Per-channel percentile stretch to [0,1]."""
-    rgb = rgb_hwc.astype(np.float32)
-    rgb = np.nan_to_num(rgb, nan=0.0, posinf=0.0, neginf=0.0)
+    rgb = np.nan_to_num(rgb_hwc.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
 
     out = np.empty_like(rgb)
     for c in range(3):
-        lo = np.percentile(rgb[..., c], p_low)
-        hi = np.percentile(rgb[..., c], p_high)
-        if hi <= lo + 1e-6:
-            out[..., c] = 0.0
-        else:
-            out[..., c] = (rgb[..., c] - lo) / (hi - lo)
-    out = np.clip(out, 0.0, 1.0)
+        out[..., c] = _robust_scale01(rgb[..., c], lo=float(p_low), hi=float(p_high))
     if gamma != 1.0:
         out = out ** (1.0 / gamma)
-    return out
+    return np.clip(out, 0.0, 1.0)
 
 
 def show_input_chw(x_chw: np.ndarray, title: str, rgb_idx=(0, 1, 2), p_low=1, p_high=99):
@@ -296,10 +308,7 @@ def show_s1_vvvh_chw(
 
     fig, axes = plt.subplots(1, 2, figsize=figsize)
     for ax, band_img, band_name in zip(axes, x[:2], tuple(band_names)[:2]):
-        band_img = np.asarray(band_img, dtype=np.float32)
-        band_img = np.nan_to_num(band_img, nan=0.0, posinf=0.0, neginf=0.0)
-        lo, hi = np.percentile(band_img, [p_low, p_high])
-        img = np.clip((band_img - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
+        img = _robust_scale01(band_img, lo=float(p_low), hi=float(p_high))
         if bool(flipud):
             img = np.flipud(img)
         ax.imshow(img, cmap=cmap)
@@ -313,122 +322,12 @@ def show_s1_vvvh_chw(
     plt.show()
 
 
-def show_s1_vvvh_from_inspect(
-    inspect_out: dict,
-    *,
-    title_prefix="S1",
-    p_low=2.0,
-    p_high=98.0,
-    figsize=(10, 4),
-    print_stats=True,
-    flipud: bool = False,
-):
-    """Visualize Sentinel-1 VV/VH from inspect_gee_patch(..., return_array=True) output."""
-    x_s1 = (inspect_out or {}).get("array_chw")
-    if x_s1 is None:
-        print("array_chw not found. Call inspect_gee_patch(..., return_array=True).")
-        return
-
-    if print_stats:
-        sensor_meta = (inspect_out or {}).get("sensor") or {}
-        print("ok:", (inspect_out or {}).get("ok"))
-        print("bands:", sensor_meta.get("bands"))
-        x = np.asarray(x_s1)
-        print(
-            "S1 CHW:",
-            x.shape,
-            x.dtype,
-            "min=",
-            float(np.nanmin(x)),
-            "max=",
-            float(np.nanmax(x)),
-        )
-
-    show_s1_vvvh_chw(
-        x_s1,
-        title_prefix=title_prefix,
-        p_low=p_low,
-        p_high=p_high,
-        figsize=figsize,
-        flipud=flipud,
-    )
-
-
-def print_band_quantiles_preview(report: dict, n_preview: int = 3):
-    """Print a compact preview for report['band_quantiles']."""
-    band_q = (report or {}).get("band_quantiles")
-    if not band_q:
-        print("band_quantiles not available")
-        return
-    preview = {k: v[:n_preview] for k, v in band_q.items()}
-    print(f"band_quantiles (first {n_preview} bins):")
-    print(preview)
-
-
-def plot_histogram_from_report(report: dict, band_index: int = 0, figsize=(6, 3)):
-    """Plot histogram for one band from inspect_gee_patch report."""
-    hist = (report or {}).get("hist")
-    if not hist or not hist.get("bins") or not hist.get("counts"):
-        print("histogram not available")
-        return
-
-    bins = hist["bins"]
-    counts = hist["counts"][band_index]
-    plt.figure(figsize=figsize)
-    plt.bar(bins[:-1], counts, width=bins[1] - bins[0], align="edge")
-    plt.title(f"Band {band_index} histogram")
-    plt.xlabel("DN")
-    plt.ylabel("Count")
-    plt.show()
-
-
-def show_quicklook_artifact(
-    artifacts: dict,
-    *,
-    flipud: bool = False,
-    figsize=(5, 5),
-    title: str = "quicklook_rgb",
-):
-    """Display quicklook image from inspect_gee_patch artifacts."""
-    quicklook_path = (artifacts or {}).get("quicklook_rgb")
-    if not quicklook_path:
-        print("quicklook not saved; artifacts:", artifacts)
-        return
-    try:
-        from pathlib import Path
-    except Exception:
-        print("pathlib is not available")
-        return
-
-    if Path(quicklook_path).exists():
-        try:
-            img = plt.imread(quicklook_path)
-        except Exception as e:
-            print(f"failed to read quicklook image: {e!r}")
-            print("quicklook path:", quicklook_path)
-            return
-
-        if bool(flipud):
-            img = np.flipud(img)
-
-        plt.figure(figsize=figsize)
-        plt.imshow(img)
-        plt.title(title)
-        plt.axis("off")
-        plt.show()
-    else:
-        print("quicklook not found on disk:", quicklook_path)
-
-
 def infer_rgb_idx_from_sensor(sensor_meta, channels: int):
     """Infer RGB channel indices from sensor metadata when possible."""
     if channels < 3:
         return None
 
-    bands = []
-    if isinstance(sensor_meta, dict):
-        bands = [str(b).upper() for b in (sensor_meta.get("bands") or [])]
-
+    bands = _sensor_bands(sensor_meta)
     if bands:
         idx = {b: i for i, b in enumerate(bands)}
         if all(k in idx for k in ("B4", "B3", "B2")):
@@ -445,7 +344,7 @@ def is_s1_sensor(sensor_meta, channels: int) -> bool:
         return False
 
     collection = str(sensor_meta.get("collection") or "").upper()
-    bands = [str(b).upper() for b in (sensor_meta.get("bands") or [])]
+    bands = _sensor_bands(sensor_meta)
     s1_bands = {"VV", "VH", "HH", "HV"}
 
     return ("COPERNICUS/S1" in collection) or any(b in s1_bands for b in bands)
@@ -453,12 +352,10 @@ def is_s1_sensor(sensor_meta, channels: int) -> bool:
 
 def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high: float = 99):
     """Visualize exact model inputs using manifest.models[*].input.npz_key."""
-    models = (manifest or {}).get("models") or []
     by_key = defaultdict(list)
     sensor_for_key = {}
 
-    for m in models:
-        model_name = m.get("model", "<unknown>")
+    for model_name, m in _iter_manifest_models(manifest):
         input_meta = m.get("input") or {}
         key = input_meta.get("npz_key")
         if not key:
@@ -471,7 +368,7 @@ def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high:
         print("No model inputs found in manifest.models[*].input.npz_key")
         return
 
-    npz_keys = set(npz_obj.files) if hasattr(npz_obj, "files") else set(npz_obj.keys())
+    npz_keys = _npz_keys(npz_obj)
     print("\n=== Visualizing exact model inputs ===")
     for key, model_names in by_key.items():
         if key not in npz_keys:
@@ -485,7 +382,7 @@ def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high:
         title = f"{key} <- {', '.join(model_names)}"
 
         if is_s1_sensor(sensor_meta, c):
-            band_names = [str(b).upper() for b in (sensor_meta.get("bands") or [])[:2]]
+            band_names = _sensor_bands(sensor_meta)[:2]
             if len(band_names) < 2:
                 band_names = ["VV", "VH"]
             show_s1_vvvh_chw(
@@ -501,6 +398,95 @@ def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high:
             show_input_chw(x, title=title, p_low=p_low, p_high=p_high)
         else:
             show_input_chw(x, title=title, rgb_idx=rgb_idx, p_low=p_low, p_high=p_high)
+
+
+def load_manifest_grid_embeddings(manifest: dict, npz_obj, models=None):
+    """Load saved grid embeddings from an export manifest as Embedding objects."""
+    from rs_embed.core.embedding import Embedding
+
+    npz_keys = _npz_keys(npz_obj)
+    loaded = []
+
+    for model_name, m in _iter_manifest_models(manifest, models=models):
+        emb_meta = m.get("embedding") or {}
+        key = emb_meta.get("npz_key")
+        if not key:
+            print(f"[skip] {model_name}: no saved embedding")
+            continue
+        if key not in npz_keys:
+            print(f"[missing] {model_name}: {key} not found in NPZ")
+            continue
+
+        arr = np.asarray(npz_obj[key], dtype=np.float32)
+        if arr.ndim != 3:
+            print(f"[skip] {model_name}: embedding shape {arr.shape} is not a grid")
+            continue
+
+        meta = dict(m.get("meta") or {})
+        meta.setdefault("model", model_name)
+        loaded.append((model_name, Embedding(data=arr, meta=meta)))
+
+    return loaded
+
+
+def _plot_embedding_pairs(items, **kwargs):
+    for i in range(0, len(items), 2):
+        pair = items[i : i + 2]
+        if len(pair) == 1:
+            model_name, emb = pair[0]
+            plot_embedding_pseudocolor(emb, title=f"export embedding: {model_name}", **kwargs)
+            continue
+
+        (model_name_1, emb1), (model_name_2, emb2) = pair
+        plot_embedding_pseudocolor(
+            emb1,
+            emb2=emb2,
+            title=f"export embedding: {model_name_1}",
+            title2=f"export embedding: {model_name_2}",
+            **kwargs,
+        )
+
+
+def visualize_manifest_embeddings(
+    manifest: dict,
+    npz_obj,
+    *,
+    models=None,
+    max_items: int | None = 2,
+    n_samples=100_000,
+    seed=0,
+    robust_lo=2.0,
+    robust_hi=98.0,
+    figsize=(6, 5),
+    show_colorbars=False,
+):
+    """Visualize saved grid embeddings from an export manifest using PCA pseudocolor."""
+    items = load_manifest_grid_embeddings(manifest, npz_obj, models=models)
+    if not items:
+        print("No saved grid embeddings found in manifest.models[*].embedding.npz_key")
+        return []
+
+    if max_items is not None:
+        limit = max(1, int(max_items))
+        shown = items[:limit]
+    else:
+        shown = items
+
+    if len(shown) < len(items):
+        print(f"[note] showing first {len(shown)} of {len(items)} grid embeddings")
+
+    print("\n=== Visualizing saved grid embeddings ===")
+    _plot_embedding_pairs(
+        shown,
+        n_samples=n_samples,
+        seed=seed,
+        robust_lo=robust_lo,
+        robust_hi=robust_hi,
+        figsize=figsize,
+        show_colorbars=show_colorbars,
+    )
+
+    return shown
 
 
 def load_export_npz(npz_path, json_path=None):
@@ -530,11 +516,14 @@ def print_export_summary(manifest: dict, npz_obj=None):
         print("npz_keys:", getattr(npz_obj, "files", None))
 
     models = manifest.get("models") or []
-    print("\n=== model -> input key ===")
+    print("\n=== model -> saved keys ===")
     for m in models:
         model_name = m.get("model")
         input_meta = m.get("input") or {}
-        print(f"{model_name}: {input_meta.get('npz_key')}")
+        emb_meta = m.get("embedding") or {}
+        print(
+            f"{model_name}: input={input_meta.get('npz_key')} | embedding={emb_meta.get('npz_key')}"
+        )
 
 
 def inspect_export_npz(npz_path, json_path=None, p_low: float = 1, p_high: float = 99):

@@ -44,14 +44,17 @@ RS-Embed aims to fix this.
 ---
 
 ## Why rs-embed
+- Support embedding acquisition for any place and time, flexibly assist your downstream tasks
 
-- **Unified interface** for diverse embedding models (on-the-fly models and precomputed products).
-- **Spatial + temporal specs** to describe what you want, not how to fetch it.
+- Supports simple usage, as well as highly customizable features
+
 - **Scale from single regions to massive datasets** built around three functions:
 
     - `get_embedding(...)`
     - `get_embeddings_batch(...)`   
     - `export_batch(...)`
+
+- Detailed documentation support
 
 ---
 
