@@ -55,6 +55,7 @@ def build_one_point_payload(
     model_progress_cb: Callable[[str], None] | None = None,
     fetch_fn: Callable[..., np.ndarray] | None = None,
     inspect_fn: Callable[..., dict[str, Any]] | None = None,
+    fetch_meta_cache: dict[tuple[int, str], dict[str, Any]] | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """Build arrays + manifest payload for one point across all models.
 
@@ -195,6 +196,15 @@ def build_one_point_payload(
             else:
                 m_entry["input"] = None
 
+            # Resolve fetch-time metadata from the prefetch cache.
+            _fmeta: dict[str, Any] | None = None
+            if fetch_meta_cache and sspec is not None:
+                _fmeta = fetch_meta_cache.get(
+                    (point_index, sensor_cache_key(sspec))
+                ) or None
+            if _fmeta:
+                m_entry["fetch_meta"] = jsonable(_fmeta)
+
             if save_embeddings:
 
                 def _infer_once():
@@ -209,6 +219,7 @@ def build_one_point_payload(
                             device=device,
                             input_chw=(input_chw if pass_input_into_embedder else None),
                             model_config=model_config,
+                            fetch_meta=_fmeta,
                         )
 
                 emb = run_with_retry(

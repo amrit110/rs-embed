@@ -36,6 +36,27 @@ class InferenceStrategy(enum.Enum):
     BATCH = "batch"
     SINGLE = "single"
 
+# ── Fetch results ─────────────────────────────────────────────────
+
+@dataclass
+class FetchResult:
+    """Result of a model-specific input fetch.
+
+    Returned by ``EmbedderBase.fetch_input()`` to carry both the pixel
+    array and any fetch-time metadata (e.g. S1 IW-mode decisions,
+    SatVision-TOA fallback provenance).
+
+    Attributes
+    ----------
+    data : np.ndarray
+        CHW float32 pixel array.
+    meta : dict[str, Any]
+        Fetch-time metadata.  Empty dict for generic models.
+    """
+
+    data: np.ndarray
+    meta: dict[str, Any]
+
 # ── Typed results ──────────────────────────────────────────────────
 
 @dataclass(frozen=True)

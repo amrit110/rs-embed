@@ -7,6 +7,7 @@ import numpy as np
 
 from ..core.embedding import Embedding
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.types import FetchResult
 from ..providers.base import ProviderBase
 
 
@@ -57,6 +58,43 @@ class EmbedderBase:
             Must be implemented by concrete embedder subclasses.
         """
         raise NotImplementedError
+
+    def fetch_input(
+        self,
+        provider: ProviderBase,
+        *,
+        spatial: SpatialSpec,
+        temporal: TemporalSpec | None,
+        sensor: SensorSpec,
+    ) -> FetchResult | None:
+        """Fetch model input with model-specific logic.
+
+        The default implementation returns ``None``, signaling callers to
+        use the generic provider fetch path.  Subclasses override this to
+        own their input semantics (fallback chains, sensor-specific
+        filters, fetch-time metadata).
+
+        Both ``get_embedding()`` and ``export_batch()`` call this method,
+        ensuring identical fetch behavior across single and batch paths.
+
+        Parameters
+        ----------
+        provider : ProviderBase
+            Ready provider instance.
+        spatial : SpatialSpec
+            Spatial request definition.
+        temporal : TemporalSpec or None
+            Optional temporal filter.
+        sensor : SensorSpec
+            Sensor/source definition.
+
+        Returns
+        -------
+        FetchResult or None
+            Model-specific fetch result, or ``None`` to fall back to
+            generic fetch.
+        """
+        return None
 
     def get_embedding(
         self,

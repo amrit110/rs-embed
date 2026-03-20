@@ -143,31 +143,37 @@ def test_fetch_provider_patch_raw_recursively_splits_bbox_on_gee_pixel_limit():
     assert provider.fetch_calls >= 3
 
 
-def test_fetch_provider_patch_raw_uses_s1_specialized_provider_path():
-    class _FakeS1Provider(ProviderBase):
-        name = "fake_s1"
+def test_fetch_provider_patch_raw_uses_generic_path_for_s1():
+    """After the model-input-contract refactor, S1 VV/VH no longer has a
+    special case in ``fetch_provider_patch_raw`` — it goes through the
+    generic ``get_region`` → ``build_image`` → ``fetch_array_chw`` path
+    like every other sensor.  Model-specific S1 fetch logic is now owned
+    by ``TerraFMBEmbedder.fetch_input()``.
+    """
+
+    class _FakeGenericS1Provider(ProviderBase):
+        name = "fake_s1_generic"
 
         def __init__(self):
-            self.s1_calls = 0
             self.build_calls = 0
+            self.fetch_calls = 0
 
-        def ensure_ready(self) -> None:  # pragma: no cover - unused
+        def ensure_ready(self) -> None:
             return None
 
-        def get_region(self, spatial):  # pragma: no cover - should not be called
-            raise AssertionError("generic region/image path should not be used for S1 VV/VH")
+        def get_region(self, spatial):
+            return spatial
 
         def build_image(self, *, sensor, temporal, region=None):  # noqa: ARG002
             self.build_calls += 1
-            raise AssertionError("generic build_image path should not be used for S1 VV/VH")
+            return object()
 
-        def fetch_s1_vvvh_raw_chw(self, **kwargs):
-            self.s1_calls += 1
-            assert kwargs["require_iw"] is True
-            assert kwargs["relax_iw_on_empty"] is True
-            return np.ones((2, 3, 4), dtype=np.float32)
+        def fetch_array_chw(self, *, image, bands, region, scale_m, fill_value, collection=None):
+            self.fetch_calls += 1
+            # Return south-up array (will be flipped by _flip_sample_tile_y)
+            return np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
 
-    provider = _FakeS1Provider()
+    provider = _FakeGenericS1Provider()
     sensor = SensorSpec(
         collection="COPERNICUS/S1_GRD_FLOAT",
         bands=("VV", "VH"),
@@ -184,8 +190,8 @@ def test_fetch_provider_patch_raw_uses_s1_specialized_provider_path():
     )
 
     assert arr.shape == (2, 3, 4)
-    assert provider.s1_calls == 1
-    assert provider.build_calls == 0
+    assert provider.build_calls == 1
+    assert provider.fetch_calls == 1
 
 
 def test_fetch_provider_patch_raw_flips_single_south_up_tile_before_return():

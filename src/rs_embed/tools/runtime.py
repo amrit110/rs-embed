@@ -21,6 +21,7 @@ from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import get_embedder_cls
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.types import FetchResult
 from ..core.validation import assert_supported
 from ..embedders.runtime_utils import default_provider_backend_name
 from ..providers import ProviderBase, get_provider, has_provider
@@ -152,6 +153,7 @@ def call_embedder_get_embedding(
     device: str,
     input_chw: np.ndarray | None = None,
     model_config: dict[str, Any] | None = None,
+    fetch_meta: dict[str, Any] | None = None,
 ) -> Embedding:
     require_model_config_support(
         embedder=embedder,
@@ -171,6 +173,10 @@ def call_embedder_get_embedding(
         kwargs.pop("model_config", None)
     if input_chw is not None and embedder_accepts_input_chw(type(embedder)):
         kwargs["input_chw"] = input_chw
+    if fetch_meta is not None and _embedder_method_accepts_parameter(
+        type(embedder), "get_embedding", "fetch_meta",
+    ):
+        kwargs["fetch_meta"] = fetch_meta
     out = embedder.get_embedding(**kwargs)
     return normalize_embedding_output(emb=out, output=output)
 
@@ -257,7 +263,13 @@ def fetch_api_side_inputs(
     input_prep_resolved: Any,
     embedder: Any,
     model_n: str,
-) -> list[np.ndarray] | None:
+) -> list[FetchResult] | None:
+    """Prefetch provider inputs for API-side input prep.
+
+    Returns a list of ``FetchResult`` (one per spatial) when API-side
+    input prep is active and a provider backend is available, or ``None``
+    to let the embedder fetch internally.
+    """
     mode = str(getattr(input_prep_resolved, "mode", "resize")).strip().lower()
     use_api_side_input_prep = mode in {"tile", "auto"}
     if not use_api_side_input_prep:
@@ -287,15 +299,21 @@ def fetch_api_side_inputs(
     ensure_ready = getattr(provider, "ensure_ready", None)
     if callable(ensure_ready):
         run_with_retry(lambda: ensure_ready(), retries=0, backoff_s=0.0)
-    return [
-        fetch_gee_patch_raw(
-            provider,
-            spatial=spatial,
-            temporal=temporal,
-            sensor=sensor_eff,
+
+    # Use the embedder's fetch_input() when available; fall back to generic.
+    results: list[FetchResult] = []
+    for spatial in spatials:
+        fr = embedder.fetch_input(
+            provider, spatial=spatial, temporal=temporal, sensor=sensor_eff,
         )
-        for spatial in spatials
-    ]
+        if fr is not None:
+            results.append(fr)
+        else:
+            raw = fetch_gee_patch_raw(
+                provider, spatial=spatial, temporal=temporal, sensor=sensor_eff,
+            )
+            results.append(FetchResult(data=raw, meta={}))
+    return results
 
 def run_embedding_request(
     *,
@@ -318,7 +336,7 @@ def run_embedding_request(
     )
     if prefetched_inputs is not None:
         out: list[Embedding] = []
-        for spatial, raw in zip(spatials, prefetched_inputs, strict=False):
+        for spatial, fr in zip(spatials, prefetched_inputs, strict=False):
             with ctx.lock:
                 emb = _call_embedder_get_embedding_with_input_prep(
                     embedder=ctx.embedder,
@@ -329,8 +347,9 @@ def run_embedding_request(
                     output=output,
                     backend=ctx.backend_n,
                     device=ctx.device,
-                    input_chw=raw,
+                    input_chw=fr.data,
                     input_prep=ctx.input_prep,
+                    fetch_meta=fr.meta if fr.meta else None,
                 )
             out.append(emb)
         return out

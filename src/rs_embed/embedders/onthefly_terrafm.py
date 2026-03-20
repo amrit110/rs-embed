@@ -14,6 +14,7 @@ from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.types import FetchResult
 from ..providers import ProviderBase
 from .base import EmbedderBase
 from .meta_utils import build_meta, temporal_midpoint_str
@@ -451,6 +452,70 @@ class TerraFMBEmbedder(EmbedderBase):
         v = int(os.environ.get("RS_EMBED_TERRAFM_BATCH_SIZE", str(default_bs)))
         return max(1, v)
 
+    def fetch_input(
+        self,
+        provider: ProviderBase,
+        *,
+        spatial: SpatialSpec,
+        temporal: TemporalSpec | None,
+        sensor: SensorSpec,
+    ) -> FetchResult | None:
+        """Fetch raw TerraFM input with model-specific logic.
+
+        Returns raw provider values (before normalization).  For S1,
+        this includes IW-mode decisions and fallback metadata.
+
+        Parameters
+        ----------
+        provider : ProviderBase
+            Ready provider instance.
+        spatial : SpatialSpec
+            Spatial request definition.
+        temporal : TemporalSpec or None
+            Temporal filter (required for TerraFM).
+        sensor : SensorSpec
+            Sensor/source definition carrying modality and fetch params.
+
+        Returns
+        -------
+        FetchResult
+            Raw CHW array and fetch-time metadata.
+        """
+        modality = str(getattr(sensor, "modality", "s2") or "s2").lower()
+        if temporal is None:
+            raise ModelError("terrafm_b_gee requires TemporalSpec.range(start,end).")
+        temporal.validate()
+        if temporal.mode != "range":
+            raise ModelError("terrafm_b_gee requires TemporalSpec.range in v0.1.")
+
+        if modality == "s2":
+            raw = _fetch_collection_patch_chw(
+                provider,
+                spatial=spatial,
+                temporal=temporal,
+                collection="COPERNICUS/S2_SR_HARMONIZED",
+                bands=tuple(_S2_SR_12_BANDS),
+                scale_m=int(getattr(sensor, "scale_m", 10)),
+                cloudy_pct=int(getattr(sensor, "cloudy_pct", 30)),
+                composite=str(getattr(sensor, "composite", "median")),
+                fill_value=0.0,
+            )
+            return FetchResult(data=raw, meta={})
+        elif modality == "s1":
+            raw, meta = _fetch_s1_vvvh_raw_chw_with_meta(
+                provider,
+                spatial,
+                temporal,
+                scale_m=int(getattr(sensor, "scale_m", 10)),
+                use_float_linear=bool(getattr(sensor, "use_float_linear", True)),
+                composite=str(getattr(sensor, "composite", "median")),
+                require_iw=bool(getattr(sensor, "s1_require_iw", True)),
+                relax_iw_on_empty=bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
+            )
+            return FetchResult(data=raw, meta=meta)
+        else:
+            raise ModelError("modality must be 's2' or 's1'.")
+
     def get_embedding(
         self,
         *,
@@ -468,15 +533,6 @@ class TerraFMBEmbedder(EmbedderBase):
         # defaults / overrides (match your style: sensor carries overrides)
         modality = getattr(sensor, "modality", "s2") if sensor else "s2"
         modality = str(modality).lower()
-
-        scale_m = getattr(sensor, "scale_m", 10) if sensor else 10
-        cloudy_pct = getattr(sensor, "cloudy_pct", 30) if sensor else 30
-        composite = getattr(sensor, "composite", "median") if sensor else "median"
-        use_float_linear = bool(getattr(sensor, "use_float_linear", True)) if sensor else True
-        s1_require_iw = bool(getattr(sensor, "s1_require_iw", True)) if sensor else True
-        s1_relax_iw_on_empty = (
-            bool(getattr(sensor, "s1_relax_iw_on_empty", True)) if sensor else True
-        )
 
         image_size = 224
         cache_dir = (
@@ -506,55 +562,31 @@ class TerraFMBEmbedder(EmbedderBase):
 
         else:
             provider = self._get_provider(backend)
-            if temporal is None:
-                raise ModelError("terrafm_b_gee requires TemporalSpec.range(start,end).")
-            temporal.validate()
-            if temporal.mode != "range":
-                raise ModelError("terrafm_b_gee requires TemporalSpec.range in v0.1.")
             if input_chw is None:
-                if modality == "s2":
-                    x_chw = _fetch_s2_sr_12_chw(
-                        provider,
-                        spatial,
-                        temporal,
-                        scale_m=scale_m,
-                        cloudy_pct=cloudy_pct,
-                        composite=composite,
-                    )  # [12,H,W]
-                elif modality == "s1":
-                    raw_s1, fetch_meta = _fetch_s1_vvvh_raw_chw_with_meta(
-                        provider,
-                        spatial,
-                        temporal,
-                        scale_m=scale_m,
-                        use_float_linear=use_float_linear,
-                        composite=composite,
-                        require_iw=s1_require_iw,
-                        relax_iw_on_empty=s1_relax_iw_on_empty,
+                result = self.fetch_input(
+                    provider, spatial=spatial, temporal=temporal, sensor=sensor or SensorSpec(
+                        collection="", bands=(), modality=modality,
+                    ),
+                )
+                assert result is not None
+                input_chw = result.data
+                fetch_meta = result.meta
+
+            # input_chw is raw provider values in the order implied by `sensor.bands`
+            if modality == "s2":
+                if input_chw.ndim != 3 or int(input_chw.shape[0]) != 12:
+                    raise ModelError(
+                        f"input_chw must be CHW with 12 bands for TerraFM S2, got {getattr(input_chw, 'shape', None)}"
                     )
-                    x_chw = _normalize_s1_vvvh_chw(raw_s1)
-                else:
-                    raise ModelError("modality must be 's2' or 's1'.")
+                x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
+            elif modality == "s1":
+                if input_chw.ndim != 3 or int(input_chw.shape[0]) != 2:
+                    raise ModelError(
+                        f"input_chw must be CHW with 2 bands (VV,VH) for TerraFM S1, got {getattr(input_chw, 'shape', None)}"
+                    )
+                x_chw = _normalize_s1_vvvh_chw(input_chw)
             else:
-                # input_chw is expected to be raw provider values in the order implied by `sensor.bands`
-                if modality == "s2":
-                    if input_chw.ndim != 3 or int(input_chw.shape[0]) != 12:
-                        raise ModelError(
-                            f"input_chw must be CHW with 12 bands for TerraFM S2, got {getattr(input_chw, 'shape', None)}"
-                        )
-                    x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
-                elif modality == "s1":
-                    if input_chw.ndim != 3 or int(input_chw.shape[0]) != 2:
-                        raise ModelError(
-                            f"input_chw must be CHW with 2 bands (VV,VH) for TerraFM S1, got {getattr(input_chw, 'shape', None)}"
-                        )
-                    x = input_chw.astype(np.float32)
-                    x = np.log1p(np.maximum(x, 0.0))
-                    denom = np.percentile(x, 99) if np.isfinite(x).all() else 1.0
-                    denom = float(denom) if denom > 0 else 1.0
-                    x_chw = np.clip(x / denom, 0.0, 1.0).astype(np.float32)
-                else:
-                    raise ModelError("modality must be 's2' or 's1'.")
+                raise ModelError("modality must be 's2' or 's1'.")
 
             # Optional: inspect on-the-fly provider input
             from ..tools.inspection import checks_should_raise, maybe_inspect_chw
