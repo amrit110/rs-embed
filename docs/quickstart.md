@@ -21,9 +21,6 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 ## Install
 
 
-```bash
-pip install rs-embed
-```
 
 For local development from the repository:
 
@@ -37,7 +34,7 @@ Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
 
 
 
-If you plan to use Google Earth Engine and this is your first time:
+If this is your first time using Google Earth Engine, authenticate once:
 
 ```bash
 earthengine authenticate

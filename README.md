@@ -35,11 +35,6 @@ emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 
 ## Install
 
-```bash
-pip install rs-embed
-```
-
-If you are developing from source:
 
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
@@ -68,8 +63,7 @@ emb = get_embedding(
     "prithvi",
     spatial=spatial,
     temporal=temporal,
-    output=OutputSpec.pooled(),
-    backend="auto",
+    output=OutputSpec.pooled()
 )
 
 ```

@@ -52,8 +52,16 @@ dependencies = [
 
 ]
 
+[project.optional-dependencies]
 plot = [
   "matplotlib>=3.10",
+]
+copernicus = [
+  "tifffile>=2024.0.0",
+]
+full = [
+  "matplotlib>=3.10",
+  "tifffile>=2024.0.0",
 ]
 dev = [
   "pytest>=7.4",

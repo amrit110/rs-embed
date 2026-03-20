@@ -30,4 +30,4 @@ jobs:
       - name: Run tests
         run: |
           # The -v flag gives verbose output so you can see exactly which test failed
-          pytest -v
+          python -m pytest -v
