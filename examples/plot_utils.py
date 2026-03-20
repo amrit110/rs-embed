@@ -267,7 +267,8 @@ def show_input_chw(x_chw: np.ndarray, title: str, rgb_idx=(0, 1, 2), p_low=1, p_
         rgb = percentile_stretch(rgb, p_low=p_low, p_high=p_high, gamma=1.0)
         plt.imshow(rgb)
     else:
-        plt.imshow(x_chw[0], cmap="gray")
+        gray = _robust_scale01(x_chw[0], lo=float(p_low), hi=float(p_high))
+        plt.imshow(gray, cmap="gray", vmin=0.0, vmax=1.0)
 
     plt.title(f"{title}  (C={c}, H={h}, W={w})")
     plt.axis("off")
@@ -279,6 +280,7 @@ def show_s1_vvvh_chw(
     *,
     band_names=("VV", "VH"),
     title_prefix="S1",
+    title=None,
     p_low=2.0,
     p_high=98.0,
     figsize=(10, 4),
@@ -303,7 +305,11 @@ def show_s1_vvvh_chw(
         ax.imshow(img, cmap=cmap)
         ax.set_title(f"{title_prefix} {band_name}")
         ax.axis("off")
-    plt.tight_layout()
+    if title:
+        fig.suptitle(title)
+        plt.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
+    else:
+        plt.tight_layout()
     plt.show()
 
 
@@ -433,6 +439,18 @@ def infer_rgb_idx_from_sensor(sensor_meta, channels: int):
     return (0, 1, 2)
 
 
+def is_s1_sensor(sensor_meta, channels: int) -> bool:
+    """Return True when sensor metadata looks like Sentinel-1 SAR input."""
+    if channels < 2 or not isinstance(sensor_meta, dict):
+        return False
+
+    collection = str(sensor_meta.get("collection") or "").upper()
+    bands = [str(b).upper() for b in (sensor_meta.get("bands") or [])]
+    s1_bands = {"VV", "VH", "HH", "HV"}
+
+    return ("COPERNICUS/S1" in collection) or any(b in s1_bands for b in bands)
+
+
 def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high: float = 99):
     """Visualize exact model inputs using manifest.models[*].input.npz_key."""
     models = (manifest or {}).get("models") or []
@@ -462,10 +480,24 @@ def visualize_manifest_inputs(manifest: dict, npz_obj, p_low: float = 1, p_high:
 
         x = npz_obj[key]
         c = int(x.shape[0]) if getattr(x, "ndim", 0) == 3 else 0
-        rgb_idx = infer_rgb_idx_from_sensor(sensor_for_key.get(key), c)
+        sensor_meta = sensor_for_key.get(key) or {}
+        rgb_idx = infer_rgb_idx_from_sensor(sensor_meta, c)
         title = f"{key} <- {', '.join(model_names)}"
 
-        if rgb_idx is None:
+        if is_s1_sensor(sensor_meta, c):
+            band_names = [str(b).upper() for b in (sensor_meta.get("bands") or [])[:2]]
+            if len(band_names) < 2:
+                band_names = ["VV", "VH"]
+            show_s1_vvvh_chw(
+                x,
+                band_names=tuple(band_names),
+                title_prefix="S1",
+                title=title,
+                p_low=p_low,
+                p_high=p_high,
+                flipud=False,
+            )
+        elif rgb_idx is None:
             show_input_chw(x, title=title, p_low=p_low, p_high=p_high)
         else:
             show_input_chw(x, title=title, rgb_idx=rgb_idx, p_low=p_low, p_high=p_high)

@@ -50,7 +50,7 @@ def test_remoteclip_batch_prefetch_passes_input_chw(monkeypatch):
         spatials=_spatials(3),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 3
@@ -256,6 +256,54 @@ def test_dofa_tensor_get_embedding_uses_input_chw(monkeypatch):
     assert out.data.shape == (2,)
 
 
+def test_dofa_tensor_get_embedding_uses_model_config_variant(monkeypatch):
+    import rs_embed.embedders.onthefly_dofa as dofa
+
+    emb = DOFAEmbedder()
+    seen = {}
+
+    def _fake_resize(x_chw, *, size=224):
+        return x_chw.astype(np.float32, copy=False), {
+            "orig_hw": x_chw.shape[-2:],
+            "target_hw": x_chw.shape[-2:],
+        }
+
+    class _M:
+        patch_size = 16
+        global_pool = True
+
+    def _fake_load(*, variant, device):
+        seen["variant"] = variant
+        return _M(), {"device": "cpu"}
+
+    def _fake_forward(model, x_bchw, wavelengths_um, *, device):
+        return (
+            np.ones((4, 2), dtype=np.float32),
+            np.array([1.0, 2.0], dtype=np.float32),
+            {"token_count": 4, "token_dim": 2},
+        )
+
+    monkeypatch.setattr(dofa, "_resize_chw", _fake_resize)
+    monkeypatch.setattr(dofa, "_load_dofa_model", _fake_load)
+    monkeypatch.setattr(dofa, "_dofa_forward_tokens_and_pooled", _fake_forward)
+
+    sensor = SensorSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12"]),
+    )
+    emb.get_embedding(
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=None,
+        sensor=sensor,
+        model_config={"variant": "large"},
+        output=OutputSpec.pooled(),
+        backend="tensor",
+        input_chw=np.ones((12, 8, 8), dtype=np.float32),
+    )
+
+    assert seen["variant"] == "large"
+
+
 def test_terrafm_tensor_get_embedding_uses_input_chw(monkeypatch):
     import rs_embed.embedders.onthefly_terrafm as tf
 
@@ -353,7 +401,7 @@ def test_fomo_batch_prefetch_passes_raw_input(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 2
@@ -386,7 +434,7 @@ def test_thor_batch_prefetch_passes_raw_input(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 2
@@ -610,7 +658,7 @@ def test_precomputed_batch_overrides_call_single_embedding(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.year(2020),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
     assert len(out_gse) == 2
 

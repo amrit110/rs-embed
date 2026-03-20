@@ -362,6 +362,8 @@ def fetch_s1_vvvh_raw_chw(
     use_float_linear: bool = True,
     composite: str = "median",
     fill_value: float = 0.0,
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
 ) -> np.ndarray:
     """Fetch Sentinel-1 VV/VH as raw float32 CHW."""
     arr = _fetch_spatial_array_with_bbox_fallback(
@@ -377,12 +379,66 @@ def fetch_s1_vvvh_raw_chw(
             use_float_linear=bool(use_float_linear),
             composite=str(composite),
             fill_value=float(fill_value),
+            require_iw=bool(require_iw),
+            relax_iw_on_empty=bool(relax_iw_on_empty),
         ),
     )
     arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim != 3 or int(arr.shape[0]) != 2:
         raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
     return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+
+
+def fetch_s1_vvvh_raw_chw_with_meta(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    scale_m: int = 10,
+    orbit: str | None = None,
+    use_float_linear: bool = True,
+    composite: str = "median",
+    fill_value: float = 0.0,
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Fetch Sentinel-1 VV/VH as raw float32 CHW together with fetch metadata."""
+    if hasattr(provider, "fetch_s1_vvvh_raw_chw_with_meta"):
+        arr, meta = provider.fetch_s1_vvvh_raw_chw_with_meta(
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=int(scale_m),
+            orbit=orbit,
+            use_float_linear=bool(use_float_linear),
+            composite=str(composite),
+            fill_value=float(fill_value),
+            require_iw=bool(require_iw),
+            relax_iw_on_empty=bool(relax_iw_on_empty),
+        )
+    else:
+        arr = fetch_s1_vvvh_raw_chw(
+            provider,
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=int(scale_m),
+            orbit=orbit,
+            use_float_linear=bool(use_float_linear),
+            composite=str(composite),
+            fill_value=float(fill_value),
+            require_iw=bool(require_iw),
+            relax_iw_on_empty=bool(relax_iw_on_empty),
+        )
+        meta = {
+            "s1_iw_requested": bool(require_iw),
+            "s1_iw_applied": bool(require_iw),
+            "s1_iw_relaxed_on_empty": False,
+            "s1_relax_iw_on_empty": bool(relax_iw_on_empty),
+        }
+    arr = np.asarray(arr, dtype=np.float32)
+    if arr.ndim != 3 or int(arr.shape[0]) != 2:
+        raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
+    meta_out = dict(meta or {})
+    return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32), meta_out
 
 def normalize_s1_vvvh_chw(raw_chw: np.ndarray) -> np.ndarray:
     """Convert raw S1 VV/VH to numerically stable [0,1] CHW."""

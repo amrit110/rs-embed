@@ -1,6 +1,6 @@
 # Prithvi-EO v2 (`prithvi`)
 
-> TerraTorch-backed Prithvi adapter for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed.
+> TerraTorch-backed Prithvi adapter for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed and `model_config["variant"]` support for TL checkpoints.
 
 ## Quick Facts
 
@@ -14,6 +14,7 @@
 | Primary input | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) |
 | Temporal mode | `range` preferred; adapter normalizes `year`/`None` to a range |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `prithvi_eo_v2_100_tl`) |
 | Extra side inputs | **required** temporal coords + location coords (derived by adapter) |
 | Training alignment (adapter path) | Medium (depends on preprocessing mode and resize/pad choices) |
 
@@ -91,6 +92,19 @@ Default `SensorSpec` if omitted:
 
 ---
 
+## `model_config`
+
+| Key | Type | Default | Choices |
+|---|---|---|---|
+| `variant` | `string` | `prithvi_eo_v2_100_tl` | `prithvi_eo_v2_100_tl`, `prithvi_eo_v2_300_tl`, `prithvi_eo_v2_600_tl` |
+
+Notes:
+
+- `model_config["variant"]` overrides `RS_EMBED_PRITHVI_KEY`.
+- Short aliases `100_tl`, `300_tl`, and `600_tl` are also accepted in code.
+
+---
+
 ## Output Semantics
 
 ### `OutputSpec.pooled()`
@@ -129,6 +143,21 @@ emb = get_embedding(
 # export RS_EMBED_PRITHVI_PREP=pad
 # export RS_EMBED_PRITHVI_PATCH_MULT=16
 # export RS_EMBED_PRITHVI_PRETRAINED=1
+```
+
+### With `model_config["variant"]`
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+emb = get_embedding(
+    "prithvi",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    output=OutputSpec.pooled(),
+    backend="gee",
+    model_config={"variant": "prithvi_eo_v2_300_tl"},
+)
 ```
 
 ---

@@ -31,6 +31,9 @@ from .runtime import (
     embedder_accepts_input_chw as _embedder_accepts_input_chw,
 )
 from .runtime import (
+    embedder_accepts_model_config as _embedder_accepts_model_config,
+)
+from .runtime import (
     supports_prefetched_batch_api as _supports_prefetched_batch_api,
 )
 from .serialization import embedding_to_numpy as _embedding_to_numpy
@@ -430,6 +433,7 @@ def _call_embedder_get_embedding_tiled(
     device: str,
     input_chw: np.ndarray,
     input_prep: _ResolvedInputPrepSpec,
+    model_config: dict[str, Any] | None = None,
 ) -> Embedding:
     x = np.asarray(input_chw, dtype=np.float32)
     h, w = _input_hw(x)
@@ -456,6 +460,7 @@ def _call_embedder_get_embedding_tiled(
                 spatial=spatial,
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -510,6 +515,7 @@ def _call_embedder_get_embedding_tiled(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -518,14 +524,22 @@ def _call_embedder_get_embedding_tiled(
 
     if _supports_prefetched_batch_api(embedder):
         try:
+            batch_kwargs: dict[str, Any] = {
+                "spatials": tile_spatials,
+                "input_chws": tiles,
+                "temporal": temporal,
+                "sensor": sensor,
+                "output": output,
+                "backend": backend,
+                "device": device,
+            }
+            if model_config is not None and _embedder_accepts_model_config(
+                type(embedder),
+                "get_embeddings_batch_from_inputs",
+            ):
+                batch_kwargs["model_config"] = model_config
             tile_embs = embedder.get_embeddings_batch_from_inputs(
-                spatials=tile_spatials,
-                input_chws=tiles,
-                temporal=temporal,
-                sensor=sensor,
-                output=output,
-                backend=backend,
-                device=device,
+                **batch_kwargs,
             )
             if len(tile_embs) != len(tiles):
                 raise ModelError(
@@ -539,6 +553,7 @@ def _call_embedder_get_embedding_tiled(
                     spatial=tile_spatials[i],
                     temporal=temporal,
                     sensor=sensor,
+                    model_config=model_config,
                     output=output,
                     backend=backend,
                     device=device,
@@ -553,6 +568,7 @@ def _call_embedder_get_embedding_tiled(
                 spatial=tile_spatials[i],
                 temporal=temporal,
                 sensor=sensor,
+                model_config=model_config,
                 output=output,
                 backend=backend,
                 device=device,
@@ -592,6 +608,7 @@ def _call_embedder_get_embedding_with_input_prep(
     device: str,
     input_chw: np.ndarray | None,
     input_prep: InputPrepSpec | str | None,
+    model_config: dict[str, Any] | None = None,
 ) -> Embedding:
     """Dispatch to resize (pass-through) or tiled embedding based on input_prep.
 
@@ -608,6 +625,7 @@ def _call_embedder_get_embedding_with_input_prep(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -624,6 +642,7 @@ def _call_embedder_get_embedding_with_input_prep(
             spatial=spatial,
             temporal=temporal,
             sensor=sensor,
+            model_config=model_config,
             output=output,
             backend=backend,
             device=device,
@@ -634,6 +653,7 @@ def _call_embedder_get_embedding_with_input_prep(
         spatial=spatial,
         temporal=temporal,
         sensor=sensor,
+        model_config=model_config,
         output=output,
         backend=backend,
         device=device,

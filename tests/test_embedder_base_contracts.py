@@ -1,10 +1,12 @@
 import sys
-import types
 
 import numpy as np
+import pytest
 
 from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, TemporalSpec
+from rs_embed.core.errors import ModelError
 from rs_embed.embedders.precomputed_copernicus_embed import CopernicusEmbedder
+from rs_embed.embedders._vendor.copernicus_embed import _bbox_to_window, _infer_axis_order
 from rs_embed.embedders.precomputed_gse_annual import GSEAnnualEmbedder
 from rs_embed.embedders.precomputed_tessera import TesseraEmbedder
 
@@ -89,7 +91,7 @@ def test_gse_get_embedding_ignores_input_chw(monkeypatch):
         temporal=TemporalSpec.year(2020),
         sensor=None,
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
         input_chw=np.ones((3, 8, 8), dtype=np.float32),
     )
 
@@ -126,7 +128,6 @@ def test_tessera_get_embedding_ignores_input_chw(monkeypatch):
 def test_copernicus_get_embedding_ignores_input_chw(monkeypatch):
     embedder = CopernicusEmbedder()
     embedder.model_name = "copernicus"
-    monkeypatch.setitem(sys.modules, "torchgeo", types.ModuleType("torchgeo"))
     monkeypatch.setattr(
         embedder,
         "_get_dataset",
@@ -143,3 +144,47 @@ def test_copernicus_get_embedding_ignores_input_chw(monkeypatch):
     )
 
     np.testing.assert_allclose(emb.data, np.array([4.0, 5.0], dtype=np.float32))
+
+
+def test_copernicus_requires_optional_tifffile(monkeypatch):
+    import rs_embed.embedders._vendor.copernicus_embed as cop_mod
+
+    real_import = __import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "tifffile":
+            raise ImportError("No module named 'tifffile'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "tifffile", raising=False)
+    monkeypatch.setattr("builtins.__import__", _fake_import)
+    monkeypatch.setattr(cop_mod, "_validate_large_file", lambda path, min_bytes=0: path)
+
+    with pytest.raises(ModelError, match="rs-embed\\[copernicus\\]"):
+        cop_mod.load_geotiff_meta("/tmp/fake.tif")
+
+
+def test_copernicus_vendor_window_math():
+    class _Meta:
+        left = -180.0
+        right = 180.0
+        bottom = -90.125
+        top = 90.125
+        xres = 0.25
+        yres = 0.25
+        width = 1440
+        height = 721
+
+    row0, row1, col0, col1 = _bbox_to_window(
+        meta=_Meta(),
+        minlon=-180.0,
+        minlat=89.625,
+        maxlon=-179.5,
+        maxlat=90.125,
+    )
+    assert (row0, row1, col0, col1) == (0, 2, 0, 2)
+
+
+def test_copernicus_vendor_axis_order_detection():
+    assert _infer_axis_order((768, 721, 1440)) == "chw"
+    assert _infer_axis_order((721, 1440, 768)) == "hwc"

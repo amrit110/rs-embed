@@ -149,6 +149,8 @@ class ProviderBase:
         use_float_linear: bool = True,
         composite: str = "median",
         fill_value: float = 0.0,
+        require_iw: bool = True,
+        relax_iw_on_empty: bool = True,
     ) -> np.ndarray:
         """Fetch Sentinel-1 VV/VH patch as ``[C,H,W]``.
 
@@ -168,6 +170,11 @@ class ProviderBase:
             Temporal compositing strategy.
         fill_value : float
             Fill value for missing pixels.
+        require_iw : bool
+            Whether to restrict Sentinel-1 fetch to IW scenes when supported.
+        relax_iw_on_empty : bool
+            Whether providers may retry without the IW restriction if the
+            strict query returns no imagery.
 
         Returns
         -------

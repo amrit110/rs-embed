@@ -7,9 +7,11 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2602.23678-b31b1b.svg)](https://arxiv.org/abs/2602.23678)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://cybergis.github.io/rs-embed/)
 ![Python](https://img.shields.io/badge/python-3.12-blue?logo=python)
+[![PyTorch 2.2](https://img.shields.io/badge/torch-2.2-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=cybergis.rs-embed)
-![License](https://img.shields.io/github/license/cybergis/rs-embed)
 ![Last Commit](https://img.shields.io/github/last-commit/cybergis/rs-embed)
+![License](https://img.shields.io/github/license/cybergis/rs-embed)
 
 
 
@@ -27,19 +29,23 @@
 ## TL;DR
 
 ```python
-emb = get_embedding("tessera", spatial=..., temporal=..., output=...)
+emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 ```
 
 
 ## Install
+
+```bash
+pip install rs-embed
+```
+
+If you are developing from source:
+
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
-conda env create -f environment.yml
-conda activate rs-embed
 pip install -e .
 ```
-
 
 If this is your first time using Google Earth Engine, authenticate once:
 
@@ -59,11 +65,11 @@ temporal = TemporalSpec.range(
 )
 
 emb = get_embedding(
-    "prithvi",       
+    "prithvi",
     spatial=spatial,
     temporal=temporal,
-    output=OutputSpec.grid(),
-    backend='gee'
+    output=OutputSpec.pooled(),
+    backend="auto",
 )
 
 ```
@@ -138,7 +144,7 @@ If you want to implement the extension yourself, you can also follow the guide i
 
 
 ## 🎖 Acknowledgements
-We would like to thank the following organizations and projects that make rs-embed possible: [Google Earth Engine](https://earthengine.google.com), [TorchGeo](https://github.com/torchgeo/torchgeo), [GeoTessera](https://github.com/ucam-eo/geotessera), [TerraTorch](https://github.com/terrastackai/terratorch), [rshf](https://github.com/mvrl/rshf).
+We would like to thank the following organizations and projects that make rs-embed possible: [Google Earth Engine](https://earthengine.google.com), [TorchGeo](https://github.com/torchgeo/torchgeo), [GeoTessera](https://github.com/ucam-eo/geotessera), [TerraTorch](https://github.com/terrastackai/terratorch), [rshf](https://github.com/mvrl/rshf), and the [Copernicus-Embed dataset on Hugging Face](https://huggingface.co/datasets/torchgeo/copernicus_embed).
 
 This library also builds upon the incredible work of the Remote Sensing community!(Full list and citations available in our Documentation)
 

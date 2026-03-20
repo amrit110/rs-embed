@@ -86,7 +86,14 @@ class EmbedderBase:
     "notes": "..."
   },
   "temporal": {"mode": "year" | "range"} | null,
-  "output": ["pooled", "grid"]
+  "output": ["pooled", "grid"],
+  "model_config": {
+    "variant": {
+      "type": "string",
+      "default": "base",
+      "choices": ["base", "large"]
+    }
+  }
 }
 ```
 
@@ -94,6 +101,10 @@ class EmbedderBase:
     `describe()` should be **fast** and should not trigger heavy downloads or model loading.
     In current rs-embed, `describe()["backend"]`, `describe()["output"]`, and `describe()["temporal"]`
     may be used for runtime validation and capability checks.
+    If your model exposes public `model_config` keys, document them in `describe()["model_config"]`
+    with a JSON-serializable schema.
+    For model detail docs, surface those public keys near the top as well, for example in the
+    `Quick Facts` table as `Model config keys | model_config["variant"]`.
 
 ---
 

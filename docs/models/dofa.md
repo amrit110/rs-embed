@@ -1,18 +1,19 @@
 # DOFA (`dofa`)
 
-> TorchGeo DOFA adapter for multispectral inputs with explicit per-channel wavelengths, supporting provider and tensor backends.
+> DOFA adapter for multispectral inputs with explicit per-channel wavelengths, supporting provider and tensor backends.
 
 ## Quick Facts
 
 | Field | Value |
 |---|---|
 | Model ID | `dofa` |
-| Family / Backbone | TorchGeo DOFA (`dofa_base_patch16_224` / `dofa_large_patch16_224`) |
+| Family / Backbone | DOFA ViT (`base` / `large`, official checkpoints) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
 | Primary input | Multiband SR CHW + wavelengths (µm) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `base`; choices: `base`, `large`) |
 | Extra side inputs | **required** wavelength vector (`wavelengths_um`) |
 | Training alignment (adapter path) | Medium-High (when wavelengths and band semantics are correct) |
 
@@ -99,11 +100,21 @@ Fixed adapter behavior:
 | `RS_EMBED_DOFA_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
 | `RS_EMBED_DOFA_BATCH_SIZE` | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs |
 
-Non-env model selection knobs (passed via `sensor` fields in current adapter path):
+Non-env model selection knobs:
 
-- `sensor.variant`: `base` / `large`
+- `model_config["variant"]`: `base` / `large` (default: `base`)
 - `sensor.bands`: channel semantics for provider fetch and wavelength inference
 - `sensor.wavelengths`: explicit wavelength vector (µm)
+
+If `model_config["variant"]` is omitted, rs-embed uses the `base` DOFA checkpoint by default. Set `model_config={"variant": "large"}` to switch to the larger model.
+
+Quick reminder:
+
+- DOFA supports `variant` directly through `model_config`
+- current public usage is:
+  - `model_config={"variant": "base"}`
+  - `model_config={"variant": "large"}`
+- for export jobs, pass the same setting via `ExportModelRequest("dofa", model_config={"variant": ...})`
 
 ---
 
@@ -133,6 +144,22 @@ emb = get_embedding(
     "dofa",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    model_config={"variant": "base"},
+    output=OutputSpec.pooled(),
+    backend="gee",
+)
+```
+
+### Switch to the large checkpoint
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+emb = get_embedding(
+    "dofa",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    model_config={"variant": "large"},
     output=OutputSpec.pooled(),
     backend="gee",
 )

@@ -10,7 +10,7 @@
 | Aliases | `remoteclip_s2rgb` |
 | Family / Backbone | RemoteCLIP (CLIP-style ViT via `rshf.remoteclip.RemoteCLIP`) |
 | Adapter type | `on-the-fly` |
-| Typical backend | provider backend (public API usually `backend="gee"`) |
+| Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 RGB (`B4,B3,B2`) |
 | Temporal mode | `TemporalSpec.range(...)` required |
 | Output modes | `pooled`, `grid` |
@@ -118,7 +118,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
 )
 ```
 
@@ -139,7 +139,7 @@ emb = get_embedding(
         composite="median",
     ),
     output=OutputSpec.grid(),
-    backend="gee",
+    backend="auto",
 )
 ```
 
@@ -147,7 +147,7 @@ emb = get_embedding(
 
 ## Common Failure Modes / Debugging
 
-- `backend` is not a provider backend (adapter expects provider path; public API `"gee"` is the common choice)
+- `backend` is not provider-compatible (`backend="auto"` is the recommended public default)
 - `TemporalSpec` is missing or not `range`
 - `input_chw` shape is not `CHW` with 3 channels
 - missing optional dependencies (`rshf`, `huggingface_hub`, torch stack)

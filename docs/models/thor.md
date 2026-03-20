@@ -1,6 +1,6 @@
-# THOR 1.0 Base (`thor`)
+# THOR (`thor`)
 
-> TerraTorch-backed THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
+> Vendored THOR adapter for Sentinel-2 SR 10-band inputs, with THOR-specific normalization and flexible group-grid aggregation (`mean` / `sum` / `concat`).
 
 ## Quick Facts
 
@@ -8,12 +8,13 @@
 |---|---|
 | Model ID | `thor` |
 | Aliases | `thor_1_0_base` |
-| Family / Backbone | Fully vendored THOR runtime (`thor_v1_base`) |
+| Family / Backbone | Fully vendored THOR runtime (`thor_v1_tiny` / `thor_v1_small` / `thor_v1_base` / `thor_v1_large`) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band `CHW` |
 | Temporal mode | `range` in practice (composite window) |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |
 | Extra side inputs | none required in current adapter |
 | Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved |
 
@@ -83,7 +84,7 @@ Default `SensorSpec` if omitted:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `RS_EMBED_THOR_MODEL_KEY` | `thor_v1_base` | THOR backbone key for TerraTorch registry |
+| `RS_EMBED_THOR_MODEL_KEY` | `thor_v1_base` | THOR backbone key for the vendored runtime |
 | `RS_EMBED_THOR_CKPT` | unset | Local checkpoint path override |
 | `RS_EMBED_THOR_PRETRAINED` | `1` | Use pretrained weights (HF default path) |
 | `RS_EMBED_THOR_IMG` | `288` | Resize target image size |
@@ -96,6 +97,26 @@ Notes:
 
 - `RS_EMBED_THOR_PATCH_SIZE` and `RS_EMBED_THOR_IMG` jointly affect token layout and `ground_cover_m`.
 - Changing `group_merge` changes grid channel semantics and dimensionality (especially `concat`).
+
+## `model_config`
+
+- `model_config["variant"]`: `tiny` / `small` / `base` / `large`
+- for export jobs, pass it via `ExportModelRequest("thor", model_config={"variant": ...})`
+
+Example:
+
+```python
+from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
+
+emb = get_embedding(
+    "thor",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    output=OutputSpec.pooled(),
+    backend="gee",
+    model_config={"variant": "large"},
+)
+```
 
 ---
 
@@ -140,6 +161,25 @@ emb = get_embedding(
 # export RS_EMBED_THOR_IMG=288
 # export RS_EMBED_THOR_PATCH_SIZE=16
 ```
+
+### Example with `model_config`
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+emb = get_embedding(
+    "thor",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    output=OutputSpec.grid(pooling="mean"),
+    backend="gee",
+    model_config={"variant": "small"},
+)
+```
+
+Use `variant` only for backbone size selection.
+Other THOR runtime knobs such as image size, normalization, patch size, and checkpoint override
+still use the existing environment-variable path.
 
 ---
 

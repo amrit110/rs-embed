@@ -14,7 +14,7 @@
 | Primary input | S2 SR 12-band or S1 VV/VH (selected by `sensor.modality`) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` (v0.1 behavior) |
 | Output modes | `pooled`, `grid` |
-| Extra side inputs | modality settings on `sensor` (`modality`, `orbit`, `use_float_linear`) |
+| Extra side inputs | modality settings on `sensor` (`modality`, `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`) |
 | Training alignment (adapter path) | Medium-High when modality-specific preprocessing matches the intended TerraFM path |
 
 ---
@@ -62,7 +62,7 @@
 ### Sensor fields used by adapter (provider path)
 
 - common: `scale_m`, `cloudy_pct`, `composite`
-- S1-specific: `orbit`, `use_float_linear`
+- S1-specific: `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`
 
 Channel sanity:
 
@@ -72,13 +72,39 @@ Channel sanity:
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
+### What the original TerraFM model assumes for S1
+
+TerraFM treats Sentinel-1 as a 2-channel input branch (`VV`, `VH`). The official model code routes the S1 path by channel count (`C == 2`). The TerraFM paper describes S1 pretraining data as Sentinel-1 RTC patches, so the strongest original assumption is dual-pol `VV/VH` plus an analysis-ready S1 product, not a hard-coded `IW` rule.
+
+### Why rs-embed prefers `IW` on GEE
+
+Earth Engine Sentinel-1 collections are heterogeneous: different instrument modes, coverage patterns, and product characteristics can appear in the same collection. rs-embed therefore prefers `IW` by default as a conservative proxy for a more homogeneous land-observation subset when approximating TerraFM's S1 training distribution from `COPERNICUS/S1_GRD_FLOAT` / `COPERNICUS/S1_GRD`. This `IW` preference is an adapter policy, not a TerraFM paper requirement.
+
+### S1 fetch options in rs-embed
+
+- `s1_require_iw=True`:
+  - first try `instrumentMode == "IW"` together with dual-pol `VV/VH`
+- `s1_relax_iw_on_empty=True`:
+  - if the strict `IW` query returns no imagery, retry without the `IW` filter
+- `s1_require_iw=False`:
+  - query dual-pol `VV/VH` directly without enforcing `IW`
+
+Metadata behavior:
+
+- when provider-backed S1 fetch succeeds, metadata records:
+  - `s1_iw_requested`
+  - `s1_iw_applied`
+  - `s1_iw_relaxed_on_empty`
+  - `s1_relax_iw_on_empty`
+- this makes it explicit whether a sample came from strict `IW` filtering or from the relaxed fallback path
+
 ### Provider path
 
 1. Validate `TemporalSpec.range(...)`
 2. Select modality from `modality` (`s2` / `s1`)
 3. Fetch provider patch:
    - S2: 12-band SR -> normalize to `[0,1]`
-   - S1: VV/VH raw -> shared S1 normalization helper -> `[0,1]`
+   - S1: dual-pol `VV/VH` raw -> prefer `IW` by default, optionally relax `IW` on empty -> shared S1 normalization helper -> `[0,1]`
 4. Optional input inspection on normalized provider input
 5. Resize to fixed `224x224`
 6. Load TerraFM-B from vendored runtime + HF `.pth` weights
@@ -115,6 +141,7 @@ Adapter behavior notes:
 - image size is fixed to `224` in current implementation
 - runtime code is vendored inside `rs-embed`
 - weights are fetched from `MBZUAI/TerraFM` (`TerraFM-B.pth`)
+- although the vendored runtime also exposes a `large` factory, the current adapter only wires up the `TerraFM-B` weight path, so `model_config` variant switching is not exposed yet
 
 ---
 
@@ -162,6 +189,8 @@ sensor = SensorSpec(
     scale_m=10,
     composite="median",
     use_float_linear=True,
+    s1_require_iw=True,
+    s1_relax_iw_on_empty=True,
 )
 
 emb = get_embedding(
@@ -180,6 +209,9 @@ Notes:
 - Prefer passing `modality="s1"` / `modality="s2"` directly at the public API layer.
 - Setting `modality="s1"` is what switches TerraFM onto the S1 path; changing only `collection` / `bands` is not enough.
 - `use_float_linear=True` matches `COPERNICUS/S1_GRD_FLOAT`; set it to `False` for `COPERNICUS/S1_GRD`.
+- `s1_require_iw=True` is the conservative default in rs-embed.
+- `s1_relax_iw_on_empty=True` keeps the default strict path but retries without `IW` if the strict query is empty.
+- if you need maximum reproducibility, keep `s1_require_iw=True` and set `s1_relax_iw_on_empty=False`.
 
 ---
 
@@ -190,11 +222,13 @@ Notes:
 - tensor backend without `input_chw`
 - wrong channel count (`C` must be `2` or `12`)
 - S1/S2 modality mismatch between data and `modality`
+- strict S1 `IW` filtering returning an empty collection for the chosen AOI / time window
 - HF weight download issues (`.pth` weights)
 
 Recommended first checks:
 
 - inspect metadata `modality`, `source`, `grid_type`, and weight file info
+- inspect S1 metadata flags `s1_iw_requested`, `s1_iw_applied`, `s1_iw_relaxed_on_empty`
 - verify tensor input scale/normalization if using `backend="tensor"`
 - start with S2 default path before enabling S1 overrides
 
@@ -205,7 +239,7 @@ Recommended first checks:
 Keep fixed and record:
 
 - backend mode (`provider` vs `tensor`)
-- modality (`s2` / `s1`) and S1-specific options (`orbit`, `use_float_linear`)
+- modality (`s2` / `s1`) and S1-specific options (`use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`)
 - temporal window + compositing settings (provider path)
 - output mode (`pooled` / `grid`)
 - TerraFM HF asset source/cache snapshot if benchmarking

@@ -1,6 +1,6 @@
 # Copernicus Embed (`copernicus`)
 
-> Precomputed embedding adapter using `torchgeo.datasets.CopernicusEmbed`, with bbox slicing and optional bbox expansion to improve tile overlap on small ROIs.
+> Precomputed embedding adapter using a vendored local GeoTIFF reader over the published `torchgeo/copernicus_embed` Hugging Face dataset, with strict bbox slicing.
 
 ## Quick Facts
 
@@ -8,14 +8,18 @@
 |---|---|
 | Model ID | `copernicus` |
 | Aliases | `copernicus_embed` |
-| Family / Source | TorchGeo `CopernicusEmbed` dataset |
+| Family / Source | `torchgeo/copernicus_embed` GeoTIFF redistribution on Hugging Face |
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
-| Primary input | `BBox` / `PointBuffer` in EPSG:4326, sliced via TorchGeo dataset bbox indexing |
+| Primary input | `BBox` / `PointBuffer` in EPSG:4326, sliced via vendored GeoTIFF bbox indexing |
 | Temporal mode | **strict** `TemporalSpec.year(2021)` in v0.1 |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |
 | Training alignment (adapter path) | N/A (precomputed product) |
+
+Install requirement:
+
+- `pip install "rs-embed[copernicus]"`
 
 ---
 
@@ -23,14 +27,14 @@
 
 ### Good fit for
 
-- precomputed embedding workflows via TorchGeo
+- precomputed embedding workflows via local GeoTIFF access
 - quick spatial baseline features without provider requests
 - experiments where coarse precomputed coverage is acceptable
 
 ### Be careful when
 
 - requesting years other than `2021` (unsupported in current adapter)
-- assuming exact ROI slicing without expansion (adapter expands bbox by default)
+- passing ROIs smaller than a single 0.25° pixel (adapter raises an error)
 - using non-auto backends (`copernicus` currently expects `backend="auto"`)
 
 ---
@@ -44,7 +48,7 @@ Accepted `SpatialSpec`:
 - `BBox`
 - `PointBuffer` (converted to EPSG:4326 bbox)
 
-The adapter internally slices `CopernicusEmbed` with bbox indexing:
+The adapter internally slices the local GeoTIFF with bbox indexing:
 
 - `ds[minlon:maxlon, minlat:maxlat]`
 
@@ -67,9 +71,9 @@ The adapter internally slices `CopernicusEmbed` with bbox indexing:
 
 1. Validate `TemporalSpec.year(...)` and supported year (`2021`)
 2. Resolve `data_dir` (env or `sensor.collection` override)
-3. Load/cache TorchGeo `CopernicusEmbed` dataset (`download=True` in current adapter)
+3. Load/cache vendored `CopernicusEmbedGeoTiff` dataset (`download=True` in current adapter)
 4. Convert `SpatialSpec` to EPSG:4326 bbox
-5. Expand bbox by fixed `expand_deg=1.0` (centered) to increase tile overlap chance for small ROIs
+5. Validate that the requested ROI covers at least one full Copernicus pixel
 6. Slice dataset with bbox indexing and get `sample["image"]` (`CHW`)
 7. Return pooled vector or grid
 
@@ -83,7 +87,7 @@ Notes:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `RS_EMBED_COP_DIR` | `data/copernicus_embed` | Local TorchGeo CopernicusEmbed data directory |
+| `RS_EMBED_COP_DIR` | `data/copernicus_embed` | Local Copernicus embed GeoTIFF directory |
 | `RS_EMBED_COPERNICUS_BATCH_WORKERS` | `4` | Batch worker count for `get_embeddings_batch(...)` |
 
 Non-env override:
@@ -93,7 +97,6 @@ Non-env override:
 Current fixed adapter behavior (not env-configurable in v0.1):
 
 - `download=True`
-- `expand_deg=1.0`
 
 ---
 
@@ -107,7 +110,7 @@ Current fixed adapter behavior (not env-configurable in v0.1):
 
 ### `OutputSpec.grid()`
 
-- Returns TorchGeo sample embedding tensor as `xarray.DataArray` `(D,H,W)`
+- Returns local GeoTIFF sample embedding tensor as `xarray.DataArray` `(D,H,W)`
 - Grid is precomputed product space (dataset slice), not raw imagery pixels
 
 ---
@@ -141,14 +144,14 @@ emb = get_embedding(
 
 - year not supported (`2021` only in current adapter)
 - backend is not `auto`
-- missing `torchgeo` dependency
+- missing `tifffile` dependency
 - dataset files missing/corrupt under `RS_EMBED_COP_DIR`
-- small ROI misses coverage even after expansion (returns dataset slicing issues)
+- ROI is smaller than one Copernicus pixel (raises immediately)
 
 Recommended first checks:
 
 - confirm `TemporalSpec.year(2021)`
-- inspect metadata `data_dir`, `expand_deg`, `chw_shape`, `bbox_4326`
+- inspect metadata `data_dir`, `chw_shape`, `bbox_4326`
 - test a larger ROI if coverage seems empty
 
 ---
@@ -168,3 +171,4 @@ Keep fixed and record:
 
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/precomputed_copernicus_embed.py`
+- Vendored GeoTIFF reader: `src/rs_embed/embedders/_vendor/copernicus_embed.py`

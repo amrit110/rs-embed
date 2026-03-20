@@ -42,6 +42,7 @@ class _EmbeddingRequestContext:
     backend_n: str
     device: str
     sensor_eff: SensorSpec | None
+    model_config: dict[str, Any] | None
     input_prep: Any | None
     input_prep_resolved: Any
     embedder: Any
@@ -67,6 +68,8 @@ def sensor_key(sensor: SensorSpec | None) -> tuple:
         getattr(sensor, "modality", None),
         getattr(sensor, "orbit", None),
         bool(getattr(sensor, "use_float_linear", True)),
+        bool(getattr(sensor, "s1_require_iw", True)),
+        bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
         bool(getattr(sensor, "check_input", False)),
         bool(getattr(sensor, "check_raise", True)),
         getattr(sensor, "check_save_dir", None),
@@ -90,17 +93,53 @@ def supports_prefetched_batch_api(embedder: Any) -> bool:
     return _overrides_base_method(embedder, "get_embeddings_batch_from_inputs")
 
 @lru_cache(maxsize=128)
-def embedder_accepts_input_chw(embedder_cls: type) -> bool:
-    fn = getattr(embedder_cls, "get_embedding", None)
+def _embedder_method_accepts_parameter(
+    embedder_cls: type,
+    method_name: str,
+    param_name: str,
+) -> bool:
+    fn = getattr(embedder_cls, method_name, None)
     if fn is None:
         return False
     try:
         sig = inspect.signature(fn)
     except Exception as _e:
         return False
-    if "input_chw" in sig.parameters:
+    if param_name in sig.parameters:
         return True
     return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+
+
+@lru_cache(maxsize=128)
+def embedder_accepts_input_chw(embedder_cls: type) -> bool:
+    return _embedder_method_accepts_parameter(embedder_cls, "get_embedding", "input_chw")
+
+
+@lru_cache(maxsize=256)
+def embedder_accepts_model_config(
+    embedder_cls: type,
+    method_name: str = "get_embedding",
+) -> bool:
+    return _embedder_method_accepts_parameter(embedder_cls, method_name, "model_config")
+
+def _display_model_name(embedder: Any) -> str:
+    return str(getattr(embedder, "model_name", type(embedder).__name__))
+
+def require_model_config_support(
+    *,
+    embedder: Any,
+    model_config: dict[str, Any] | None,
+    method_name: str = "get_embedding",
+) -> None:
+    if model_config is None:
+        return
+    if embedder_accepts_model_config(type(embedder), method_name):
+        return
+    keys = sorted(str(k) for k in model_config.keys())
+    raise ModelError(
+        f"Model {_display_model_name(embedder)} does not support model_config"
+        f" for {method_name}(); got keys {keys}."
+    )
 
 def call_embedder_get_embedding(
     *,
@@ -112,15 +151,24 @@ def call_embedder_get_embedding(
     backend: str,
     device: str,
     input_chw: np.ndarray | None = None,
+    model_config: dict[str, Any] | None = None,
 ) -> Embedding:
+    require_model_config_support(
+        embedder=embedder,
+        model_config=model_config,
+        method_name="get_embedding",
+    )
     kwargs: dict[str, Any] = {
         "spatial": spatial,
         "temporal": temporal,
         "sensor": sensor,
+        "model_config": model_config,
         "output": output,
         "backend": backend,
         "device": device,
     }
+    if model_config is None:
+        kwargs.pop("model_config", None)
     if input_chw is not None and embedder_accepts_input_chw(type(embedder)):
         kwargs["input_chw"] = input_chw
     out = embedder.get_embedding(**kwargs)
@@ -167,6 +215,7 @@ def _prepare_embedding_request_context(
     model: str,
     temporal: TemporalSpec | None,
     sensor: SensorSpec | None,
+    model_config: dict[str, Any] | None,
     output: OutputSpec,
     backend: str,
     device: str,
@@ -192,6 +241,7 @@ def _prepare_embedding_request_context(
         backend_n=backend_n,
         device=device_n,
         sensor_eff=sensor_eff,
+        model_config=model_config,
         input_prep=input_prep,
         input_prep_resolved=input_prep_resolved,
         embedder=embedder,
@@ -275,6 +325,7 @@ def run_embedding_request(
                     spatial=spatial,
                     temporal=temporal,
                     sensor=ctx.sensor_eff,
+                    model_config=ctx.model_config,
                     output=output,
                     backend=ctx.backend_n,
                     device=ctx.device,
@@ -291,19 +342,46 @@ def run_embedding_request(
                 spatial=spatials[0],
                 temporal=temporal,
                 sensor=sensor,
+                model_config=ctx.model_config,
                 output=output,
                 backend=ctx.backend_n,
                 device=ctx.device,
             )
         return [emb]
 
+    if ctx.model_config is not None and not embedder_accepts_model_config(
+        type(ctx.embedder),
+        "get_embeddings_batch",
+    ):
+        out: list[Embedding] = []
+        for spatial in spatials:
+            with ctx.lock:
+                emb = call_embedder_get_embedding(
+                    embedder=ctx.embedder,
+                    spatial=spatial,
+                    temporal=temporal,
+                    sensor=sensor,
+                    model_config=ctx.model_config,
+                    output=output,
+                    backend=ctx.backend_n,
+                    device=ctx.device,
+                )
+            out.append(emb)
+        return out
+
     with ctx.lock:
-        embs = ctx.embedder.get_embeddings_batch(
-            spatials=spatials,
-            temporal=temporal,
-            sensor=sensor,
-            output=output,
-            backend=ctx.backend_n,
-            device=ctx.device,
-        )
+        kwargs: dict[str, Any] = {
+            "spatials": spatials,
+            "temporal": temporal,
+            "sensor": sensor,
+            "output": output,
+            "backend": ctx.backend_n,
+            "device": ctx.device,
+        }
+        if ctx.model_config is not None and embedder_accepts_model_config(
+            type(ctx.embedder),
+            "get_embeddings_batch",
+        ):
+            kwargs["model_config"] = ctx.model_config
+        embs = ctx.embedder.get_embeddings_batch(**kwargs)
     return [normalize_embedding_output(emb=emb, output=output) for emb in embs]

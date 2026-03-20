@@ -32,6 +32,15 @@ Most users only need these public functions:
 - `inspect_gee_patch(...)`: compatibility wrapper around `inspect_provider_patch(...)`
 - `list_models()`: stable public model catalog helper
 
+Model-specific configuration:
+
+- `get_embedding(...)` and `get_embeddings_batch(...)` accept `model_config`
+- `export_batch(...)` supports per-model `model_config` via `ExportModelRequest(...)`
+- currently documented model-level `model_config` usage includes `dofa`, `anysat`, `thor`, and `satmaepp_s2_10b`
+- for the currently documented variant-aware models, use a unified field: `model_config={"variant": "..."}`
+- valid `variant` values still depend on the selected model and currently exposed published checkpoints, so check the corresponding model detail page
+- unsupported `model_config` usage raises `ModelError` instead of being ignored silently
+
 If you need a stable model list in code:
 
 ```python

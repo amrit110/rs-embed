@@ -175,3 +175,279 @@ def test_fetch_array_chw_empty_sample_props_raises_clear_error(monkeypatch):
             fill_value=0.0,
             collection="COPERNICUS/S2_SR_HARMONIZED",
         )
+
+
+def test_fetch_s1_vvvh_raw_chw_empty_collection_reports_filter_counts(monkeypatch):
+    class _FakeSize:
+        def __init__(self, n):
+            self._n = n
+
+        def getInfo(self):
+            return self._n
+
+    class _FakeFilter:
+        @staticmethod
+        def eq(field, value):
+            return ("eq", field, value)
+
+        @staticmethod
+        def listContains(field, value):
+            return ("listContains", field, value)
+
+    class _FakeCollection:
+        def __init__(self, count=5, stage="base"):
+            self.count = count
+            self.stage = stage
+
+        def filterDate(self, _start, _end):
+            return self
+
+        def filterBounds(self, _region):
+            return self
+
+        def filter(self, filt):
+            kind, field, value = filt
+            if kind == "eq" and field == "instrumentMode" and value == "IW":
+                return _FakeCollection(2, "iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VV"
+                and self.stage == "base"
+            ):
+                return _FakeCollection(1, "vv_no_iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VH"
+                and self.stage == "vv_no_iw"
+            ):
+                return _FakeCollection(0, "vh_no_iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VV"
+                and self.stage == "iw"
+            ):
+                return _FakeCollection(1, "vv")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VH"
+                and self.stage == "vv"
+            ):
+                return _FakeCollection(0, "vh")
+            if kind == "eq" and field == "orbitProperties_pass":
+                return _FakeCollection(0, "orbit")
+            return self
+
+        def size(self):
+            return _FakeSize(self.count)
+
+    fake_ee = types.SimpleNamespace(
+        ImageCollection=lambda _collection: _FakeCollection(),
+        Filter=_FakeFilter,
+    )
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    monkeypatch.setattr(provider, "ensure_ready", lambda: None)
+    monkeypatch.setattr(provider, "get_region", lambda _spatial: object())
+    temporal = TemporalSpec.range("2024-01-01", "2024-02-01")
+
+    with pytest.raises(ProviderError, match=r"base\(date\+bounds\)=5, iw=2, vv=1, vh=0"):
+        provider.fetch_s1_vvvh_raw_chw(
+            spatial=object(),
+            temporal=temporal,
+            orbit=None,
+        )
+
+
+def test_fetch_s1_vvvh_raw_chw_ignores_orbit_filter(monkeypatch):
+    class _FakeSize:
+        def __init__(self, n):
+            self._n = n
+
+        def getInfo(self):
+            return self._n
+
+    class _FakeFilter:
+        @staticmethod
+        def eq(field, value):
+            return ("eq", field, value)
+
+        @staticmethod
+        def listContains(field, value):
+            return ("listContains", field, value)
+
+    class _FakeRect:
+        def getInfo(self):
+            return {
+                "properties": {
+                    "VV": [[1.0, 2.0], [3.0, 4.0]],
+                    "VH": [[5.0, 6.0], [7.0, 8.0]],
+                }
+            }
+
+    class _FakeImage:
+        def select(self, _bands):
+            return self
+
+        def reproject(self, **_kwargs):
+            return self
+
+        def sampleRectangle(self, *, region, defaultValue):  # noqa: ARG002
+            return _FakeRect()
+
+    class _FakeCollection:
+        def __init__(self, count=5, stage="base"):
+            self.count = count
+            self.stage = stage
+
+        def filterDate(self, _start, _end):
+            return self
+
+        def filterBounds(self, _region):
+            return self
+
+        def filter(self, filt):
+            kind, field, value = filt
+            if kind == "eq" and field == "instrumentMode" and value == "IW":
+                return _FakeCollection(2, "iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VV"
+                and self.stage == "iw"
+            ):
+                return _FakeCollection(1, "vv")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VH"
+                and self.stage == "vv"
+            ):
+                return _FakeCollection(1, "vh")
+            if kind == "eq" and field == "orbitProperties_pass":
+                raise AssertionError("orbit filter should not be applied")
+            return self
+
+        def size(self):
+            return _FakeSize(self.count)
+
+        def median(self):
+            return _FakeImage()
+
+    fake_ee = types.SimpleNamespace(
+        ImageCollection=lambda _collection: _FakeCollection(),
+        Filter=_FakeFilter,
+    )
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    monkeypatch.setattr(provider, "ensure_ready", lambda: None)
+    monkeypatch.setattr(provider, "get_region", lambda _spatial: object())
+
+    arr = provider.fetch_s1_vvvh_raw_chw(
+        spatial=object(),
+        temporal=TemporalSpec.range("2024-01-01", "2024-02-01"),
+        orbit="ASCENDING",
+    )
+
+    assert arr.shape == (2, 2, 2)
+
+
+def test_fetch_s1_vvvh_raw_chw_relaxes_iw_and_reports_meta(monkeypatch):
+    class _FakeSize:
+        def __init__(self, n):
+            self._n = n
+
+        def getInfo(self):
+            return self._n
+
+    class _FakeFilter:
+        @staticmethod
+        def eq(field, value):
+            return ("eq", field, value)
+
+        @staticmethod
+        def listContains(field, value):
+            return ("listContains", field, value)
+
+    class _FakeRect:
+        def getInfo(self):
+            return {
+                "properties": {
+                    "VV": [[1.0, 2.0], [3.0, 4.0]],
+                    "VH": [[5.0, 6.0], [7.0, 8.0]],
+                }
+            }
+
+    class _FakeImage:
+        def select(self, _bands):
+            return self
+
+        def reproject(self, **_kwargs):
+            return self
+
+        def sampleRectangle(self, *, region, defaultValue):  # noqa: ARG002
+            return _FakeRect()
+
+    class _FakeCollection:
+        def __init__(self, count=5, stage="base"):
+            self.count = count
+            self.stage = stage
+
+        def filterDate(self, _start, _end):
+            return self
+
+        def filterBounds(self, _region):
+            return self
+
+        def filter(self, filt):
+            kind, field, value = filt
+            if kind == "eq" and field == "instrumentMode" and value == "IW":
+                return _FakeCollection(0, "iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VV"
+                and self.stage == "base"
+            ):
+                return _FakeCollection(1, "vv_no_iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VH"
+                and self.stage == "vv_no_iw"
+            ):
+                return _FakeCollection(1, "vh_no_iw")
+            return self
+
+        def size(self):
+            return _FakeSize(self.count)
+
+        def median(self):
+            return _FakeImage()
+
+    fake_ee = types.SimpleNamespace(
+        ImageCollection=lambda _collection: _FakeCollection(),
+        Filter=_FakeFilter,
+    )
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    monkeypatch.setattr(provider, "ensure_ready", lambda: None)
+    monkeypatch.setattr(provider, "get_region", lambda _spatial: object())
+
+    arr, meta = provider.fetch_s1_vvvh_raw_chw_with_meta(
+        spatial=object(),
+        temporal=TemporalSpec.range("2024-01-01", "2024-02-01"),
+        require_iw=True,
+        relax_iw_on_empty=True,
+    )
+
+    assert arr.shape == (2, 2, 2)
+    assert meta["s1_iw_requested"] is True
+    assert meta["s1_iw_applied"] is False
+    assert meta["s1_iw_relaxed_on_empty"] is True

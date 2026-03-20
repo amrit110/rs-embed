@@ -17,7 +17,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
     device="auto",
 )
 ```
@@ -45,7 +45,7 @@ embs = get_embeddings_batch(
     spatials=spatials,
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
 )
 ```
 
@@ -73,7 +73,7 @@ export_batch(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     models=["remoteclip", "prithvi"],
     target=ExportTarget.per_item("exports", names=["p1", "p2"]),
-    backend="gee",
+    backend="auto",
     config=ExportConfig(save_inputs=True, save_embeddings=True, resume=True),
 )
 ```
@@ -125,7 +125,7 @@ emb = get_embedding(
     spatial=PointBuffer(121.5, 31.2, 8000),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.grid(),
-    backend="gee",
+    backend="auto",
     input_prep="tile",
 )
 ```

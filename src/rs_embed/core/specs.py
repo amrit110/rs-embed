@@ -191,6 +191,11 @@ class SensorSpec:
     use_float_linear : bool
         Whether the provider path should use linear-scale floating-point
         values when a sensor family offers both linear and dB products.
+    s1_require_iw : bool
+        Whether Sentinel-1 provider fetch should prefer IW scenes only.
+    s1_relax_iw_on_empty : bool
+        When ``s1_require_iw`` is enabled and no S1 imagery is found, allow a
+        fallback fetch without the IW filter.
     check_input : bool
         If ``True``, run input diagnostics.
     check_raise : bool
@@ -208,6 +213,8 @@ class SensorSpec:
     modality: str | None = None
     orbit: str | None = None
     use_float_linear: bool = True
+    s1_require_iw: bool = True
+    s1_relax_iw_on_empty: bool = True
 
     # Optional: on-the-fly input inspection for GEE downloads.
     # If enabled, embedders can attach a compact stats report into Embedding.meta

@@ -13,6 +13,7 @@
 | Primary input | S2 RGB (`B4,B3,B2`) | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) |
 | Temporal mode | range window + single composite | range window + single composite |
 | Output modes | `pooled`, `grid` | `pooled`, `grid` |
+| Model config keys | none | `model_config["variant"]` (default: `large`; choices: `large`) |
 | Core extraction | `forward_encoder(mask_ratio=0.0)` | `forward_encoder(mask_ratio=0.0)` |
 
 ---
@@ -182,6 +183,27 @@ emb_s2 = get_embedding(
 # export RS_EMBED_SATMAEPP_S2_IMG=224
 # export RS_EMBED_SATMAEPP_S2_GRID_REDUCE=mean
 ```
+
+### Example with `model_config`
+
+```python
+from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
+
+spatial = PointBuffer(lon=121.5, lat=31.2, buffer_m=2048)
+temporal = TemporalSpec.range("2022-06-01", "2022-09-01")
+
+emb_s2 = get_embedding(
+    "satmaepp_s2_10b",
+    spatial=spatial,
+    temporal=temporal,
+    output=OutputSpec.grid(),
+    backend="gee",
+    model_config={"variant": "large"},
+)
+```
+
+For export jobs, the same setting goes through
+`ExportModelRequest("satmaepp_s2_10b", model_config={"variant": "large"})`.
 
 ---
 

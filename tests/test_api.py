@@ -111,6 +111,64 @@ class _MockMultimodalEmbedder(EmbedderBase):
         )
 
 
+class _MockVariantEmbedder(EmbedderBase):
+    def describe(self):
+        return {
+            "type": "mock",
+            "backend": ["auto", "gee"],
+            "output": ["pooled"],
+            "model_config": {
+                "variant": {
+                    "type": "string",
+                    "default": "base",
+                    "choices": ["base", "large"],
+                }
+            },
+        }
+
+    def get_embedding(
+        self,
+        *,
+        spatial,
+        temporal,
+        sensor,
+        output,
+        backend,
+        device="auto",
+        input_chw=None,
+        model_config=None,
+    ):
+        variant = (model_config or {}).get("variant", "base")
+        return Embedding(
+            data=np.arange(3, dtype=np.float32),
+            meta={"model": self.model_name, "variant": variant, "backend_used": backend},
+        )
+
+    def get_embeddings_batch(
+        self,
+        *,
+        spatials,
+        temporal=None,
+        sensor=None,
+        model_config=None,
+        output=OutputSpec.pooled(),
+        backend="auto",
+        device="auto",
+    ):
+        return [
+            self.get_embedding(
+                spatial=sp,
+                temporal=temporal,
+                sensor=sensor,
+                model_config=model_config,
+                output=output,
+                backend=backend,
+                device=device,
+            )
+            for sp in spatials
+        ]
+
+
 @pytest.fixture(autouse=True)
 def register_mock():
     registry._REGISTRY.clear()
@@ -186,6 +244,27 @@ def test_get_embedding_rejects_unsupported_modality():
         get_embedding("mock_model", spatial=_SPATIAL, modality="s1")
 
 
+def test_get_embedding_rejects_model_config_for_unsupported_model():
+    from rs_embed.api import get_embedding
+
+    with pytest.raises(ModelError, match="does not support model_config"):
+        get_embedding("mock_model", spatial=_SPATIAL, model_config={"variant": "large"})
+
+
+def test_get_embedding_passes_model_config_to_variant_aware_model():
+    from rs_embed.api import get_embedding
+
+    registry.register("mock_variant")(_MockVariantEmbedder)
+
+    emb = get_embedding(
+        "mock_variant",
+        spatial=_SPATIAL,
+        temporal=_TEMPORAL,
+        model_config={"variant": "large"},
+    )
+    assert emb.meta["variant"] == "large"
+
+
 # ══════════════════════════════════════════════════════════════════════
 # get_embeddings_batch
 # ══════════════════════════════════════════════════════════════════════
@@ -257,6 +336,20 @@ def test_get_embeddings_batch_precomputed_default_backend_auto_resolves_to_auto(
     )
     assert len(results) == 2
     assert all(emb.meta["backend_used"] == "auto" for emb in results)
+
+
+def test_get_embeddings_batch_passes_model_config_to_variant_aware_model():
+    from rs_embed.api import get_embeddings_batch
+
+    registry.register("mock_variant")(_MockVariantEmbedder)
+
+    results = get_embeddings_batch(
+        "mock_variant",
+        spatials=[_SPATIAL, PointBuffer(lon=1.0, lat=0.0, buffer_m=512)],
+        temporal=_TEMPORAL,
+        model_config={"variant": "large"},
+    )
+    assert [emb.meta["variant"] for emb in results] == ["large", "large"]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -746,6 +839,45 @@ def test_export_batch_export_model_request_applies_per_model_overrides(monkeypat
     assert sensor.modality == "s1"
     assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
     assert sensor.scale_m == 20
+
+
+def test_export_batch_export_model_request_preserves_model_config(monkeypatch, tmp_path):
+    from rs_embed.api import export_batch
+
+    registry.register("mock_variant")(_MockVariantEmbedder)
+    captured = {}
+
+    def _fake_run(self):
+        captured["model_config"] = self.models[0].model_config
+        return {"status": "ok"}
+
+    monkeypatch.setattr("rs_embed.pipelines.exporter.BatchExporter.run", _fake_run)
+
+    result = export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=[ExportModelRequest("mock_variant", model_config={"variant": "large"})],
+        target=ExportTarget.combined(str(tmp_path / "combined")),
+        backend="auto",
+        config=ExportConfig(show_progress=False),
+    )
+
+    assert result == {"status": "ok"}
+    assert captured["model_config"] == {"variant": "large"}
+
+
+def test_export_batch_rejects_model_config_for_unsupported_model(tmp_path):
+    from rs_embed.api import export_batch
+
+    with pytest.raises(ModelError, match="does not support model_config"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=[ExportModelRequest("mock_model", model_config={"variant": "large"})],
+            target=ExportTarget.combined(str(tmp_path / "combined")),
+            backend="auto",
+            config=ExportConfig(show_progress=False),
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════

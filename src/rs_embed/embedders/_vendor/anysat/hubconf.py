@@ -10,8 +10,8 @@ from pathlib import Path
 import warnings
 
 REPO_ROOT = Path(__file__).parent
-if str(REPO_ROOT / "src") not in sys.path:
-    sys.path.append(str(REPO_ROOT / "src"))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
 
 dependencies = ['torch']
 
@@ -57,8 +57,8 @@ class AnySat(nn.Module):
                     current = current.setdefault(key, {})
                 current[keys[-1]] = v
         
-        from src.models.networks.encoder.utils.ltae import PatchLTAEMulti
-        from src.models.networks.encoder.utils.patch_embeddings import PatchMLPMulti
+        from .src.models.networks.encoder.utils.ltae import PatchLTAEMulti
+        from .src.models.networks.encoder.utils.patch_embeddings import PatchMLPMulti
         projectors = {}
         for modality in self.config['modalities']['all']:
             if 'T' in self.config['projectors'][modality].keys():
@@ -71,10 +71,10 @@ class AnySat(nn.Module):
         with warnings.catch_warnings():
             # Ignore all warnings during model initialization
             warnings.filterwarnings('ignore')
-            from src.models.networks.encoder.Transformer import TransformerMulti
+            from .src.models.networks.encoder.Transformer import TransformerMulti
             self.spatial_encoder = TransformerMulti(**self.config['spatial_encoder'])
             del self.config['spatial_encoder']
-            from src.models.networks.encoder.Any_multi import AnyModule  # Import your actual model class
+            from .src.models.networks.encoder.Any_multi import AnyModule
             self.model = AnyModule(projectors=projectors, spatial_encoder=self.spatial_encoder, **self.config)
         
         if device is not None:

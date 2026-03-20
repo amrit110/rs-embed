@@ -109,6 +109,43 @@ def _raise_if_empty_collection(col: Any, *, collection: str | None = None) -> No
     if n == 0:
         raise ProviderError(_no_images_found_message(collection=collection))
 
+
+def _format_s1_empty_collection_message(
+    *,
+    collection_id: str,
+    temporal: TemporalSpec,
+    counts: dict[str, int | None],
+    require_iw: bool,
+    relax_iw_on_empty: bool,
+) -> str:
+    detail_parts = [
+        f"base(date+bounds)={counts.get('base')}",
+        f"iw={counts.get('iw')}",
+        f"vv={counts.get('vv')}",
+        f"vh={counts.get('vh')}",
+    ]
+    if "vh_no_iw" in counts:
+        detail_parts.append(f"vh_no_iw={counts.get('vh_no_iw')}")
+    details = ", ".join(detail_parts)
+    return (
+        f"{_NO_IMAGES_FOUND_MSG} collection={collection_id!r} "
+        f"time=({temporal.start!r}, {temporal.end!r}) "
+        f"filters=[{details}]. "
+        f"requested_iw={require_iw} relax_iw_on_empty={relax_iw_on_empty}. "
+        "TerraFM S1 expects dual-pol VV/VH input; try a wider time window or a different AOI."
+    )
+
+
+def _build_s1_dualpol_collection(base: Any, *, require_iw: bool) -> Any:
+    import ee
+
+    col = base
+    if require_iw:
+        col = col.filter(ee.Filter.eq("instrumentMode", "IW"))
+    col = col.filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
+    col = col.filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
+    return col
+
 def _sample_image_bands_raw_chw(
     img: Any,
     *,
@@ -299,24 +336,83 @@ class GEEProvider(ProviderBase):
         use_float_linear: bool = True,
         composite: str = "median",
         fill_value: float = 0.0,
+        require_iw: bool = True,
+        relax_iw_on_empty: bool = True,
     ) -> np.ndarray:
+        arr, _meta = self.fetch_s1_vvvh_raw_chw_with_meta(
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=scale_m,
+            orbit=orbit,
+            use_float_linear=use_float_linear,
+            composite=composite,
+            fill_value=fill_value,
+            require_iw=require_iw,
+            relax_iw_on_empty=relax_iw_on_empty,
+        )
+        return arr
+
+    def fetch_s1_vvvh_raw_chw_with_meta(
+        self,
+        *,
+        spatial: SpatialSpec,
+        temporal: TemporalSpec,
+        scale_m: int = 10,
+        orbit: str | None = None,
+        use_float_linear: bool = True,
+        composite: str = "median",
+        fill_value: float = 0.0,
+        require_iw: bool = True,
+        relax_iw_on_empty: bool = True,
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         import ee
 
         temporal.validate()
 
         region = self.get_region(spatial)
         collection_id = "COPERNICUS/S1_GRD_FLOAT" if bool(use_float_linear) else "COPERNICUS/S1_GRD"
-        col = (
-            ee.ImageCollection(collection_id)
-            .filterDate(temporal.start, temporal.end)
-            .filterBounds(region)
-            .filter(ee.Filter.eq("instrumentMode", "IW"))
-            .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
-            .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
+        base = ee.ImageCollection(collection_id).filterDate(temporal.start, temporal.end).filterBounds(
+            region
         )
-        if orbit:
-            col = col.filter(ee.Filter.eq("orbitProperties_pass", orbit))
-        _raise_if_empty_collection(col, collection=collection_id)
+        col = _build_s1_dualpol_collection(base, require_iw=bool(require_iw))
+        iw_relaxed = False
+        iw_applied = bool(require_iw)
+        n = _collection_size_or_none(col)
+        fallback_n: int | None = None
+        if n == 0 and bool(require_iw) and bool(relax_iw_on_empty):
+            relaxed_col = _build_s1_dualpol_collection(base, require_iw=False)
+            fallback_n = _collection_size_or_none(relaxed_col)
+            if fallback_n is not None and fallback_n > 0:
+                col = relaxed_col
+                n = fallback_n
+                iw_relaxed = True
+                iw_applied = False
+        if n == 0:
+            counts = {
+                "base": _collection_size_or_none(base),
+                "iw": _collection_size_or_none(base.filter(ee.Filter.eq("instrumentMode", "IW"))),
+                "vv": _collection_size_or_none(
+                    base.filter(ee.Filter.eq("instrumentMode", "IW")).filter(
+                        ee.Filter.listContains("transmitterReceiverPolarisation", "VV")
+                    )
+                ),
+                "vh": _collection_size_or_none(
+                    base.filter(ee.Filter.eq("instrumentMode", "IW"))
+                    .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
+                    .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
+                ),
+            }
+            if fallback_n is not None:
+                counts["vh_no_iw"] = fallback_n
+            raise ProviderError(
+                _format_s1_empty_collection_message(
+                    collection_id=collection_id,
+                    temporal=temporal,
+                    counts=counts,
+                    require_iw=bool(require_iw),
+                    relax_iw_on_empty=bool(relax_iw_on_empty),
+                )
+            )
 
         comp = str(composite).lower().strip()
         if comp == "median":
@@ -342,7 +438,15 @@ class GEEProvider(ProviderBase):
             raise ProviderError(
                 f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}"
             )
-        return arr
+        meta = {
+            "s1_iw_requested": bool(require_iw),
+            "s1_iw_applied": bool(iw_applied),
+            "s1_iw_relaxed_on_empty": bool(iw_relaxed),
+            "s1_relax_iw_on_empty": bool(relax_iw_on_empty),
+            "s1_orbit_requested": orbit,
+            "s1_collection_used": collection_id,
+        }
+        return arr, meta
 
     def fetch_multiframe_collection_raw_tchw(
         self,

@@ -2,9 +2,12 @@ import torch
 from torch import nn
 import math
 
-from models.networks.encoder.utils.utils import trunc_normal_
-from models.networks.encoder.utils.utils_ViT import Block, BlockTransformer
-from models.networks.encoder.utils.pos_embed import get_2d_sincos_pos_embed_with_scale, get_2d_sincos_pos_embed_with_resolution
+from .utils.utils import trunc_normal_
+from .utils.utils_ViT import Block, BlockTransformer
+from .utils.pos_embed import (
+    get_2d_sincos_pos_embed_with_scale,
+    get_2d_sincos_pos_embed_with_resolution,
+)
 
 class Transformer(nn.Module):
     def __init__(

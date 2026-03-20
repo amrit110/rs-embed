@@ -122,6 +122,7 @@ def get_embedding(
     spatial: SpatialSpec,
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
+    model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
@@ -140,6 +141,8 @@ def get_embedding(
         Optional temporal filter.
     sensor : SensorSpec or None
         Optional sensor override.
+    model_config : dict[str, Any] or None
+        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -181,6 +184,7 @@ def get_embedding(
         model=model,
         temporal=temporal,
         sensor=sensor_eff,
+        model_config=model_config,
         output=output,
         backend=backend,
         device=device,
@@ -200,6 +204,7 @@ def get_embeddings_batch(
     spatials: list[SpatialSpec],
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
+    model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
@@ -218,6 +223,8 @@ def get_embeddings_batch(
         Optional temporal filter.
     sensor : SensorSpec or None
         Optional sensor override.
+    model_config : dict[str, Any] or None
+        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -254,6 +261,7 @@ def get_embeddings_batch(
         model=model,
         temporal=temporal,
         sensor=sensor_eff,
+        model_config=model_config,
         output=output,
         backend=backend,
         device=device,

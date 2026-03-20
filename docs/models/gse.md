@@ -10,7 +10,7 @@
 | Aliases | `gse_annual` |
 | Family / Source | Google Satellite Embedding annual product (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`) |
 | Adapter type | `precomputed` |
-| Typical backend | provider backend (`gee`) |
+| Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | Provider-sampled annual embedding image collection |
 | Temporal mode | **strict** `TemporalSpec.year(...)` |
 | Output modes | `pooled`, `grid` |
@@ -39,7 +39,7 @@
 
 ### Backend / temporal
 
-- provider backend only (`gee` / provider-compatible; not `auto`)
+- provider-backed path; public API should usually use `backend="auto"`
 - requires `TemporalSpec.year(year=...)`
 - adapter validates `temporal.mode == "year"`
 
@@ -59,7 +59,7 @@ Fixed provider fetch settings in current adapter:
 
 ## Retrieval Pipeline (Current rs-embed Path)
 
-1. Validate provider backend + `TemporalSpec.year(...)`
+1. Validate provider-compatible backend + `TemporalSpec.year(...)`
 2. Fetch all embedding bands as `CHW` from annual collection
 3. Replace fill value `-9999` with `NaN`
 4. Build metadata (year, scale, band names)
@@ -108,7 +108,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.year(2021),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
 )
 ```
 

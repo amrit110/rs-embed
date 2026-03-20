@@ -326,6 +326,30 @@ def fetch_provider_patch_raw(
     sensor: SensorSpec,
     to_float_image: bool = False,
 ) -> np.ndarray:
+    bands_upper = tuple(str(b).upper() for b in tuple(sensor.bands))
+    modality = str(getattr(sensor, "modality", "") or "").strip().lower()
+    looks_like_s1_vvvh = bands_upper == ("VV", "VH") and (
+        modality == "s1" or "COPERNICUS/S1" in str(sensor.collection).upper()
+    )
+    if looks_like_s1_vvvh and temporal is not None and hasattr(provider, "fetch_s1_vvvh_raw_chw"):
+        x = provider.fetch_s1_vvvh_raw_chw(
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=int(sensor.scale_m),
+            orbit=getattr(sensor, "orbit", None),
+            use_float_linear=bool(getattr(sensor, "use_float_linear", True)),
+            composite=str(sensor.composite),
+            fill_value=float(sensor.fill_value),
+            require_iw=bool(getattr(sensor, "s1_require_iw", True)),
+            relax_iw_on_empty=bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
+        )
+        x = normalize_input_chw(
+            x,
+            expected_channels=len(sensor.bands),
+            name=f"gee_input[{sensor.collection}]",
+        )
+        return np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32, copy=False)
+
     region = provider.get_region(spatial)
     img = provider.build_image(sensor=sensor, temporal=temporal, region=region)
     if bool(to_float_image):

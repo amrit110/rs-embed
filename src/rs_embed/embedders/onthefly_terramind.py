@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -131,6 +132,12 @@ _V01_STD = np.array(
     dtype=np.float32,
 )
 
+_TERRAMIND_REGISTRATION_MODULES = (
+    "terratorch",
+    "terratorch.models.backbones.terramind",
+    "terratorch.models.backbones.terramind.model.terramind_register",
+)
+
 def _resize_chw(x_chw: np.ndarray, *, size: int = 224) -> np.ndarray:
     ensure_torch()
     import torch
@@ -185,17 +192,10 @@ def _terramind_zscore_s2(raw_chw: np.ndarray, *, model_key: str, mode: str) -> n
     x = (x - mean[:, None, None]) / std[:, None, None]
     return np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
-@lru_cache(maxsize=8)
-def _load_terramind_cached(
-    model_key: str,
-    pretrained: bool,
-    modality: str,
-    dev: str,
-) -> tuple[Any, dict[str, Any]]:
-    ensure_torch()
-    import torch
 
+def _import_terramind_backbone_registry() -> Any:
     try:
+        importlib.import_module("terratorch")
         from terratorch.registry import BACKBONE_REGISTRY
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
@@ -211,6 +211,80 @@ def _load_terramind_cached(
         raise ModelError(
             f"Failed to import terratorch registry while loading TerraMind: {type(e).__name__}: {e}"
         ) from e
+    return BACKBONE_REGISTRY
+
+
+def _registered_terramind_backbone_keys(backbone_registry: Any) -> tuple[str, ...]:
+    keys: list[str] = []
+    try:
+        terratorch_registry = backbone_registry["terratorch"]
+        keys.extend(str(name) for name in terratorch_registry if str(name).startswith("terramind_"))
+    except Exception:
+        pass
+
+    if not keys:
+        try:
+            for name in backbone_registry:
+                name_s = str(name)
+                if name_s.startswith("terratorch_"):
+                    name_s = name_s[len("terratorch_") :]
+                if name_s.startswith("terramind_"):
+                    keys.append(name_s)
+        except Exception:
+            pass
+
+    return tuple(sorted(set(keys)))
+
+
+def _ensure_terramind_backbone_registered(backbone_registry: Any, *, model_key: str) -> None:
+    model_key_s = str(model_key)
+    if model_key_s in backbone_registry:
+        return
+
+    for module_name in _TERRAMIND_REGISTRATION_MODULES:
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError as e:
+            if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
+                raise ModelError(
+                    "TerraMind requires terratorch. Install: pip install terratorch"
+                ) from e
+            raise ModelError(
+                f"Failed to import TerraMind registration module '{module_name}': "
+                f"{type(e).__name__}: {e}"
+            ) from e
+        except Exception as e:
+            raise ModelError(
+                f"Failed to import TerraMind registration module '{module_name}': "
+                f"{type(e).__name__}: {e}"
+            ) from e
+        if model_key_s in backbone_registry:
+            return
+
+    terramind_keys = _registered_terramind_backbone_keys(backbone_registry)
+    if terramind_keys:
+        raise ModelError(
+            f"TerraMind backbone '{model_key_s}' is not registered in terratorch. "
+            f"Available TerraMind backbones: {', '.join(terramind_keys)}."
+        )
+    raise ModelError(
+        f"TerraMind backbone '{model_key_s}' is not registered in terratorch after explicit "
+        "TerraMind registration imports. Restart the Python kernel and verify terratorch "
+        "imports cleanly."
+    )
+
+@lru_cache(maxsize=8)
+def _load_terramind_cached(
+    model_key: str,
+    pretrained: bool,
+    modality: str,
+    dev: str,
+) -> tuple[Any, dict[str, Any]]:
+    ensure_torch()
+    import torch
+
+    BACKBONE_REGISTRY = _import_terramind_backbone_registry()
+    _ensure_terramind_backbone_registered(BACKBONE_REGISTRY, model_key=str(model_key))
 
     try:
         model = BACKBONE_REGISTRY.build(
@@ -219,9 +293,15 @@ def _load_terramind_cached(
             modalities=[str(modality)],
         )
     except Exception as e:
+        terramind_keys = _registered_terramind_backbone_keys(BACKBONE_REGISTRY)
+        hint = (
+            f" Available TerraMind backbones: {', '.join(terramind_keys)}."
+            if terramind_keys
+            else ""
+        )
         raise ModelError(
-            f"Failed to build TerraMind backbone '{model_key}'. "
-            "Check terratorch install and model_key (e.g. terramind_v1_small)."
+            f"Failed to build TerraMind backbone '{model_key}' for modality '{modality}': "
+            f"{type(e).__name__}: {e}.{hint}"
         ) from e
 
     try:

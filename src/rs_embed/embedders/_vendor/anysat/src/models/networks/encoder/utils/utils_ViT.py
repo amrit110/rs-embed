@@ -1,12 +1,12 @@
-from models.networks.encoder.utils.irpe import build_rpe, get_rpe_config
-from models.networks.encoder.utils.pos_embed import get_2d_sincos_pos_embed_with_scale
+from .irpe import build_rpe, get_rpe_config
+from .pos_embed import get_2d_sincos_pos_embed_with_scale
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.jit import Final
 
-from models.networks.encoder.utils.utils import Mlp, DropPath
+from .utils import Mlp, DropPath
 
 class Attention(nn.Module):
     fused_attn: Final[bool]

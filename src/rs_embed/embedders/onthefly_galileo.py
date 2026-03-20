@@ -469,7 +469,7 @@ class GalileoEmbedder(EmbedderBase):
     DEFAULT_IMAGE_SIZE = 64
     DEFAULT_FRAMES = 8
     DEFAULT_FETCH_WORKERS = 8
-    _allow_auto_backend = False
+    _allow_auto_backend = True
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -531,8 +531,8 @@ class GalileoEmbedder(EmbedderBase):
         device: str = "auto",
         input_chw: np.ndarray | None = None,
     ) -> Embedding:
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("galileo expects a provider backend.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("galileo expects a provider backend (or 'auto').")
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
@@ -697,8 +697,8 @@ class GalileoEmbedder(EmbedderBase):
         if not spatials:
             return []
 
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("galileo expects a provider backend.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("galileo expects a provider backend (or 'auto').")
 
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()

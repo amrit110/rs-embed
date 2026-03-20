@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import numpy as np
@@ -7,6 +8,19 @@ import numpy as np
 from ..core.embedding import Embedding
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers.base import ProviderBase
+
+
+def _method_accepts_parameter(obj: Any, method_name: str, param_name: str) -> bool:
+    fn = getattr(type(obj), method_name, None)
+    if fn is None:
+        return False
+    try:
+        sig = inspect.signature(fn)
+    except Exception:
+        return False
+    if param_name in sig.parameters:
+        return True
+    return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
 
 
 class EmbedderBase:
@@ -54,6 +68,7 @@ class EmbedderBase:
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        model_config: dict[str, Any] | None = None,
     ) -> Embedding:
         """Compute a single embedding.
 
@@ -65,6 +80,8 @@ class EmbedderBase:
             Optional temporal filter.
         sensor : SensorSpec or None
             Optional sensor override for provider-backed models.
+        model_config : dict[str, Any] or None
+            Optional model-specific settings such as architecture variant.
         output : OutputSpec
             Requested output layout.
         backend : str
@@ -93,6 +110,7 @@ class EmbedderBase:
         spatials: list[SpatialSpec],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -109,6 +127,8 @@ class EmbedderBase:
             Optional temporal filter applied to all inputs.
         sensor : SensorSpec or None
             Optional sensor override.
+        model_config : dict[str, Any] or None
+            Optional model-specific settings.
         output : OutputSpec
             Requested output layout.
         backend : str
@@ -121,17 +141,24 @@ class EmbedderBase:
         list[Embedding]
             Embeddings in the same order as ``spatials``.
         """
-        return [
-            self.get_embedding(
-                spatial=s,
-                temporal=temporal,
-                sensor=sensor,
-                output=output,
-                backend=backend,
-                device=device,
-            )
-            for s in spatials
-        ]
+        out: list[Embedding] = []
+        for s in spatials:
+            kwargs: dict[str, Any] = {
+                "spatial": s,
+                "temporal": temporal,
+                "sensor": sensor,
+                "output": output,
+                "backend": backend,
+                "device": device,
+            }
+            if model_config is not None and _method_accepts_parameter(
+                self,
+                "get_embedding",
+                "model_config",
+            ):
+                kwargs["model_config"] = model_config
+            out.append(self.get_embedding(**kwargs))
+        return out
 
     def get_embeddings_batch_from_inputs(
         self,
@@ -140,6 +167,7 @@ class EmbedderBase:
         input_chws: list[np.ndarray],
         temporal: TemporalSpec | None = None,
         sensor: SensorSpec | None = None,
+        model_config: dict[str, Any] | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         backend: str = "auto",
         device: str = "auto",
@@ -160,6 +188,8 @@ class EmbedderBase:
             Optional temporal filter.
         sensor : SensorSpec or None
             Optional sensor override.
+        model_config : dict[str, Any] or None
+            Optional model-specific settings.
         output : OutputSpec
             Requested output layout.
         backend : str
@@ -181,15 +211,22 @@ class EmbedderBase:
             raise ValueError(
                 f"spatials/input_chws length mismatch: {len(spatials)} != {len(input_chws)}"
             )
-        return [
-            self.get_embedding(
-                spatial=s,
-                temporal=temporal,
-                sensor=sensor,
-                output=output,
-                backend=backend,
-                device=device,
-                input_chw=x,
-            )
-            for s, x in zip(spatials, input_chws, strict=False)
-        ]
+        out: list[Embedding] = []
+        for s, x in zip(spatials, input_chws, strict=False):
+            kwargs: dict[str, Any] = {
+                "spatial": s,
+                "temporal": temporal,
+                "sensor": sensor,
+                "output": output,
+                "backend": backend,
+                "device": device,
+                "input_chw": x,
+            }
+            if model_config is not None and _method_accepts_parameter(
+                self,
+                "get_embedding",
+                "model_config",
+            ):
+                kwargs["model_config"] = model_config
+            out.append(self.get_embedding(**kwargs))
+        return out

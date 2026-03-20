@@ -20,7 +20,7 @@ This page lists the main user-facing constraints in the current `0.1.x` implemen
 
 ## Dependencies
 
-- Different providers and models require different optional packages such as `earthengine-api`, `torch`, `rshf`, and `torchgeo`.
+- Different providers and models require different optional packages such as `earthengine-api`, `torch`, `rshf`, and `tifffile`.
 - Missing optional dependencies fail only when you use the corresponding backend or model path.
 
 ## Known Edge Case

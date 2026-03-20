@@ -2,7 +2,7 @@
 import math
 import torch
 import torch.nn as nn
-from models.networks.encoder.utils.utils import trunc_normal_
+from .utils import trunc_normal_
 try:
     from rpe_ops.rpe_index import RPEIndexFunction
 except ImportError:

@@ -159,7 +159,7 @@ def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
         spatial=spatial,
         temporal=temporal,
         output=OutputSpec.pooled(pooling="mean"),
-        backend="gee",
+        backend="auto",
         device=device,
     )
     _show_embedding("single/pooled", pooled)
@@ -173,7 +173,7 @@ def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
         spatials=spatials,
         temporal=temporal,
         output=OutputSpec.pooled(pooling="mean"),
-        backend="gee",
+        backend="auto",
         device=device,
     )
     _show_batch("batch/pooled", batch)
@@ -206,7 +206,7 @@ def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
             models=["remoteclip"],
             target=ExportTarget.per_item(str(gee_out), names=["p1", "p2"]),
             output=OutputSpec.pooled(),
-            backend="gee",
+            backend="auto",
             device=device,
             config=ExportConfig(
                 save_inputs=True,

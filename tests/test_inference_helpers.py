@@ -51,6 +51,52 @@ class _BatchEmbedder:
         return out
 
 
+class _VariantBatchEmbedder:
+    def __init__(self):
+        self.seen_prefetched = []
+        self.seen_batch = []
+
+    def get_embeddings_batch_from_inputs(
+        self,
+        *,
+        spatials,
+        input_chws,
+        temporal,
+        sensor,
+        model_config,
+        output,
+        backend,
+        device,
+    ):
+        self.seen_prefetched.append(model_config)
+        return [
+            Embedding(
+                data=np.array([float(np.mean(inp))], dtype=np.float32),
+                meta={"variant": model_config["variant"]},
+            )
+            for inp in input_chws
+        ]
+
+    def get_embeddings_batch(
+        self,
+        *,
+        spatials,
+        temporal,
+        sensor,
+        model_config,
+        output,
+        backend,
+        device,
+    ):
+        self.seen_batch.append(model_config)
+        return [
+            Embedding(
+                data=np.array([1.0], dtype=np.float32),
+                meta={"variant": model_config["variant"]},
+            )
+            for _ in spatials
+        ]
+
 def _engine() -> InferenceEngine:
     return InferenceEngine(device="cpu", output=OutputSpec.pooled(), config=ExportConfig())
 
@@ -176,6 +222,56 @@ def test_run_batch_no_input_returns_false_on_length_mismatch():
 
     assert succeeded is False
     assert out == {}
+
+
+def test_run_batch_prefetched_passes_model_config():
+    engine = _engine()
+    embedder = _VariantBatchEmbedder()
+
+    out, succeeded = engine._run_batch_prefetched(
+        idxs=[0, 1],
+        spatials=_spatials(2),
+        temporal=None,
+        sensor=SensorSpec(collection="C", bands=("B1",)),
+        embedder=embedder,
+        lock=threading.Lock(),
+        backend="gee",
+        get_input_fn=lambda i: np.full((3, 2, 2), float(i), dtype=np.float32),
+        batch_size=2,
+        continue_on_error=False,
+        on_done=lambda _i: None,
+        use_lock=False,
+        model_name="dummy",
+        model_config={"variant": "large"},
+    )
+
+    assert succeeded is True
+    assert embedder.seen_prefetched == [{"variant": "large"}]
+    assert out[0].meta["variant"] == "large"
+
+
+def test_run_batch_no_input_passes_model_config():
+    engine = _engine()
+    embedder = _VariantBatchEmbedder()
+
+    out, succeeded = engine._run_batch_no_input(
+        idxs=[0, 1],
+        spatials=_spatials(2),
+        temporal=None,
+        sensor=None,
+        embedder=embedder,
+        lock=threading.Lock(),
+        backend="gee",
+        batch_size=8,
+        on_done=lambda _i: None,
+        use_lock=False,
+        model_name="dummy",
+        model_config={"variant": "large"},
+    )
+
+    assert succeeded is True
+    assert embedder.seen_batch == [{"variant": "large"}]
+    assert out[0].meta["variant"] == "large"
 
 
 def test_run_single_fallback_skips_done_and_records_errors():

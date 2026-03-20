@@ -17,6 +17,7 @@ from ..core.specs import (
     SpatialSpec,
     TemporalSpec,
 )
+from ._vendor.copernicus_embed import CopernicusEmbedGeoTiff
 from .base import EmbedderBase
 from .meta_utils import build_meta
 
@@ -65,7 +66,7 @@ def _pool_chw(chw: np.ndarray, pooling: str) -> np.ndarray:
 @register("copernicus")
 class CopernicusEmbedder(EmbedderBase):
     """
-    Precomputed embeddings via TorchGeo CopernicusEmbed dataset.
+    Precomputed embeddings via a vendored Copernicus GeoTIFF reader.
 
     Output:
       - OutputSpec.pooled(): (D,)
@@ -88,11 +89,10 @@ class CopernicusEmbedder(EmbedderBase):
                 "data_dir_env": "RS_EMBED_COP_DIR",
                 "data_dir_default": "data/copernicus_embed",
                 "download": True,
-                "expand_deg": 1.0,  # NOTE: helps hit a tile for small ROIs
             },
             "notes": [
-                "Uses torchgeo.datasets.CopernicusEmbed bbox slicing ds[minlon:maxlon, minlat:maxlat].",
-                "If ROI is small, expand_deg expands around bbox center to increase overlap.",
+                "Uses a vendored GeoTIFF reader with bbox slicing ds[minlon:maxlon, minlat:maxlat].",
+                "ROIs smaller than a single Copernicus pixel raise an error.",
             ],
         }
 
@@ -101,13 +101,11 @@ class CopernicusEmbedder(EmbedderBase):
         self._ds_cache: dict[str, Any] = {}
 
     def _get_dataset(self, *, data_dir: str, download: bool):
-        # TorchGeo dataset does indexing/metadata checks; cache per data_dir.
+        # Cache per data_dir to avoid reopening the large GeoTIFF repeatedly.
         key = f"{data_dir}|download={int(bool(download))}"
         if key not in self._ds_cache:
-            from torchgeo.datasets import CopernicusEmbed
-
             os.makedirs(data_dir, exist_ok=True)
-            self._ds_cache[key] = CopernicusEmbed(paths=data_dir, download=download)
+            self._ds_cache[key] = CopernicusEmbedGeoTiff(paths=data_dir, download=download)
         return self._ds_cache[key]
 
     @staticmethod
@@ -149,13 +147,6 @@ class CopernicusEmbedder(EmbedderBase):
         if backend_n != "auto":
             raise ModelError("copernicus_embed is precomputed; use backend='auto'.")
 
-        try:
-            import torchgeo  # noqa: F401
-        except ImportError as e:
-            raise ModelError(
-                "CopernicusEmbed requires torchgeo. Install: pip install torchgeo"
-            ) from e
-
         bbox = _spatial_to_bbox_4326(spatial)
 
         # data_dir: env var override OR (optional) sensor.collection override
@@ -166,48 +157,37 @@ class CopernicusEmbedder(EmbedderBase):
                 data_dir = sensor.collection.replace("dir:", "", 1).strip()
 
         download = True  # v0.1 default
-        expand_deg = 1.0  # v0.1 default
 
         ds = self._get_dataset(data_dir=data_dir, download=download)
-
-        # Expand bbox to hit a tile (centered)
         minlon, minlat, maxlon, maxlat = (
             bbox.minlon,
             bbox.minlat,
             bbox.maxlon,
             bbox.maxlat,
         )
-        if expand_deg and expand_deg > 0:
-            clon = (minlon + maxlon) / 2
-            clat = (minlat + maxlat) / 2
-            half = expand_deg / 2
-            minlon, minlat, maxlon, maxlat = (
-                clon - half,
-                clat - half,
-                clon + half,
-                clat + half,
-            )
 
-        # TorchGeo bbox slicing
+        # Vendored GeoTIFF bbox slicing
         sample = ds[minlon:maxlon, minlat:maxlat]
-        img = sample["image"]  # torch Tensor [C,H,W]
-
-        chw = img.detach().cpu().numpy().astype(np.float32)
+        img = sample["image"]
+        if hasattr(img, "detach"):
+            chw = img.detach().cpu().numpy().astype(np.float32)
+        else:
+            chw = np.asarray(img, dtype=np.float32)
 
         meta = build_meta(
             model=self.model_name,
             kind="precomputed",
-            backend="torchgeo",
-            source="torchgeo.CopernicusEmbed",
+            backend="vendored_geotiff",
+            source="hf://torchgeo/copernicus_embed/embed_map_310k.tif",
             sensor=None,
             temporal=None,
             image_size=None,
             extra={
                 "data_dir": data_dir,
                 "download": download,
-                "expand_deg": expand_deg,
                 "bbox_4326": (minlon, minlat, maxlon, maxlat),
                 "chw_shape": tuple(chw.shape),
+                "dataset_path": getattr(ds, "path", None),
             },
         )
 

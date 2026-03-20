@@ -44,6 +44,7 @@ def build_one_point_payload(
     device: str,
     output: OutputSpec,
     resolved_sensor: dict[str, SensorSpec | None],
+    resolved_model_config: dict[str, dict[str, Any] | None],
     model_type: dict[str, str],
     inputs_cache: dict[tuple[int, str], np.ndarray],
     input_reports: dict[tuple[int, str], dict[str, Any]],
@@ -105,6 +106,7 @@ def build_one_point_payload(
         try:
             sensor_k = sensor_key(sspec)
             m_backend = _resolved_backend.get(m, backend)
+            model_config = resolved_model_config.get(m)
             embedder, lock = get_embedder_bundle_cached(
                 normalize_model_name(m), m_backend, device, sensor_k
             )
@@ -206,6 +208,7 @@ def build_one_point_payload(
                             backend=m_backend,
                             device=device,
                             input_chw=(input_chw if pass_input_into_embedder else None),
+                            model_config=model_config,
                         )
 
                 emb = run_with_retry(
