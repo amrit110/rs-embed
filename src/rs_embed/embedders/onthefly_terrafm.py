@@ -534,6 +534,14 @@ class TerraFMBEmbedder(EmbedderBase):
         modality = getattr(sensor, "modality", "s2") if sensor else "s2"
         modality = str(modality).lower()
 
+        # Extract sensor-level fetch params (used in metadata below)
+        scale_m = int(getattr(sensor, "scale_m", 10)) if sensor else 10
+        cloudy_pct = int(getattr(sensor, "cloudy_pct", 30)) if sensor else 30
+        composite = str(getattr(sensor, "composite", "median")) if sensor else "median"
+        use_float_linear = bool(getattr(sensor, "use_float_linear", True)) if sensor else True
+        s1_require_iw = bool(getattr(sensor, "s1_require_iw", True)) if sensor else True
+        s1_relax_iw_on_empty = bool(getattr(sensor, "s1_relax_iw_on_empty", True)) if sensor else True
+
         image_size = 224
         cache_dir = (
             os.environ.get("HUGGINGFACE_HUB_CACHE")
