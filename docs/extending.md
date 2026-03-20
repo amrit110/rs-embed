@@ -103,6 +103,8 @@ class EmbedderBase:
     may be used for runtime validation and capability checks.
     If your model exposes public `model_config` keys, document them in `describe()["model_config"]`
     with a JSON-serializable schema.
+    For model detail docs, surface those public keys near the top as well, for example in the
+    `Quick Facts` table as `Model config keys | model_config["variant"]`.
 
 ---
 

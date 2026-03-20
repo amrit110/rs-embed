@@ -13,6 +13,7 @@
 | Primary input | Multiband SR CHW + wavelengths (µm) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `base`; choices: `base`, `large`) |
 | Extra side inputs | **required** wavelength vector (`wavelengths_um`) |
 | Training alignment (adapter path) | Medium-High (when wavelengths and band semantics are correct) |
 

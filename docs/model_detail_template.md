@@ -33,6 +33,7 @@ Goal: make every model page answer the same questions quickly, so users can comp
 | Primary input | `TODO` |
 | Temporal mode | `year` / `range` / model-specific |
 | Output modes | `pooled`, `grid` |
+| Model config keys | none / `variant` / `TODO` |
 | Extra side inputs | none / `TODO` |
 | Training alignment (adapter path) | Low / Medium / High + short note |
 

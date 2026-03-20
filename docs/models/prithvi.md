@@ -14,6 +14,7 @@
 | Primary input | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) |
 | Temporal mode | `range` preferred; adapter normalizes `year`/`None` to a range |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `prithvi_eo_v2_100_tl`) |
 | Extra side inputs | **required** temporal coords + location coords (derived by adapter) |
 | Training alignment (adapter path) | Medium (depends on preprocessing mode and resize/pad choices) |
 

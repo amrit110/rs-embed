@@ -4,7 +4,7 @@
 
 ---
 
-## Why This Exists
+## Motivation
 
 ![rs-embed background](assets/background.png)
 

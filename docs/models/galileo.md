@@ -9,7 +9,7 @@
 | Model ID | `galileo` |
 | Family / Backbone | Galileo `Encoder` from vendored local runtime |
 | Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee` via public API) |
+| Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
 | Temporal mode | `range` in practice (adapter normalizes via shared helper) |
 | Output modes | `pooled`, `grid` |
@@ -130,7 +130,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-01-01", "2023-01-01"),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
 )
 ```
 

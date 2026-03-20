@@ -97,7 +97,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(pooling="mean"),
-    backend="gee",
+    backend="auto",
     device="auto",
     input_prep="resize",  # default
 )

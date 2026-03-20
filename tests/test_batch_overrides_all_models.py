@@ -50,7 +50,7 @@ def test_remoteclip_batch_prefetch_passes_input_chw(monkeypatch):
         spatials=_spatials(3),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 3
@@ -401,7 +401,7 @@ def test_fomo_batch_prefetch_passes_raw_input(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 2
@@ -434,7 +434,7 @@ def test_thor_batch_prefetch_passes_raw_input(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
 
     assert len(out) == 2
@@ -658,7 +658,7 @@ def test_precomputed_batch_overrides_call_single_embedding(monkeypatch):
         spatials=_spatials(2),
         temporal=TemporalSpec.year(2020),
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
     )
     assert len(out_gse) == 2
 

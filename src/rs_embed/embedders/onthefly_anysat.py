@@ -405,7 +405,7 @@ def _anysat_patch_features(
 class AnySatEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_FRAMES = 8
-    _allow_auto_backend = False
+    _allow_auto_backend = True
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -476,8 +476,8 @@ class AnySatEmbedder(EmbedderBase):
         input_chw: np.ndarray | None = None,
         model_config: dict[str, Any] | None = None,
     ) -> Embedding:
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("anysat expects a provider backend.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("anysat expects a provider backend (or 'auto').")
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
@@ -619,8 +619,8 @@ class AnySatEmbedder(EmbedderBase):
         if not spatials:
             return []
 
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("anysat expects a provider backend.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("anysat expects a provider backend (or 'auto').")
 
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()

@@ -13,6 +13,7 @@
 | Primary input | S2 RGB (`B4,B3,B2`) | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) |
 | Temporal mode | range window + single composite | range window + single composite |
 | Output modes | `pooled`, `grid` | `pooled`, `grid` |
+| Model config keys | none | `model_config["variant"]` (default: `large`; choices: `large`) |
 | Core extraction | `forward_encoder(mask_ratio=0.0)` | `forward_encoder(mask_ratio=0.0)` |
 
 ---

@@ -14,6 +14,7 @@
 | Primary input | S2 SR 10-band `CHW` |
 | Temporal mode | `range` in practice (composite window) |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |
 | Extra side inputs | none required in current adapter |
 | Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved |
 

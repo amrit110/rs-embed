@@ -29,7 +29,7 @@ class GSEAnnualEmbedder(EmbedderBase):
     """
 
     DEFAULT_BATCH_WORKERS = 4
-    _allow_auto_backend = False
+    _allow_auto_backend = True
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -62,8 +62,8 @@ class GSEAnnualEmbedder(EmbedderBase):
         device: str = "auto",
         input_chw: np.ndarray | None = None,
     ) -> Embedding:
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("gse_annual only supports a provider backend in v0.1.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("gse_annual expects a provider backend (or 'auto').")
         if temporal is None:
             raise ModelError("gse_annual requires TemporalSpec.year(year=...).")
         temporal.validate()
@@ -130,8 +130,8 @@ class GSEAnnualEmbedder(EmbedderBase):
     ) -> list[Embedding]:
         if not spatials:
             return []
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("gse_annual only supports a provider backend in v0.1.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("gse_annual expects a provider backend (or 'auto').")
 
         n = len(spatials)
         out: list[Embedding | None] = [None] * n

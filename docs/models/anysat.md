@@ -9,10 +9,11 @@
 | Model ID | `anysat` |
 | Family / Backbone | AnySat (vendored local runtime) |
 | Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee` via public API) |
+| Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
 | Temporal mode | `range` in practice (adapter normalizes `year`/`None` to range) |
 | Output modes | `pooled`, `grid` |
+| Model config keys | `model_config["variant"]` (default: `base`; choices: `base`) |
 | Extra side inputs | **required** `s2_dates` (per-frame DOY values) |
 | Training alignment (adapter path) | Medium (depends on frame count, normalization mode, and image size) |
 
@@ -126,7 +127,7 @@ emb = get_embedding(
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-01-01", "2023-01-01"),
     output=OutputSpec.pooled(),
-    backend="gee",
+    backend="auto",
 )
 ```
 

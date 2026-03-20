@@ -91,7 +91,7 @@ def test_gse_get_embedding_ignores_input_chw(monkeypatch):
         temporal=TemporalSpec.year(2020),
         sensor=None,
         output=OutputSpec.pooled(),
-        backend="gee",
+        backend="auto",
         input_chw=np.ones((3, 8, 8), dtype=np.float32),
     )
 

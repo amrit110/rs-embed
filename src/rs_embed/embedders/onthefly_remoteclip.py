@@ -506,7 +506,7 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 64
-    _allow_auto_backend = False
+    _allow_auto_backend = True
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -590,8 +590,8 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
         device: str = "auto",
         input_chw: np.ndarray | None = None,
     ) -> Embedding:
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("remoteclip_s2rgb only supports a provider backend in v0.1.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("remoteclip_s2rgb expects a provider backend (or 'auto').")
         if temporal is None:
             raise ModelError("remoteclip_s2rgb requires TemporalSpec.range(start,end).")
         temporal.validate()
@@ -781,8 +781,8 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
     ) -> list[Embedding]:
         if not spatials:
             return []
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("remoteclip_s2rgb only supports a provider backend in v0.1.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("remoteclip_s2rgb expects a provider backend (or 'auto').")
         if temporal is None:
             raise ModelError("remoteclip_s2rgb requires TemporalSpec.range(start,end).")
         temporal.validate()
@@ -849,8 +849,8 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
         backend: str = "auto",
         device: str = "auto",
     ) -> list[Embedding]:
-        if not is_provider_backend(backend, allow_auto=False):
-            raise ModelError("remoteclip_s2rgb only supports a provider backend in v0.1.")
+        if not is_provider_backend(backend, allow_auto=True):
+            raise ModelError("remoteclip_s2rgb expects a provider backend (or 'auto').")
         if temporal is None:
             raise ModelError("remoteclip_s2rgb requires TemporalSpec.range(start,end).")
         temporal.validate()
