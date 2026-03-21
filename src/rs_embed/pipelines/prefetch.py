@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from ..core.specs import SensorSpec, SpatialSpec, TemporalSpec
-from ..core.types import ExportConfig
+from ..core.types import ExportConfig, FetchResult
 from ..providers import gee_utils as _gee_utils
 from ..providers.prefetch_plan import (
     build_gee_prefetch_plan,
@@ -55,6 +55,7 @@ class PrefetchManager:
         config: ExportConfig,
         fetch_fn: Callable[..., np.ndarray] | None = None,
         inspect_fn: Callable[..., dict[str, Any]] | None = None,
+        fetcher_by_key: dict[str, Any] | None = None,
     ) -> None:
         self.provider = provider
         self.models = models
@@ -63,11 +64,13 @@ class PrefetchManager:
         self.config = config
         self.fetch_fn = fetch_fn or _gee_utils.fetch_gee_patch_raw
         self.inspect_fn = inspect_fn or _gee_utils.inspect_input_raw
+        self.fetcher_by_key: dict[str, Any] = fetcher_by_key or {}
 
         # Caches populated by fetch_chunk / restored from checkpoint
         self.cache: dict[tuple[int, str], np.ndarray] = {}
         self.errors: dict[tuple[int, str], str] = {}
         self.input_reports: dict[tuple[int, str], dict[str, Any]] = {}
+        self.fetch_meta: dict[tuple[int, str], dict[str, Any]] = {}
 
         # Populated by plan()
         self.sensor_by_key: dict[str, SensorSpec] = {}
@@ -133,7 +136,19 @@ class PrefetchManager:
         cfg = self.config
         provider = self.provider
 
-        def _fetch_one(i: int, skey: str, sspec: SensorSpec) -> tuple[int, str, np.ndarray]:
+        def _fetch_one(
+            i: int, skey: str, sspec: SensorSpec,
+        ) -> tuple[int, str, np.ndarray, dict[str, Any]]:
+            fetcher = self.fetcher_by_key.get(skey)
+            if fetcher is not None:
+                fr: FetchResult = run_with_retry(
+                    lambda: fetcher.fetch_input(
+                        provider, spatial=spatials[i], temporal=temporal, sensor=sspec,
+                    ),
+                    retries=cfg.max_retries,
+                    backoff_s=cfg.retry_backoff_s,
+                )
+                return i, skey, fr.data, fr.meta
             x = run_with_retry(
                 lambda: self.fetch_fn(
                     provider, spatial=spatials[i], temporal=temporal, sensor=sspec
@@ -141,7 +156,7 @@ class PrefetchManager:
                 retries=cfg.max_retries,
                 backoff_s=cfg.retry_backoff_s,
             )
-            return i, skey, x
+            return i, skey, x, {}
 
         mw = max(1, cfg.num_workers)
         with ThreadPoolExecutor(max_workers=mw) as ex:
@@ -149,7 +164,7 @@ class PrefetchManager:
             for fut in as_completed(fut_map):
                 i, skey = fut_map[fut]
                 try:
-                    i, skey, x = fut.result()
+                    i, skey, x, fmeta = fut.result()
                 except Exception as e:
                     if not cfg.continue_on_error:
                         raise
@@ -186,6 +201,8 @@ class PrefetchManager:
                             continue
                         self.input_reports[(i, member_skey)] = rep
                     self.cache[(i, member_skey)] = x_member
+                    if fmeta:
+                        self.fetch_meta[(i, member_skey)] = fmeta
 
                 if progress is not None:
                     progress.update(1)
@@ -220,11 +237,24 @@ class PrefetchManager:
         if self.provider is None:
             raise RuntimeError(f"Missing provider for input fetch: index={idx}, sensor={skey}")
         cfg = self.config
-        x = run_with_retry(
-            lambda: self.fetch_fn(self.provider, spatial=spatial, temporal=temporal, sensor=sspec),
-            retries=cfg.max_retries,
-            backoff_s=cfg.retry_backoff_s,
-        )
+        fetcher = self.fetcher_by_key.get(skey)
+        if fetcher is not None:
+            fr: FetchResult = run_with_retry(
+                lambda: fetcher.fetch_input(
+                    self.provider, spatial=spatial, temporal=temporal, sensor=sspec,
+                ),
+                retries=cfg.max_retries,
+                backoff_s=cfg.retry_backoff_s,
+            )
+            x = fr.data
+            if fr.meta:
+                self.fetch_meta[(idx, skey)] = fr.meta
+        else:
+            x = run_with_retry(
+                lambda: self.fetch_fn(self.provider, spatial=spatial, temporal=temporal, sensor=sspec),
+                retries=cfg.max_retries,
+                backoff_s=cfg.retry_backoff_s,
+            )
         rep = self.inspect_fn(x, sensor=sspec, name=f"gee_input_{skey}")
         if cfg.fail_on_bad_input and (not bool(rep.get("ok", True))):
             issues = (rep.get("report", {}) or {}).get("issues", [])
@@ -232,6 +262,10 @@ class PrefetchManager:
         self.cache[(idx, skey)] = x
         self.input_reports[(idx, skey)] = rep
         return x
+
+    def get_fetch_meta(self, idx: int, sensor_key: str) -> dict[str, Any]:
+        """Return fetch metadata for a cached input, or empty dict."""
+        return self.fetch_meta.get((idx, sensor_key), {})
 
     def has_error(self, idx: int, sensor_key: str) -> str | None:
         return self.errors.get((idx, sensor_key))
@@ -241,3 +275,4 @@ class PrefetchManager:
         self.cache.clear()
         self.errors.clear()
         self.input_reports.clear()
+        self.fetch_meta.clear()

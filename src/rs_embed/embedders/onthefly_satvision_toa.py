@@ -13,6 +13,7 @@ from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.types import FetchResult
 from ..providers import ProviderBase
 from ._vit_mae_utils import (
     base_meta,
@@ -912,6 +913,42 @@ class SatVisionTOAEmbedder(EmbedderBase):
             "emissive_maxs": emissive_maxs,
         }
 
+    def fetch_input(
+        self,
+        provider: ProviderBase,
+        *,
+        spatial: SpatialSpec,
+        temporal: TemporalSpec | None,
+        sensor: SensorSpec,
+    ) -> FetchResult | None:
+        """Fetch raw MODIS TOA input with fallback to surrogate collections.
+
+        When MOD021KM is unavailable, automatically falls back to a
+        14-channel surrogate built from MOD09GA (reflectance) + MOD21A1D
+        (thermal).  Fallback provenance is recorded in metadata.
+
+        Parameters
+        ----------
+        provider : ProviderBase
+            Ready provider instance.
+        spatial : SpatialSpec
+            Spatial request definition.
+        temporal : TemporalSpec or None
+            Temporal filter (required for SatVision-TOA).
+        sensor : SensorSpec
+            Sensor/source definition.
+
+        Returns
+        -------
+        FetchResult
+            Raw CHW array and fetch-time metadata including fallback info.
+        """
+        t = temporal_to_range(temporal)
+        raw, meta = _coerce_fetch_result(
+            _fetch_toa_raw_chw_from_gee(provider, spatial, t, sensor)
+        )
+        return FetchResult(data=raw, meta=meta)
+
     def get_embedding(
         self,
         *,
@@ -922,6 +959,7 @@ class SatVisionTOAEmbedder(EmbedderBase):
         backend: str,
         device: str = "auto",
         input_chw: np.ndarray | None = None,
+        fetch_meta: dict[str, Any] | None = None,
     ) -> Embedding:
         if not is_provider_backend(backend, allow_auto=True):
             raise ModelError("satvision_toa expects a provider backend (or 'auto').")
@@ -932,21 +970,23 @@ class SatVisionTOAEmbedder(EmbedderBase):
         rt = self._resolve_runtime(sensor=sensor, device=device)
 
         if input_chw is None:
-            raw, fetch_meta = _coerce_fetch_result(
-                _fetch_toa_raw_chw_from_gee(
-                    self._get_provider(backend),
-                    spatial,
-                    t,
-                    sensor,
-                )
+            result = self.fetch_input(
+                self._get_provider(backend),
+                spatial=spatial,
+                temporal=temporal,
+                sensor=sensor,
             )
+            assert result is not None
+            raw = result.data
+            fetch_meta = result.meta
         else:
             raw = np.asarray(input_chw, dtype=np.float32)
-            fetch_meta = {
-                "source_collection": None,
-                "fallback_used": False,
-                "already_unit_scaled": False,
-            }
+            if fetch_meta is None:
+                fetch_meta = {
+                    "source_collection": None,
+                    "fallback_used": False,
+                    "already_unit_scaled": False,
+                }
 
         norm_mode_eff = str(rt["norm_mode"])
         if bool(fetch_meta.get("already_unit_scaled")):

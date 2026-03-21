@@ -11,7 +11,7 @@ from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import PointBuffer, TemporalSpec, OutputSpec, SensorSpec
-from rs_embed.core.types import ExportConfig, ExportModelRequest, ExportTarget
+from rs_embed.core.types import ExportConfig, ExportModelRequest, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 
 
@@ -970,7 +970,7 @@ def test_run_embedding_request_prefetched_path_normalizes_once(monkeypatch):
     monkeypatch.setattr(
         rt,
         "fetch_api_side_inputs",
-        lambda *, spatials, temporal, **_: [fake_input],
+        lambda *, spatials, temporal, **_: [FetchResult(data=fake_input, meta={})],
     )
 
     emb = api.get_embedding(

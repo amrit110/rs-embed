@@ -86,6 +86,7 @@ class InferenceEngine:
         backend: str,
         input_chw: np.ndarray | None = None,
         model_config: dict[str, Any] | None = None,
+        fetch_meta: dict[str, Any] | None = None,
     ) -> Embedding:
         """Run a single embedding with retry + optional tiling."""
         cfg = self.config
@@ -101,6 +102,7 @@ class InferenceEngine:
                 input_chw=input_chw,
                 input_prep=cfg.input_prep,
                 model_config=model_config,
+                fetch_meta=fetch_meta,
             ),
             retries=cfg.max_retries,
             backoff_s=cfg.retry_backoff_s,

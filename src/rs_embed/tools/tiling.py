@@ -609,6 +609,7 @@ def _call_embedder_get_embedding_with_input_prep(
     input_chw: np.ndarray | None,
     input_prep: InputPrepSpec | str | None,
     model_config: dict[str, Any] | None = None,
+    fetch_meta: dict[str, Any] | None = None,
 ) -> Embedding:
     """Dispatch to resize (pass-through) or tiled embedding based on input_prep.
 
@@ -630,6 +631,7 @@ def _call_embedder_get_embedding_with_input_prep(
             backend=backend,
             device=device,
             input_chw=input_chw,
+            fetch_meta=fetch_meta,
         )
     if not _embedder_accepts_input_chw(type(embedder)):
         if spec.mode == "tile":
@@ -647,6 +649,7 @@ def _call_embedder_get_embedding_with_input_prep(
             backend=backend,
             device=device,
             input_chw=input_chw,
+            fetch_meta=fetch_meta,
         )
     return _call_embedder_get_embedding_tiled(
         embedder=embedder,

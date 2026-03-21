@@ -374,6 +374,43 @@ class BatchExporter:
         )
         return provider
 
+    def _resolve_fetcher_by_key(
+        self, prefetch: PrefetchManager,
+    ) -> dict[str, Any]:
+        """Build a mapping from fetch_key to embedder for models with custom fetch.
+
+        Must be called after ``prefetch.plan()`` so that the sensor-to-fetch
+        mapping is available.
+        """
+        from ..tools.normalization import normalize_model_name
+        from ..tools.runtime import (
+            _overrides_base_method,
+            get_embedder_bundle_cached,
+            sensor_key,
+        )
+        from ..tools.serialization import sensor_cache_key
+
+        fetcher_by_key: dict[str, Any] = {}
+        for mc in self.models:
+            if mc.sensor is None or "precomputed" in mc.model_type.lower():
+                continue
+            member_skey = sensor_cache_key(mc.sensor)
+            mapping = prefetch.sensor_to_fetch.get(member_skey)
+            if mapping is None:
+                continue
+            fetch_key = mapping[0]
+            if fetch_key in fetcher_by_key:
+                continue
+            embedder, _lock = get_embedder_bundle_cached(
+                normalize_model_name(mc.name),
+                self.resolved_backend.get(mc.name, self.backend),
+                self.device,
+                sensor_key(mc.sensor),
+            )
+            if _overrides_base_method(embedder, "fetch_input"):
+                fetcher_by_key[fetch_key] = embedder
+        return fetcher_by_key
+
     def _setup_prefetch(self) -> tuple[PrefetchManager, bool]:
         """Create and plan a PrefetchManager plus provider-enabled flag."""
         provider = self._init_provider()
@@ -388,6 +425,7 @@ class BatchExporter:
         )
         band_resolver = getattr(provider, "normalize_bands", None) if provider is not None else None
         prefetch.plan(resolve_bands_fn=band_resolver)
+        prefetch.fetcher_by_key = self._resolve_fetcher_by_key(prefetch)
         return prefetch, prefetch.enabled
 
     def _build_pending_queue(self, *, progress: Any) -> tuple[list[int], list[dict[str, Any]]]:
@@ -455,6 +493,7 @@ class BatchExporter:
             config=self.config,
             fetch_fn=self.fetch_fn,
             inspect_fn=self.inspect_fn,
+            fetcher_by_key=src.fetcher_by_key,
         )
         clone.sensor_by_key = src.sensor_by_key
         clone.fetch_sensor_by_key = src.fetch_sensor_by_key
@@ -465,6 +504,7 @@ class BatchExporter:
         clone.cache = src.cache
         clone.errors = src.errors
         clone.input_reports = src.input_reports
+        clone.fetch_meta = src.fetch_meta
         return clone
 
     def _write_per_item_chunk(
@@ -518,6 +558,7 @@ class BatchExporter:
                         model_progress_cb=(None if use_batch else model_progress_cb),
                         fetch_fn=self.fetch_fn,
                         inspect_fn=self.inspect_fn,
+                        fetch_meta_cache=prefetch.fetch_meta,
                     )
                     if use_batch:
                         self._inject_precomputed_embeddings(
