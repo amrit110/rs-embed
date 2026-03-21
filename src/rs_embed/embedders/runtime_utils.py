@@ -316,7 +316,7 @@ def fetch_collection_patch_all_bands_chw(
                 arr_a, names_a = _rec(a_sp, depth + 1)
                 arr_b, names_b = _rec(b_sp, depth + 1)
                 if tuple(names_a) != tuple(names_b):
-                    raise ModelError("Band names mismatch while stitching all-band bbox tiles.")
+                    raise ModelError("Band names mismatch while stitching all-band bbox tiles.") from None
                 stitched = _stitch_spatial_last2_arrays(
                     a=arr_a,
                     b=arr_b,

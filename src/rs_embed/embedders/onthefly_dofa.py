@@ -737,7 +737,6 @@ class DOFAEmbedder(EmbedderBase):
         # Model + forward
         # -----------------
         model, mmeta = _load_dofa_model(variant=variant, device=device)
-        dev = mmeta.get("device", device)
         tokens, pooled, tmeta = _dofa_forward_tokens_and_pooled(
             model, x_bchw, wavelengths_um=wavelengths_um, device=device
         )

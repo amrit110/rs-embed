@@ -189,11 +189,10 @@ def run_with_retry(
     """Run a callable with bounded retries and optional exponential backoff."""
     tries = max(0, int(retries))
     backoff = max(0.0, float(backoff_s))
-    last_err: Exception | None = None
     for attempt in range(tries + 1):
         try:
             return fn()
-        except Exception as e:  # pragma: no cover - exercised by call-sites
+        except Exception:  # pragma: no cover - exercised by call-sites
             if attempt >= tries:
                 raise
             if backoff > 0:

@@ -1165,7 +1165,7 @@ class SatVisionTOAEmbedder(EmbedderBase):
 
             x_batch: list[np.ndarray] = []
             norm_modes_eff: list[str] = []
-            for x, m in zip(raws, metas):
+            for x, m in zip(raws, metas, strict=True):
                 assert x is not None
                 assert m is not None
                 norm_mode_eff = str(rt["norm_mode"])
