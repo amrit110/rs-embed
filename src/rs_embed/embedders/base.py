@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 
 from ..core.embedding import Embedding
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import FetchResult
 from ..providers.base import ProviderBase
 
@@ -32,6 +32,7 @@ class EmbedderBase:
     """
 
     model_name: str = "base"
+    input_spec: ModelInputSpec | None = None
     _allow_auto_backend: bool = True
 
     def __init__(self) -> None:
@@ -59,6 +60,20 @@ class EmbedderBase:
         """
         raise NotImplementedError
 
+    @property
+    def has_custom_fetch(self) -> bool:
+        """Whether this embedder provides its own fetch logic.
+
+        Returns ``True`` when the embedder has an ``input_spec`` (spec-driven
+        auto-fetch) or overrides ``fetch_input()`` (behavioral override).
+        Used by the export pipeline to decide whether to delegate fetching
+        to the embedder rather than using the generic provider path.
+        """
+        return (
+            self.input_spec is not None
+            or type(self).fetch_input is not EmbedderBase.fetch_input
+        )
+
     def fetch_input(
         self,
         provider: ProviderBase,
@@ -67,15 +82,16 @@ class EmbedderBase:
         temporal: TemporalSpec | None,
         sensor: SensorSpec,
     ) -> FetchResult | None:
-        """Fetch model input with model-specific logic.
+        """Fetch model input with model-specific or spec-driven logic.
 
-        The default implementation returns ``None``, signaling callers to
-        use the generic provider fetch path.  Subclasses override this to
-        own their input semantics (fallback chains, sensor-specific
-        filters, fetch-time metadata).
+        When ``input_spec`` is set and the method is not overridden, the
+        default implementation performs a generic provider fetch using the
+        spec's collection, bands, scale, and normalization.  This ensures
+        both ``get_embedding()`` and ``export_batch()`` use identical fetch
+        semantics.
 
-        Both ``get_embedding()`` and ``export_batch()`` call this method,
-        ensuring identical fetch behavior across single and batch paths.
+        Subclasses may override this for custom behavior (fallback chains,
+        multi-sensor routing, fetch-time metadata).
 
         Parameters
         ----------
@@ -91,10 +107,51 @@ class EmbedderBase:
         Returns
         -------
         FetchResult or None
-            Model-specific fetch result, or ``None`` to fall back to
-            generic fetch.
+            Fetched input data and metadata, or ``None`` to fall back to
+            the generic provider fetch path.
         """
-        return None
+        spec = self.input_spec
+        if spec is None:
+            return None
+
+        from .runtime_utils import (
+            fetch_collection_patch_chw,
+            fetch_s2_multiframe_raw_tchw,
+        )
+
+        if spec.temporal_mode == "multi":
+            if temporal is None:
+                from ..core.errors import ModelError
+
+                raise ModelError(
+                    f"{self.model_name} requires a TemporalSpec for multi-frame fetch."
+                )
+            raw = fetch_s2_multiframe_raw_tchw(
+                provider,
+                spatial=spatial,
+                temporal=temporal,
+                bands=spec.bands,
+                n_frames=spec.n_frames or 8,
+                collection=spec.collection,
+                scale_m=spec.scale_m,
+                cloudy_pct=spec.cloudy_pct,
+                composite=spec.composite,
+                fill_value=spec.fill_value,
+            )
+        else:
+            raw = fetch_collection_patch_chw(
+                provider,
+                spatial=spatial,
+                temporal=temporal,
+                collection=spec.collection,
+                bands=spec.bands,
+                scale_m=spec.scale_m,
+                cloudy_pct=spec.cloudy_pct,
+                composite=spec.composite,
+                fill_value=spec.fill_value,
+            )
+
+        return FetchResult(data=raw, meta={})
 
     def get_embedding(
         self,

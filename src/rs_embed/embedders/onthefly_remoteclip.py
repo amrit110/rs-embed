@@ -13,7 +13,7 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
 
 # -----------------------------
@@ -508,22 +508,32 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
     DEFAULT_BATCH_CUDA = 64
     _allow_auto_backend = True
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=("B4", "B3", "B2"),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        image_size=224,
+        expected_channels=3,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": ["B4", "B3", "B2"],
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
             "defaults": {
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "ckpt": "MVRL/remote-clip-vit-base-patch32",
-                "image_size": 224,
+                "image_size": self.input_spec.image_size,
             },
             "notes": "grid output is ViT token grid (patch-level), typically 7x7 for ViT-B/32 at 224px.",
         }

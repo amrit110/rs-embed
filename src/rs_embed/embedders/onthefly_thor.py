@@ -12,7 +12,7 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
@@ -563,13 +563,23 @@ class THORBaseEmbedder(EmbedderBase):
     DEFAULT_IMAGE_SIZE = 288
     DEFAULT_FETCH_WORKERS = 8
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_10_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="none"),  # THOR uses custom z-score normalization
+        image_size=288,
+        expected_channels=10,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": _S2_SR_10_BANDS,
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "output": ["pooled", "grid"],
             "defaults": {
@@ -577,9 +587,9 @@ class THORBaseEmbedder(EmbedderBase):
                 "variant": _thor_variant_from_model_key(self.DEFAULT_MODEL_KEY),
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "normalization": "thor_stats",
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "group_merge": "mean",
             },
             "model_config": {
@@ -607,14 +617,7 @@ class THORBaseEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_SR_10_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return THORBaseEmbedder.input_spec.to_sensor_spec()
 
     def get_embedding(
         self,

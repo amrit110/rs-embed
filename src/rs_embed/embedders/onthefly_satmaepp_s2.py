@@ -11,7 +11,7 @@ import numpy as np
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers.base import ProviderBase
 from ._vit_mae_utils import base_meta, ensure_torch, temporal_to_range
 from .base import EmbedderBase
@@ -520,6 +520,16 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
       - forward_encoder(mask_ratio=0.0) for embedding extraction
     """
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_10_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="none"),
+        image_size=96,
+        expected_channels=10,
+    )
+
     DEFAULT_CKPT_REPO = "mubashir04/checkpoint_ViT-L_pretrain_fmow_sentinel"
     DEFAULT_CKPT_FILE = "checkpoint_ViT-L_pretrain_fmow_sentinel.pth"
     DEFAULT_MODEL_FN = "mae_vit_large_patch16"
@@ -537,8 +547,8 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
             "model_id_default": self.DEFAULT_CKPT_REPO,
             "image_size": self.DEFAULT_IMAGE_SIZE,
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": list(_S2_SR_10_BANDS),
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
@@ -568,14 +578,7 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_SR_10_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return SatMAEPPSentinel10Embedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

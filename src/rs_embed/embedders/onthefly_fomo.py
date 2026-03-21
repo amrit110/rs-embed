@@ -14,7 +14,7 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
 from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
@@ -466,13 +466,23 @@ class FoMoEmbedder(EmbedderBase):
     DEFAULT_NUM_CLASSES = 1000
     DEFAULT_FETCH_WORKERS = 8
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_12_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="none"),  # FoMo uses unit_scale internally
+        image_size=64,
+        expected_channels=12,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": _S2_SR_12_BANDS,
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
@@ -484,9 +494,9 @@ class FoMoEmbedder(EmbedderBase):
                 "heads": self.DEFAULT_HEADS,
                 "mlp_dim": self.DEFAULT_MLP_DIM,
                 "num_classes": self.DEFAULT_NUM_CLASSES,
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "normalization": "unit_scale",
                 "auto_download_ckpt": True,
             },
@@ -499,14 +509,7 @@ class FoMoEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_SR_12_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return FoMoEmbedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

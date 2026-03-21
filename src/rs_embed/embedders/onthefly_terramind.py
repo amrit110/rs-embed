@@ -12,7 +12,7 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
@@ -503,6 +503,16 @@ def _prepare_terramind_input_chw(
 
 @register("terramind")
 class TerraMindEmbedder(EmbedderBase):
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_12_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="none"),
+        image_size=224,
+        expected_channels=12,
+    )
+
     DEFAULT_MODEL_KEY = "terramind_v1_small"
     DEFAULT_MODALITY = "S2L2A"
     DEFAULT_IMAGE_SIZE = 224
@@ -514,8 +524,8 @@ class TerraMindEmbedder(EmbedderBase):
             "backend": ["provider", "tensor"],
             "inputs": {
                 "s2_sr": {
-                    "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                    "bands": _S2_SR_12_BANDS,
+                    "collection": self.input_spec.collection,
+                    "bands": list(self.input_spec.bands),
                 }
             },
             "modalities": {
@@ -554,14 +564,7 @@ class TerraMindEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_SR_12_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return TerraMindEmbedder.input_spec.to_sensor_spec()
 
     def get_embedding(
         self,

@@ -12,7 +12,7 @@ import numpy as np
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import FetchResult
 from ..providers import ProviderBase
 from ._vit_mae_utils import (
@@ -750,6 +750,19 @@ class SatVisionTOAEmbedder(EmbedderBase):
     - Provide `sensor.bands` in the exact order expected by your checkpoint.
     """
 
+    # Default MODIS input spec. SatVision-TOA's _default_sensor() allows env-var
+    # overrides for collection/bands/scale; this spec documents the baseline.
+    input_spec = ModelInputSpec(
+        collection=_DEFAULT_MODIS_COLLECTION,
+        bands=_DEFAULT_MODIS_BANDS,
+        scale_m=1000,
+        cloudy_pct=100,
+        composite="mosaic",
+        normalization=NormalizationSpec(mode="none"),
+        image_size=_DEFAULT_IMAGE_SIZE,
+        expected_channels=_DEFAULT_IN_CHANS,
+    )
+
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_BATCH_CPU = 2
     DEFAULT_BATCH_CUDA = 8
@@ -759,8 +772,8 @@ class SatVisionTOAEmbedder(EmbedderBase):
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": _DEFAULT_MODIS_COLLECTION,
-                "bands": list(_DEFAULT_MODIS_BANDS),
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "output": ["pooled", "grid"],
             "defaults": {

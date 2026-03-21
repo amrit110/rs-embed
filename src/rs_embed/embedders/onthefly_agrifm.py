@@ -17,7 +17,7 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
@@ -555,20 +555,32 @@ class AgriFMEmbedder(EmbedderBase):
     DEFAULT_FRAMES = 8
     DEFAULT_NORM = "agrifm_stats"
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_10_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        temporal_mode="multi",
+        n_frames=8,
+        normalization=NormalizationSpec(mode="s2_sr_raw"),  # AgriFM normalizes internally
+        image_size=224,
+        expected_channels=10,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": _S2_10_BANDS,
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
                 "shape": "[T,10,H,W]",
             },
             "output": ["pooled", "grid"],
             "defaults": {
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "n_frames": self.DEFAULT_FRAMES,
                 "norm_mode": self.DEFAULT_NORM,
@@ -580,14 +592,7 @@ class AgriFMEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_10_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return AgriFMEmbedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

@@ -10,7 +10,7 @@ import numpy as np
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import ModelInputSpec, NormalizationSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ._vit_mae_utils import (
     base_meta,
     ensure_torch,
@@ -129,6 +129,16 @@ class SatMAERGBEmbedder(EmbedderBase):
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 32
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=("B4", "B3", "B2"),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        image_size=224,
+        expected_channels=3,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "onthefly",
@@ -136,29 +146,19 @@ class SatMAERGBEmbedder(EmbedderBase):
             "model_id_default": self.DEFAULT_MODEL_ID,
             "image_size": self.DEFAULT_IMAGE_SIZE,
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": ["B4", "B3", "B2"],
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
             "defaults": {
                 "model_id": self.DEFAULT_MODEL_ID,
                 "image_size": self.DEFAULT_IMAGE_SIZE,
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
             },
         }
-
-    @staticmethod
-    def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=("B4", "B3", "B2"),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-        )
 
     def _resolve_fetch_workers(self, n_items: int) -> int:
         v = int(os.environ.get("RS_EMBED_SATMAE_FETCH_WORKERS", str(self.DEFAULT_FETCH_WORKERS)))
@@ -186,7 +186,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             raise ModelError("satmae_rgb expects a provider backend (or 'auto').")
 
         if sensor is None:
-            sensor = self._default_sensor()
+            sensor = self.input_spec.to_sensor_spec()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
         image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
@@ -282,7 +282,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             return []
 
         if sensor is None:
-            sensor = self._default_sensor()
+            sensor = self.input_spec.to_sensor_spec()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
         image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
@@ -416,7 +416,7 @@ class SatMAERGBEmbedder(EmbedderBase):
             return []
 
         if sensor is None:
-            sensor = self._default_sensor()
+            sensor = self.input_spec.to_sensor_spec()
 
         model_id = os.environ.get("RS_EMBED_SATMAE_ID", self.DEFAULT_MODEL_ID)
         image_size = int(os.environ.get("RS_EMBED_SATMAE_IMG", str(self.DEFAULT_IMAGE_SIZE)))
