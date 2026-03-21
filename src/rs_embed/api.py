@@ -116,6 +116,46 @@ def list_models(*, include_aliases: bool = False) -> list[str]:
         model_ids.update(MODEL_ALIASES.keys())
     return sorted(model_ids)
 
+
+def describe_model(model: str) -> dict[str, Any]:
+    """Return metadata for a model without loading its weights.
+
+    Instantiates the embedder class (a lightweight operation — no checkpoint
+    download, no torch import) and calls its :meth:`~EmbedderBase.describe`
+    method, which returns a plain dict of static configuration.
+
+    Parameters
+    ----------
+    model : str
+        Canonical model id or any registered alias (e.g. ``"prithvi"``,
+        ``"satmae"``, ``"galileo"``).  Call :func:`list_models` to see all
+        available ids.
+
+    Returns
+    -------
+    dict[str, Any]
+        Model metadata including input bands, supported output modes,
+        default parameters, and architecture notes.  The exact keys vary
+        per model but always include ``"type"`` and ``"output"``.
+
+    Raises
+    ------
+    ModelError
+        If *model* is not a known id or alias.
+
+    Examples
+    --------
+    >>> from rs_embed import describe_model
+    >>> info = describe_model("galileo")
+    >>> info["output"]
+    ['pooled', 'grid']
+    """
+    from .core.registry import get_embedder_cls
+
+    model_n = _normalize_model_name(model)
+    cls = get_embedder_cls(model_n)
+    return cls().describe()
+
 def get_embedding(
     model: str,
     *,
