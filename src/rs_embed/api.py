@@ -30,6 +30,7 @@ from typing import Any
 
 from .core.embedding import Embedding
 from .core.errors import ModelError
+from .core.registry import get_embedder_cls as _get_embedder_cls
 from .core.specs import (
     InputPrepSpec,
     OutputSpec,
@@ -150,10 +151,8 @@ def describe_model(model: str) -> dict[str, Any]:
     >>> info["output"]
     ['pooled', 'grid']
     """
-    from .core.registry import get_embedder_cls
-
     model_n = _normalize_model_name(model)
-    cls = get_embedder_cls(model_n)
+    cls = _get_embedder_cls(model_n)
     return cls().describe()
 
 def get_embedding(
