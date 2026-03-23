@@ -66,6 +66,7 @@ full = [
 dev = [
   "pytest>=7.4",
   "pytest-cov>=4.1",
+  "pytest-xdist>=3.0",
   "ruff>=0.5.0",
 ]
 
