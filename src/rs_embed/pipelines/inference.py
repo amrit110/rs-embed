@@ -550,10 +550,11 @@ class InferenceEngine:
                     "backend": model_backend,
                     "device": self.device,
                     "input_chw": inp,
+                    "input_prep": self.config.input_prep,
                 }
                 if model_config is not None:
                     kwargs["model_config"] = model_config
-                return call_embedder_get_embedding(
+                return _call_embedder_get_embedding_with_input_prep(
                     **kwargs,
                 )
 
@@ -570,7 +571,7 @@ class InferenceEngine:
             sensor=sensor,
             skey=ctx.skey,
             prefer_batch=(allow_batch and prefer_batch),
-            allow_nonresize=True,
+            allow_nonresize=not self._explicit_nonresize,
         )
 
         batch_attempted = False

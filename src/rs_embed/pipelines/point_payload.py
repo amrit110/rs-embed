@@ -31,6 +31,7 @@ from ..tools.serialization import (
     sha1,
     utc_ts,
 )
+from ..tools.tiling import _call_embedder_get_embedding_with_input_prep
 
 
 def build_one_point_payload(
@@ -224,6 +225,7 @@ def build_one_point_payload(
                 m_entry["fetch_meta"] = jsonable(_fmeta)
 
             if save_embeddings:
+                input_prep = getattr(config, "input_prep", "resize")
 
                 def _infer_once(
                     _m_backend=m_backend,
@@ -235,7 +237,7 @@ def build_one_point_payload(
                     _sspec=sspec,
                 ):
                     with _lock:
-                        return call_embedder_get_embedding(
+                        return _call_embedder_get_embedding_with_input_prep(
                             embedder=_embedder,
                             spatial=spatial,
                             temporal=temporal,
@@ -244,6 +246,7 @@ def build_one_point_payload(
                             backend=_m_backend,
                             device=device,
                             input_chw=(_input_chw if pass_input_into_embedder else None),
+                            input_prep=input_prep,
                             model_config=_model_config,
                             fetch_meta=_fmeta_cap,
                         )

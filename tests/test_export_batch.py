@@ -4,8 +4,8 @@ import pytest
 
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
-from rs_embed.core.specs import PointBuffer, TemporalSpec, SensorSpec, OutputSpec
-from rs_embed.core.types import FetchResult
+from rs_embed.core.specs import InputPrepSpec, PointBuffer, TemporalSpec, SensorSpec, OutputSpec
+from rs_embed.core.types import ExportConfig, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.runtime import get_embedder_bundle_cached
 
@@ -1488,6 +1488,217 @@ def test_export_batch_combined_prefers_model_batch_api(tmp_path):
     assert mani["status"] == "ok"
     assert DummyBatch.batch_calls == 1
     assert DummyBatch.single_calls == 0
+
+
+def test_export_batch_per_item_cpu_honors_config_input_prep_tile(tmp_path, monkeypatch):
+    class DummyTilePerItem:
+        batch_sizes = []
+        single_calls = 0
+
+        def describe(self):
+            return {
+                "type": "onthefly",
+                "inputs": {"collection": "C", "bands": ["B1", "B2", "B3"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            DummyTilePerItem.single_calls += 1
+            assert input_chw is not None
+            return Embedding(
+                data=np.array([float(input_chw.shape[-1])], dtype=np.float32),
+                meta={"seen_hw": list(input_chw.shape[-2:])},
+            )
+
+        def get_embeddings_batch_from_inputs(
+            self,
+            *,
+            spatials,
+            input_chws,
+            temporal=None,
+            sensor=None,
+            output=OutputSpec.pooled(),
+            backend="auto",
+            device="auto",
+        ):
+            DummyTilePerItem.batch_sizes.append(len(input_chws))
+            return [
+                Embedding(
+                    data=np.array([float(x.shape[-1])], dtype=np.float32),
+                    meta={"seen_hw": list(x.shape[-2:])},
+                )
+                for x in input_chws
+            ]
+
+    registry.register("dummy_tile_per_item")(DummyTilePerItem)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.fetch_gee_patch_raw",
+        lambda provider, *, spatial, temporal, sensor: np.ones((3, 5, 5), dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    out_dir = tmp_path / "per_item_tile"
+    res = api.export_batch(
+        spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=10)],
+        temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
+        models=["dummy_tile_per_item"],
+        out_dir=str(out_dir),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
+        config=ExportConfig(
+            save_inputs=True,
+            save_embeddings=True,
+            show_progress=False,
+            async_write=False,
+            input_prep=InputPrepSpec.tile(tile_size=4, max_tiles=9),
+        ),
+    )
+
+    assert len(res) == 1
+    assert DummyTilePerItem.batch_sizes == [4]
+    assert DummyTilePerItem.single_calls == 0
+    meta = res[0]["models"][0]["meta"]
+    assert meta["input_prep"]["resolved_mode"] == "tile"
+    assert meta["input_prep"]["tile_count"] == 4
+
+
+def test_export_batch_combined_honors_config_input_prep_tile(tmp_path, monkeypatch):
+    class DummyTileCombined:
+        batch_sizes = []
+        single_calls = 0
+
+        def describe(self):
+            return {
+                "type": "onthefly",
+                "inputs": {"collection": "C", "bands": ["B1", "B2", "B3"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            DummyTileCombined.single_calls += 1
+            assert input_chw is not None
+            return Embedding(
+                data=np.array([float(input_chw.shape[-1])], dtype=np.float32),
+                meta={"seen_hw": list(input_chw.shape[-2:])},
+            )
+
+        def get_embeddings_batch_from_inputs(
+            self,
+            *,
+            spatials,
+            input_chws,
+            temporal=None,
+            sensor=None,
+            output=OutputSpec.pooled(),
+            backend="auto",
+            device="auto",
+        ):
+            DummyTileCombined.batch_sizes.append(len(input_chws))
+            return [
+                Embedding(
+                    data=np.array([float(x.shape[-1])], dtype=np.float32),
+                    meta={"seen_hw": list(x.shape[-2:])},
+                )
+                for x in input_chws
+            ]
+
+    registry.register("dummy_tile_combined")(DummyTileCombined)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.fetch_gee_patch_raw",
+        lambda provider, *, spatial, temporal, sensor: np.ones((3, 5, 5), dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    out_path = tmp_path / "combined_tile.npz"
+    manifest = api.export_batch(
+        spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=10)],
+        temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
+        models=["dummy_tile_combined"],
+        out_path=str(out_path),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
+        config=ExportConfig(
+            save_inputs=True,
+            save_embeddings=True,
+            show_progress=False,
+            input_prep=InputPrepSpec.tile(tile_size=4, max_tiles=9),
+        ),
+    )
+
+    assert out_path.exists()
+    assert DummyTileCombined.batch_sizes == [4]
+    assert DummyTileCombined.single_calls == 0
+    meta = manifest["models"][0]["metas"][0]
+    assert meta["input_prep"]["resolved_mode"] == "tile"
+    assert meta["input_prep"]["tile_count"] == 4
 
 
 def test_export_batch_dedup_inputs_across_models_in_file(tmp_path, monkeypatch):
