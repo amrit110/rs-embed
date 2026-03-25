@@ -10,7 +10,9 @@ from ..tools.serialization import sensor_cache_key as _sensor_cache_key
 
 _LEGACY_RESOLVE_BANDS_WARNED = False
 
-def sensor_fetch_group_key(sensor: SensorSpec) -> tuple[str, int, int, float, str]:
+def sensor_fetch_group_key(
+    sensor: SensorSpec,
+) -> tuple[str, int, int, float, str, str | None, str | None, bool, bool, bool]:
     """Fetch identity excluding bands; used to build reusable band supersets."""
     cloudy = -1 if getattr(sensor, "cloudy_pct", None) is None else int(sensor.cloudy_pct)
     return (
@@ -19,6 +21,11 @@ def sensor_fetch_group_key(sensor: SensorSpec) -> tuple[str, int, int, float, st
         cloudy,
         float(sensor.fill_value),
         str(sensor.composite),
+        getattr(sensor, "modality", None),
+        getattr(sensor, "orbit", None),
+        bool(getattr(sensor, "use_float_linear", True)),
+        bool(getattr(sensor, "s1_require_iw", True)),
+        bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
     )
 
 def select_prefetched_channels(x_chw: np.ndarray, idx: tuple[int, ...]) -> np.ndarray:
@@ -50,7 +57,8 @@ def build_prefetch_plan(
         sensor_models.setdefault(skey, []).append(m)
 
     groups: dict[
-        tuple[str, int, int, float, str], list[tuple[str, SensorSpec, tuple[str, ...]]]
+        tuple[str, int, int, float, str, str | None, str | None, bool, bool, bool],
+        list[tuple[str, SensorSpec, tuple[str, ...]]],
     ] = {}
     for skey, sspec in sensor_by_key.items():
         gkey = sensor_fetch_group_key(sspec)
@@ -106,6 +114,11 @@ def build_prefetch_plan(
             ),
             fill_value=float(base.fill_value),
             composite=str(base.composite),
+            modality=getattr(base, "modality", None),
+            orbit=getattr(base, "orbit", None),
+            use_float_linear=bool(getattr(base, "use_float_linear", True)),
+            s1_require_iw=bool(getattr(base, "s1_require_iw", True)),
+            s1_relax_iw_on_empty=bool(getattr(base, "s1_relax_iw_on_empty", True)),
             check_input=bool(getattr(base, "check_input", False)),
             check_raise=bool(getattr(base, "check_raise", True)),
             check_save_dir=getattr(base, "check_save_dir", None),

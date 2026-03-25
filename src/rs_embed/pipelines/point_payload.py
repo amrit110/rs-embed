@@ -96,6 +96,7 @@ def build_one_point_payload(
 
     local_inp: dict[str, np.ndarray] = {}
     local_input_meta: dict[str, dict[str, Any]] = {}
+    local_fetch_meta: dict[str, dict[str, Any]] = {}
 
     _resolved_backend = resolved_backend or {}
 
@@ -155,8 +156,8 @@ def build_one_point_payload(
                             retries=max_retries,
                             backoff_s=retry_backoff_s,
                         )
-                        input_chw = run_with_retry(
-                            lambda _p=prov, _ss=sspec: fetch(
+                        fetch_result = run_with_retry(
+                            lambda _p=prov, _ss=sspec, _embedder=embedder: _embedder.fetch_input(
                                 _p,
                                 spatial=spatial,
                                 temporal=temporal,
@@ -165,6 +166,21 @@ def build_one_point_payload(
                             retries=max_retries,
                             backoff_s=retry_backoff_s,
                         )
+                        if fetch_result is not None:
+                            input_chw = np.asarray(fetch_result.data, dtype=np.float32)
+                            if fetch_result.meta:
+                                local_fetch_meta[skey] = jsonable(fetch_result.meta)
+                        else:
+                            input_chw = run_with_retry(
+                                lambda _p=prov, _ss=sspec: fetch(
+                                    _p,
+                                    spatial=spatial,
+                                    temporal=temporal,
+                                    sensor=_ss,
+                                ),
+                                retries=max_retries,
+                                backoff_s=retry_backoff_s,
+                            )
                         local_inp[skey] = input_chw
 
                 report = input_reports.get((point_index, skey))
@@ -202,6 +218,8 @@ def build_one_point_payload(
                 _fmeta = fetch_meta_cache.get(
                     (point_index, sensor_cache_key(sspec))
                 ) or None
+            if _fmeta is None and sspec is not None:
+                _fmeta = local_fetch_meta.get(sensor_cache_key(sspec)) or None
             if _fmeta:
                 m_entry["fetch_meta"] = jsonable(_fmeta)
 
