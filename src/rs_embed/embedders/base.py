@@ -111,6 +111,10 @@ class EmbedderBase:
         if spec is None:
             return None
 
+        # API-side prefetch must honor the resolved SensorSpec so tile/auto
+        # input prep uses the same fetch overrides as the direct embedder path.
+        fetch_sensor = sensor or spec.to_sensor_spec()
+
         from .runtime_utils import (
             fetch_collection_patch_chw,
             fetch_s2_multiframe_raw_tchw,
@@ -127,25 +131,25 @@ class EmbedderBase:
                 provider,
                 spatial=spatial,
                 temporal=temporal,
-                bands=spec.bands,
+                bands=fetch_sensor.bands,
                 n_frames=spec.n_frames or 8,
-                collection=spec.collection,
-                scale_m=spec.scale_m,
-                cloudy_pct=spec.cloudy_pct,
-                composite=spec.composite,
-                fill_value=spec.fill_value,
+                collection=fetch_sensor.collection,
+                scale_m=fetch_sensor.scale_m,
+                cloudy_pct=fetch_sensor.cloudy_pct,
+                composite=fetch_sensor.composite,
+                fill_value=fetch_sensor.fill_value,
             )
         else:
             raw = fetch_collection_patch_chw(
                 provider,
                 spatial=spatial,
                 temporal=temporal,
-                collection=spec.collection,
-                bands=spec.bands,
-                scale_m=spec.scale_m,
-                cloudy_pct=spec.cloudy_pct,
-                composite=spec.composite,
-                fill_value=spec.fill_value,
+                collection=fetch_sensor.collection,
+                bands=fetch_sensor.bands,
+                scale_m=fetch_sensor.scale_m,
+                cloudy_pct=fetch_sensor.cloudy_pct,
+                composite=fetch_sensor.composite,
+                fill_value=fetch_sensor.fill_value,
             )
 
         return FetchResult(data=raw, meta={})
