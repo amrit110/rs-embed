@@ -59,3 +59,13 @@ def test_ensure_terramind_backbone_registered_lists_available_keys(monkeypatch):
 
     with pytest.raises(ModelError, match="Available TerraMind backbones: terramind_v1_base, terramind_v1_large"):
         tm._ensure_terramind_backbone_registered(registry, model_key="terramind_v1_small")
+
+
+def test_import_terramind_backbone_registry_missing_terratorch_points_to_optional(monkeypatch):
+    """Missing terratorch must suggest the optional-dep install command."""
+    err = ModuleNotFoundError("No module named 'terratorch'")
+    err.name = "terratorch"
+    monkeypatch.setattr(tm.importlib, "import_module", lambda _name: (_ for _ in ()).throw(err))
+
+    with pytest.raises(ModelError, match=r"pip install rs-embed\[terratorch\]"):
+        tm._import_terramind_backbone_registry()

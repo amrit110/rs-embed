@@ -46,13 +46,15 @@ dependencies = [
   "Pillow>=10",
   "pandas>=2.3",
   "xarray>=2024.06.0",
-  
-  # Keep direct dependency explicit because multiple embedders import terratorch directly.
-  "terratorch==1.2.1", 
-
 ]
 
 [project.optional-dependencies]
+# terratorch is required by TerraMind (and temporarily Prithvi until it is isolated).
+# Install with: pip install rs-embed[terratorch]
+#           or: uv add rs-embed[terratorch]
+terratorch = [
+  "terratorch==1.2.1",
+]
 plot = [
   "matplotlib>=3.10",
 ]
@@ -62,6 +64,7 @@ copernicus = [
 full = [
   "matplotlib>=3.10",
   "tifffile>=2024.0.0",
+  "terratorch==1.2.1",
 ]
 dev = [
   "pytest>=7.4",
