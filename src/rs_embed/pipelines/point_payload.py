@@ -18,7 +18,6 @@ from ..providers import gee_utils as _gee_utils
 from ..tools.manifest import summarize_status
 from ..tools.normalization import normalize_model_name
 from ..tools.runtime import (
-    call_embedder_get_embedding,
     get_embedder_bundle_cached,
     run_with_retry,
     sensor_key,
@@ -230,6 +229,7 @@ def build_one_point_payload(
                 def _infer_once(
                     _m_backend=m_backend,
                     _input_chw=input_chw,
+                    _input_prep=input_prep,
                     _model_config=model_config,
                     _fmeta_cap=_fmeta,
                     _lock=lock,
@@ -246,7 +246,7 @@ def build_one_point_payload(
                             backend=_m_backend,
                             device=device,
                             input_chw=(_input_chw if pass_input_into_embedder else None),
-                            input_prep=input_prep,
+                            input_prep=_input_prep,
                             model_config=_model_config,
                             fetch_meta=_fmeta_cap,
                         )

@@ -16,7 +16,6 @@ from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import ExportConfig, ModelConfig, TaskResult
 from ..tools.output import normalize_embedding_output
 from ..tools.runtime import (
-    call_embedder_get_embedding,
     embedder_accepts_model_config,
     get_embedder_bundle_cached,
     require_model_config_support,
