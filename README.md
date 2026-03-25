@@ -92,15 +92,15 @@ This is a convenience index with basic model info only (for quick scanning / lin
 
 ### Precomputed Embeddings
 
-| Model ID | Type | Resolution | Time Coverage | Publication |
-|---|---|---|---|---|
-|`tessera` | Precomputed | 10m | 2017-2025 |[CVPR 2026](https://arxiv.org/abs/2506.20380v4)|
-|`gse` (Alpha Earth) | Precomputed | 10 m | 2017-2024 |[arXiv 2025](https://arxiv.org/abs/2507.22291)|
-| `copernicus` | Precomputed | 0.25° | 2021 |[ICCV 2025](https://arxiv.org/abs/2503.11849)|
+| Model ID | Resolution | Time Coverage | Publication |
+|---|---|---|---|
+|`tessera` | 10m | 2017-2025 |[CVPR 2026](https://arxiv.org/abs/2506.20380v4)|
+|`gse` (Alpha Earth) |  10 m | 2017-2024 |[arXiv 2025](https://arxiv.org/abs/2507.22291)|
+| `copernicus` |  0.25° | 2021 |[ICCV 2025](https://arxiv.org/abs/2503.11849)|
 
 ### On-the-fly Foundation Models
 
-| Model ID |  Primary Input  | Resolution | Publication | Link |
+| Model ID |  Primary Input  | Resolution(Default) | Publication | Link |
 |---|---|---|---|---|
 | `satmae` |  S2 RGB | 10m | [NeurIPS 2022](https://arxiv.org/abs/2207.08051) |[link](https://github.com/sustainlab-group/SatMAE)|
 | `satmaepp` | S2 RGB | 10m | [CVPR 2024](https://arxiv.org/abs/2403.05419) | [link](https://github.com/techmn/satmae_pp) |
