@@ -36,13 +36,15 @@ emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 ## Install
 
 ```bash
-pip install rs-embed
+git clone https://github.com/cybergis/rs-embed.git
+cd rs-embed
+pip install -e .
 ```
 
 For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`, `prithvi`):
 
 ```bash
-pip install rs-embed[terratorch]
+pip install -e ".[terratorch]"
 ```
 
 If this is your first time using Google Earth Engine, authenticate once:

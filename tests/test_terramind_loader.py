@@ -67,5 +67,5 @@ def test_import_terramind_backbone_registry_missing_terratorch_points_to_optiona
     err.name = "terratorch"
     monkeypatch.setattr(tm.importlib, "import_module", lambda _name: (_ for _ in ()).throw(err))
 
-    with pytest.raises(ModelError, match=r"pip install rs-embed\[terratorch\]"):
+    with pytest.raises(ModelError, match=r'pip install -e "\.\[terratorch\]"'):
         tm._import_terramind_backbone_registry()

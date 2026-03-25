@@ -204,7 +204,7 @@ def _load_prithvi_cached(
         from terratorch.registry import BACKBONE_REGISTRY
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError("Prithvi requires terratorch. Install: pip install rs-embed[terratorch]") from e
+            raise ModelError('Prithvi requires terratorch. Install: pip install -e ".[terratorch]"') from e
         raise ModelError(
             "Failed to import terratorch registry while loading Prithvi. "
             f"Missing dependency: {getattr(e, 'name', None) or e}. "
