@@ -72,6 +72,33 @@ def apply_fetch_to_sensor(sensor: SensorSpec, fetch: FetchSpec | None) -> Sensor
         return sensor
     return replace(sensor, **updates)
 
+def _fetch_override_sensor_for_model(model_id: str) -> SensorSpec | None:
+    model_key = str(model_id).strip().lower()
+    if model_key == "gse":
+        return SensorSpec(
+            collection="GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
+            bands=tuple(),
+            scale_m=10,
+            cloudy_pct=100,
+            composite="mosaic",
+            fill_value=-9999.0,
+        )
+
+    desc = _probe_model_desc(model_id)
+    source = str(desc.get("source", "")).strip()
+    defaults = desc.get("defaults", {}) or {}
+
+    if source == "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL":
+        return SensorSpec(
+            collection=source,
+            bands=tuple(),
+            scale_m=int(defaults.get("scale_m", 10)),
+            cloudy_pct=int(defaults.get("cloudy_pct", 100)),
+            composite=str(defaults.get("composite", "mosaic")),
+            fill_value=float(defaults.get("fill_value", -9999.0)),
+        )
+    return None
+
 
 def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:
     desc = _probe_model_desc(model_id)
@@ -246,7 +273,9 @@ def resolve_sensor_for_model(
         return replace(sensor, modality=requested_modality)
 
     if fetch is not None:
-        resolved = default_sensor_for_model(model_id, modality=requested_modality)
+        resolved = _fetch_override_sensor_for_model(model_id)
+        if resolved is None:
+            resolved = default_sensor_for_model(model_id, modality=requested_modality)
         if resolved is None:
             raise ModelError(f"Model '{model_id}' does not support fetch=... overrides.")
         return apply_fetch_to_sensor(resolved, fetch)

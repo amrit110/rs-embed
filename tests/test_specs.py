@@ -156,9 +156,9 @@ def test_temporal_spec_year_out_of_range():
 
 
 def test_output_spec_grid():
-    grid = OutputSpec.grid(scale_m=20)
+    grid = OutputSpec.grid()
     assert grid.mode == "grid"
-    assert grid.scale_m == 20
+    assert grid.grid_orientation == "north_up"
 
 
 def test_output_spec_pooled_mean():
@@ -173,8 +173,18 @@ def test_output_spec_pooled_max():
 
 
 def test_output_spec_grid_default_scale():
-    grid = OutputSpec.grid()
-    assert grid.scale_m == 10
+    grid = OutputSpec.grid(grid_orientation="native")
+    assert grid.grid_orientation == "native"
+
+
+def test_output_spec_grid_rejects_scale_m():
+    with pytest.raises(SpecError, match="OutputSpec.scale_m is no longer supported"):
+        OutputSpec.grid(scale_m=20)
+
+
+def test_output_spec_pooled_rejects_scale_m():
+    with pytest.raises(SpecError, match="OutputSpec.scale_m is no longer supported"):
+        OutputSpec.pooled(scale_m=20)
 
 
 # ══════════════════════════════════════════════════════════════════════

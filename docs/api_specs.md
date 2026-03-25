@@ -122,6 +122,51 @@ SensorSpec(
     Public embedding/export APIs also accept a top-level `modality=...` convenience argument.
     When provided, rs-embed resolves it into the model's sensor/input contract and validates that the model explicitly supports that modality.
 
+### FetchSpec
+
+`FetchSpec` is the lightweight public override for **sampling / fetch policy**.
+Use it when you want to change common knobs such as resolution or compositing, but do **not** want to define a full `SensorSpec`.
+
+```python
+FetchSpec(
+    scale_m: int | None = None,
+    cloudy_pct: int | None = None,
+    fill_value: float | None = None,
+    composite: Literal["median", "mosaic"] | None = None,
+)
+```
+
+- `scale_m`: sampling resolution override
+- `cloudy_pct`: cloud filter override
+- `fill_value`: no-data fill override
+- `composite`: temporal compositing override
+
+Recommended rule:
+
+- use `fetch=FetchSpec(...)` for normal public API usage
+- use `sensor=SensorSpec(...)` only when you need advanced control over `collection`, `bands`, `modality`, or similar source-level details
+
+Important constraints:
+
+- `fetch` and `sensor` cannot be passed together in the same request
+- `fetch` is applied on top of the model's default sensor contract
+- some models use `scale_m` as more than fetch resolution
+  - for example, `scalemae` uses it as semantic scale conditioning
+  - `anysat` uses it as both fetch resolution and patch-size control
+
+Example:
+
+```python
+from rs_embed import FetchSpec, get_embedding
+
+emb = get_embedding(
+    "prithvi",
+    spatial=...,
+    temporal=...,
+    fetch=FetchSpec(scale_m=10, cloudy_pct=10),
+)
+```
+
 ---
 
 ### OutputSpec
@@ -131,7 +176,6 @@ SensorSpec(
 ```python
 OutputSpec(
     mode: Literal["grid", "pooled"],
-    scale_m: int = 10,
     pooling: Literal["mean", "max"] = "mean",
     grid_orientation: Literal["north_up", "native"] = "north_up",
 )
@@ -148,9 +192,12 @@ Recommended constructors:
 === ":material-grid: Grid (spatial)"
 
     ```python
-    OutputSpec.grid(scale_m=10)         # shape: (D, H, W), normalized to north-up when possible
-    OutputSpec.grid(scale_m=10, grid_orientation="native")  # keep model/provider native orientation
+    OutputSpec.grid()         # shape: (D, H, W), normalized to north-up when possible
+    OutputSpec.grid(grid_orientation="native")  # keep model/provider native orientation
     ```
+
+Sampling resolution is no longer configured on `OutputSpec`.
+Use `fetch=FetchSpec(scale_m=...)` for resolution overrides.
 
 
 #### `pooled`

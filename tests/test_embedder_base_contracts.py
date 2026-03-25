@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from rs_embed.core.errors import ModelError
-from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, TemporalSpec
+from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.embedders._vendor.copernicus_embed import _bbox_to_window, _infer_axis_order
 from rs_embed.embedders.precomputed_copernicus_embed import CopernicusEmbedder
 from rs_embed.embedders.precomputed_gse_annual import GSEAnnualEmbedder
@@ -96,6 +96,32 @@ def test_gse_get_embedding_ignores_input_chw(monkeypatch):
     )
 
     np.testing.assert_allclose(emb.data, np.array([4.0, 5.0], dtype=np.float32))
+
+
+def test_gse_get_embedding_uses_sensor_scale_m(monkeypatch):
+    import rs_embed.embedders.precomputed_gse_annual as gse_mod
+
+    embedder = GSEAnnualEmbedder()
+    embedder.model_name = "gse"
+    embedder._get_provider = lambda _backend: object()
+    seen = {}
+
+    def _fake_fetch(provider, **kw):
+        seen["scale_m"] = kw["scale_m"]
+        return np.ones((2, 2, 2), dtype=np.float32), ["b0", "b1"]
+
+    monkeypatch.setattr(gse_mod, "_fetch_collection_patch_all_bands_chw", _fake_fetch)
+
+    emb = embedder.get_embedding(
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=TemporalSpec.year(2020),
+        sensor=SensorSpec(collection="GSE", bands=tuple(), scale_m=60),
+        output=OutputSpec.pooled(),
+        backend="auto",
+    )
+
+    assert seen["scale_m"] == 60
+    np.testing.assert_allclose(emb.data, np.array([1.0, 1.0], dtype=np.float32))
 
 
 def test_tessera_get_embedding_ignores_input_chw(monkeypatch):

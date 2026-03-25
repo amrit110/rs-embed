@@ -51,7 +51,7 @@ earthengine authenticate
 
 ## Quick Example
 ```python
-from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
+from rs_embed import FetchSpec, PointBuffer, TemporalSpec, OutputSpec, get_embedding
 
 spatial = PointBuffer(lon=121.5, lat=31.2, buffer_m=2048)
 temporal = TemporalSpec.range(
@@ -63,10 +63,12 @@ emb = get_embedding(
     "prithvi",
     spatial=spatial,
     temporal=temporal,
-    output=OutputSpec.pooled()
+    output=OutputSpec.pooled(),
 )
 
 ```
+
+Use `fetch=FetchSpec(...)` when you want to adjust sampling resolution or compositing without constructing a full `SensorSpec`.
 See the visualization helper and end-to-end notebook in the repository:
 
 - [`examples/plot_utils.py`](https://github.com/cybergis/rs-embed/blob/main/examples/plot_utils.py)

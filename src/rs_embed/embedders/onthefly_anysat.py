@@ -514,7 +514,7 @@ class AnySatEmbedder(EmbedderBase):
         flash_attn = bool(runtime_cfg["flash_attn"])
         image_size = int(runtime_cfg["image_size"])
         norm_mode = str(runtime_cfg["norm_mode"])
-        patch_size_m = int(getattr(output, "scale_m", 10))
+        patch_size_m = int(ss.scale_m)
 
         if input_chw is None:
             provider = self._get_provider(backend)

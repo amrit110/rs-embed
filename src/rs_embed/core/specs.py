@@ -345,8 +345,6 @@ class OutputSpec:
     ----------
     mode : {"grid", "pooled"}
         Output representation mode.
-    scale_m : int
-        Output resolution in meters.
     pooling : {"mean", "max"}
         Pooling reducer for pooled output mode.
     grid_orientation : {"north_up", "native"}
@@ -354,7 +352,6 @@ class OutputSpec:
     """
 
     mode: Literal["grid", "pooled"]
-    scale_m: int = 10
     pooling: Literal["mean", "max"] = "mean"
     # Grid orientation policy:
     # - north_up: normalize y-axis to north->south when metadata permits.
@@ -363,16 +360,14 @@ class OutputSpec:
 
     @staticmethod
     def grid(
-        scale_m: int = 10,
         *,
         grid_orientation: Literal["north_up", "native"] = "north_up",
+        **kwargs: object,
     ) -> OutputSpec:
         """Build a grid-output specification.
 
         Parameters
         ----------
-        scale_m : int
-            Output pixel scale in meters.
         grid_orientation : {"north_up", "native"}
             Orientation policy for returned grid embeddings.
 
@@ -381,10 +376,21 @@ class OutputSpec:
         OutputSpec
             Output specification with ``mode="grid"``.
         """
-        return OutputSpec(mode="grid", scale_m=scale_m, grid_orientation=grid_orientation)
+        if "scale_m" in kwargs:
+            raise SpecError(
+                "OutputSpec.scale_m is no longer supported. "
+                "Use fetch=FetchSpec(scale_m=...) to control sampling resolution."
+            )
+        if kwargs:
+            bad = ", ".join(sorted(str(k) for k in kwargs))
+            raise SpecError(f"Unexpected OutputSpec.grid() keyword(s): {bad}")
+        return OutputSpec(mode="grid", grid_orientation=grid_orientation)
 
     @staticmethod
-    def pooled(pooling: Literal["mean", "max"] = "mean") -> OutputSpec:
+    def pooled(
+        pooling: Literal["mean", "max"] = "mean",
+        **kwargs: object,
+    ) -> OutputSpec:
         """Build a pooled-output specification.
 
         Parameters
@@ -397,7 +403,15 @@ class OutputSpec:
         OutputSpec
             Output specification with ``mode="pooled"``.
         """
-        return OutputSpec(mode="pooled", scale_m=10, pooling=pooling, grid_orientation="north_up")
+        if "scale_m" in kwargs:
+            raise SpecError(
+                "OutputSpec.scale_m is no longer supported. "
+                "Use fetch=FetchSpec(scale_m=...) to control sampling resolution."
+            )
+        if kwargs:
+            bad = ", ".join(sorted(str(k) for k in kwargs))
+            raise SpecError(f"Unexpected OutputSpec.pooled() keyword(s): {bad}")
+        return OutputSpec(mode="pooled", pooling=pooling, grid_orientation="north_up")
 
 
 @dataclass(frozen=True)

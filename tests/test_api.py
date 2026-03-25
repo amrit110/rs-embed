@@ -399,20 +399,19 @@ def test_validate_specs_bad_output_mode():
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "unknown")
-    object.__setattr__(bad_output, "scale_m", 10)
     object.__setattr__(bad_output, "pooling", "mean")
     with pytest.raises(ModelError, match="Unknown output mode"):
         _validate_specs(spatial=_SPATIAL, temporal=None, output=bad_output)
 
 
-def test_validate_specs_non_positive_scale():
+def test_validate_specs_rejects_legacy_output_scale_m():
     from rs_embed.api import _validate_specs
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
-    object.__setattr__(bad_output, "scale_m", 0)
+    object.__setattr__(bad_output, "scale_m", 10)
     object.__setattr__(bad_output, "pooling", "mean")
-    with pytest.raises(ModelError, match="scale_m must be positive"):
+    with pytest.raises(ModelError, match="output.scale_m is no longer supported"):
         _validate_specs(spatial=_SPATIAL, temporal=None, output=bad_output)
 
 
@@ -421,7 +420,6 @@ def test_validate_specs_bad_pooling():
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
-    object.__setattr__(bad_output, "scale_m", 10)
     object.__setattr__(bad_output, "pooling", "median")
     with pytest.raises(ModelError, match="Unknown pooling"):
         _validate_specs(spatial=_SPATIAL, temporal=None, output=bad_output)

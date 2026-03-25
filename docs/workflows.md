@@ -10,13 +10,14 @@ Use [Quickstart](quickstart.md) for the first-run path and [API](api.md) for exa
 Use `get_embedding(...)` when you want one ROI embedding now and want the smallest possible call.
 
 ```python
-from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
+from rs_embed import FetchSpec, PointBuffer, TemporalSpec, OutputSpec, get_embedding
 
 emb = get_embedding(
     "remoteclip",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
+    fetch=FetchSpec(scale_m=10),
     backend="auto",
     device="auto",
 )
@@ -25,6 +26,7 @@ emb = get_embedding(
 - you are prototyping
 - you want to inspect metadata
 - you are debugging model behavior on one location
+- you may want a quick resolution override via `fetch=FetchSpec(...)`
 
 ---
 
@@ -61,7 +63,7 @@ Use `export_batch(...)` for reproducible data pipelines and downstream experimen
 For new code, prefer `target=ExportTarget(...)` plus `config=ExportConfig(...)`.
 
 ```python
-from rs_embed import export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
+from rs_embed import FetchSpec, export_batch, ExportConfig, ExportTarget, PointBuffer, TemporalSpec
 
 spatials = [
     PointBuffer(121.5, 31.2, 2048),
@@ -73,6 +75,7 @@ export_batch(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     models=["remoteclip", "prithvi"],
     target=ExportTarget.per_item("exports", names=["p1", "p2"]),
+    fetch=FetchSpec(scale_m=10),
     backend="auto",
     config=ExportConfig(save_inputs=True, save_embeddings=True, resume=True),
 )
@@ -83,6 +86,7 @@ export_batch(
 - Mix multiple models in one export job when building benchmark datasets.
 - `per_item` keeps each ROI grouped together; useful for inspection and resume.
 - Move runtime knobs into `ExportConfig(...)` instead of adding more top-level keywords.
+- Use one shared `FetchSpec` when you want to normalize resolution/compositing across models.
 
 ---
 

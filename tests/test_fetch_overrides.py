@@ -47,3 +47,14 @@ def test_resolve_sensor_for_model_rejects_sensor_and_fetch_together():
             sensor=SensorSpec(collection="A", bands=("B1",)),
             fetch=FetchSpec(scale_m=20),
         )
+
+
+def test_resolve_sensor_for_gse_fetch_override():
+    out = resolve_sensor_for_model(
+        "gse",
+        sensor=None,
+        fetch=FetchSpec(scale_m=60),
+    )
+    assert out is not None
+    assert out.collection == "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL"
+    assert out.scale_m == 60
