@@ -9,7 +9,7 @@ from typing import Any, TypeVar
 import numpy as np
 
 from ..core.errors import ModelError
-from ..core.specs import SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import NormalizationSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers import get_provider, has_provider, list_providers
 from ..providers.base import ProviderBase
 from ..tools.normalization import normalize_backend_name
@@ -316,7 +316,7 @@ def fetch_collection_patch_all_bands_chw(
                 arr_a, names_a = _rec(a_sp, depth + 1)
                 arr_b, names_b = _rec(b_sp, depth + 1)
                 if tuple(names_a) != tuple(names_b):
-                    raise ModelError("Band names mismatch while stitching all-band bbox tiles.")
+                    raise ModelError("Band names mismatch while stitching all-band bbox tiles.") from None
                 stitched = _stitch_spatial_last2_arrays(
                     a=arr_a,
                     b=arr_b,
@@ -439,6 +439,33 @@ def fetch_s1_vvvh_raw_chw_with_meta(
         raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
     meta_out = dict(meta or {})
     return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32), meta_out
+
+def apply_normalization(raw: np.ndarray, norm: NormalizationSpec) -> np.ndarray:
+    """Apply a declarative normalization strategy to raw provider data.
+
+    Parameters
+    ----------
+    raw : np.ndarray
+        Raw provider array (CHW or TCHW).
+    norm : NormalizationSpec
+        Normalization strategy to apply.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized float32 array.
+    """
+    arr = np.asarray(raw, dtype=np.float32)
+    if norm.mode == "s2_sr_clip":
+        return np.clip(arr / 10000.0, 0.0, 1.0).astype(np.float32)
+    if norm.mode == "s2_sr_raw":
+        return np.clip(arr, 0.0, 10000.0).astype(np.float32)
+    if norm.mode == "s1_log_normalize":
+        return normalize_s1_vvvh_chw(arr)
+    if norm.mode == "none":
+        return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+    raise ModelError(f"Unknown normalization mode: {norm.mode!r}")
+
 
 def normalize_s1_vvvh_chw(raw_chw: np.ndarray) -> np.ndarray:
     """Convert raw S1 VV/VH to numerically stable [0,1] CHW."""

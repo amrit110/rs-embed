@@ -373,35 +373,35 @@ class InferenceEngine:
                 provider_enabled=True,
             )
 
-            def _get_input(i: int) -> np.ndarray:
-                if not ctx.needs_provider_input or ctx.skey is None:
-                    raise RuntimeError(f"Missing prefetched input for model={mc.name}, index={i}")
-                hit = prefetch_cache.get((i, ctx.skey))
+            def _get_input(i: int, _ctx=ctx, _mc=mc) -> np.ndarray:
+                if not _ctx.needs_provider_input or _ctx.skey is None:
+                    raise RuntimeError(f"Missing prefetched input for model={_mc.name}, index={i}")
+                hit = prefetch_cache.get((i, _ctx.skey))
                 if hit is not None:
                     return hit
-                err = prefetch_errors.get((i, ctx.skey))
+                err = prefetch_errors.get((i, _ctx.skey))
                 if err:
-                    raise RuntimeError(f"Prefetch failed for model={mc.name}, index={i}: {err}")
-                raise RuntimeError(f"Missing prefetched input for model={mc.name}, index={i}")
+                    raise RuntimeError(f"Prefetch failed for model={_mc.name}, index={i}: {err}")
+                raise RuntimeError(f"Missing prefetched input for model={_mc.name}, index={i}")
 
-            def _single(i: int) -> Embedding:
-                inp = _get_input(i) if ctx.needs_provider_input else None
+            def _single(i: int, _ctx=ctx, _mc=mc) -> Embedding:
+                inp = _get_input(i) if _ctx.needs_provider_input else None
                 return self.infer_single(
-                    embedder=ctx.embedder,
-                    lock=ctx.lock,
+                    embedder=_ctx.embedder,
+                    lock=_ctx.lock,
                     spatial=spatials[i],
                     temporal=temporal,
-                    sensor=mc.sensor,
-                    backend=mc.backend,
+                    sensor=_mc.sensor,
+                    backend=_mc.backend,
                     input_chw=inp,
-                    model_config=mc.model_config,
+                    model_config=_mc.model_config,
                 )
 
-            def _mark_done(_: int) -> None:
+            def _mark_done(_: int, _mc=mc) -> None:
                 if model_progress_cb is None:
                     return
                 try:
-                    model_progress_cb(mc.name)
+                    model_progress_cb(_mc.name)
                 except Exception as _e:
                     pass
 

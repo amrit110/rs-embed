@@ -151,16 +151,16 @@ def build_one_point_payload(
                             )
                         prov = provider_factory()
                         run_with_retry(
-                            lambda: prov.ensure_ready(),
+                            lambda _p=prov: _p.ensure_ready(),
                             retries=max_retries,
                             backoff_s=retry_backoff_s,
                         )
                         input_chw = run_with_retry(
-                            lambda: fetch(
-                                prov,
+                            lambda _p=prov, _ss=sspec: fetch(
+                                _p,
                                 spatial=spatial,
                                 temporal=temporal,
-                                sensor=sspec,
+                                sensor=_ss,
                             ),
                             retries=max_retries,
                             backoff_s=retry_backoff_s,
@@ -207,19 +207,27 @@ def build_one_point_payload(
 
             if save_embeddings:
 
-                def _infer_once():
-                    with lock:
+                def _infer_once(
+                    _m_backend=m_backend,
+                    _input_chw=input_chw,
+                    _model_config=model_config,
+                    _fmeta_cap=_fmeta,
+                    _lock=lock,
+                    _embedder=embedder,
+                    _sspec=sspec,
+                ):
+                    with _lock:
                         return call_embedder_get_embedding(
-                            embedder=embedder,
+                            embedder=_embedder,
                             spatial=spatial,
                             temporal=temporal,
-                            sensor=sspec,
+                            sensor=_sspec,
                             output=output,
-                            backend=m_backend,
+                            backend=_m_backend,
                             device=device,
-                            input_chw=(input_chw if pass_input_into_embedder else None),
-                            model_config=model_config,
-                            fetch_meta=_fmeta,
+                            input_chw=(_input_chw if pass_input_into_embedder else None),
+                            model_config=_model_config,
+                            fetch_meta=_fmeta_cap,
                         )
 
                 emb = run_with_retry(

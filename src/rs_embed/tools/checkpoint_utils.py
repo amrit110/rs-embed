@@ -55,16 +55,20 @@ def store_prefetch_checkpoint_arrays(
             continue
         entry: dict[str, Any] = {"sensor": _jsonable(sensor_by_key[skey])}
 
-        def _store_per_item(items: list[tuple[int, np.ndarray]]) -> None:
+        def _store_per_item(
+            items: list[tuple[int, np.ndarray]],
+            _skey=skey,
+            _entry=entry,
+        ) -> None:
             keys: list[str] = []
             indices: list[int] = []
             for i, x in items:
-                key = f"{_CHECKPOINT_PREFETCH_CHW_PREFIX}{skey}__{i:05d}"
+                key = f"{_CHECKPOINT_PREFETCH_CHW_PREFIX}{_skey}__{i:05d}"
                 arrays[key] = np.asarray(x, dtype=np.float32)
                 keys.append(key)
                 indices.append(int(i))
-            entry["npz_keys"] = keys
-            entry["indices"] = indices
+            _entry["npz_keys"] = keys
+            _entry["indices"] = indices
 
         if len(hit_items) == n_items:
             key = f"{_CHECKPOINT_PREFETCH_BCHW_PREFIX}{skey}"

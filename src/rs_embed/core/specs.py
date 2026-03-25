@@ -223,6 +223,92 @@ class SensorSpec:
     check_raise: bool = True
     check_save_dir: str | None = None
 
+# ── Normalization & model input contract ──────────────────────────
+
+@dataclass(frozen=True)
+class NormalizationSpec:
+    """Declarative normalization strategy applied to raw provider data.
+
+    Attributes
+    ----------
+    mode : {"s2_sr_clip", "s2_sr_raw", "s1_log_normalize", "none"}
+        Normalization mode:
+        - ``s2_sr_clip``: divide by 10 000 then clip to [0, 1].
+        - ``s2_sr_raw``: clip to [0, 10 000] (model normalizes later).
+        - ``s1_log_normalize``: log1p + 99th-percentile scaling.
+        - ``none``: nan-to-zero passthrough.
+    """
+
+    mode: Literal["s2_sr_clip", "s2_sr_raw", "s1_log_normalize", "none"]
+
+
+@dataclass(frozen=True)
+class ModelInputSpec:
+    """Declarative input contract for on-the-fly embedder models.
+
+    When set as a class attribute on an ``EmbedderBase`` subclass, the base
+    class ``fetch_input()`` implementation reads this spec and performs
+    generic provider fetching + normalization automatically.  Models with
+    custom fetch logic (fallback chains, multi-sensor routing) can still
+    override ``fetch_input()`` directly.
+
+    Attributes
+    ----------
+    collection : str
+        Provider collection identifier (e.g. ``"COPERNICUS/S2_SR_HARMONIZED"``).
+    bands : tuple[str, ...]
+        Band names in the order the model expects.
+    scale_m : int
+        Pixel scale in meters.
+    cloudy_pct : int
+        Cloud threshold for cloud-aware providers.
+    composite : {"median", "mosaic"}
+        Temporal compositing strategy.
+    fill_value : float
+        Fill value for missing data.
+    temporal_mode : {"single", "multi"}
+        Whether the model expects a single composite or a multi-frame time
+        series.
+    n_frames : int or None
+        Number of temporal frames when ``temporal_mode="multi"``.
+    normalization : NormalizationSpec
+        Post-fetch normalization strategy.
+    image_size : int or None
+        Target spatial size for resize (``None`` = no resize at this layer).
+    expected_channels : int or None
+        Expected channel count for validation (``None`` = skip check).
+    """
+
+    collection: str
+    bands: tuple[str, ...]
+    scale_m: int = 10
+    cloudy_pct: int = 30
+    composite: Literal["median", "mosaic"] = "median"
+    fill_value: float = 0.0
+    temporal_mode: Literal["single", "multi"] = "single"
+    n_frames: int | None = None
+    normalization: NormalizationSpec = NormalizationSpec(mode="s2_sr_clip")
+    image_size: int | None = None
+    expected_channels: int | None = None
+
+    def to_sensor_spec(self) -> SensorSpec:
+        """Derive a ``SensorSpec`` from this input contract.
+
+        Returns
+        -------
+        SensorSpec
+            Sensor specification with fields populated from this spec.
+        """
+        return SensorSpec(
+            collection=self.collection,
+            bands=self.bands,
+            scale_m=self.scale_m,
+            cloudy_pct=self.cloudy_pct,
+            composite=self.composite,
+            fill_value=self.fill_value,
+        )
+
+
 @dataclass(frozen=True)
 class OutputSpec:
     """Embedding output layout and post-processing policy.

@@ -407,7 +407,9 @@ class BatchExporter:
                 self.device,
                 sensor_key(mc.sensor),
             )
-            if _overrides_base_method(embedder, "fetch_input"):
+            if getattr(embedder, "has_custom_fetch", False) or _overrides_base_method(
+                embedder, "fetch_input"
+            ):
                 fetcher_by_key[fetch_key] = embedder
         return fetcher_by_key
 

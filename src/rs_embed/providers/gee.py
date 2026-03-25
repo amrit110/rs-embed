@@ -182,13 +182,13 @@ class GEEProvider(ProviderBase):
             if not self.auto_auth:
                 raise ProviderError(
                     "Earth Engine not initialized. Run `earthengine authenticate` and try again."
-                )
+                ) from None
             try:
                 import geemap
 
                 geemap.ee_initialize()
             except Exception as e:
-                raise ProviderError(f"Failed to initialize GEE: {e!r}")
+                raise ProviderError(f"Failed to initialize GEE: {e!r}") from e
 
     def _to_ee_region_3857(self, spatial: SpatialSpec):
         import ee

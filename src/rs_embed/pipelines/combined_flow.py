@@ -142,10 +142,10 @@ def run_pending_models(
             # ── Inference via engine ────────────────────────────
             if save_embeddings:
 
-                def _progress_cb(i: int) -> None:
+                def _progress_cb(i: int, _ip=infer_progress) -> None:
                     nonlocal infer_progress_done
                     infer_progress_done += 1
-                    infer_progress.update(1)
+                    _ip.update(1)
 
                 results = inference_engine.infer_model(
                     model_name=m,

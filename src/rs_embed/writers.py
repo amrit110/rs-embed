@@ -33,7 +33,7 @@ def get_extension(fmt: str) -> str:
     try:
         return _FORMAT_EXT[fmt]
     except KeyError:
-        raise ValueError(f"Unknown format {fmt!r}. Supported: {SUPPORTED_FORMATS}")
+        raise ValueError(f"Unknown format {fmt!r}. Supported: {SUPPORTED_FORMATS}") from None
 
 # ── public dispatcher ──────────────────────────────────────────────
 

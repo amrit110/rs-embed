@@ -13,7 +13,14 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import (
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    SensorSpec,
+    SpatialSpec,
+    TemporalSpec,
+)
 from ..core.types import FetchResult
 from ..providers import ProviderBase
 from .base import EmbedderBase
@@ -384,6 +391,18 @@ class TerraFMBEmbedder(EmbedderBase):
     - OutputSpec.grid():  grid [D, Ht, Wt] (model-native feature map grid)
     """
 
+    # Primary modality spec (S2 12-band). TerraFM also supports S1 VV/VH via
+    # its custom fetch_input() override; this spec documents the default path.
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_12_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        image_size=224,
+        expected_channels=12,
+    )
+
     DEFAULT_FETCH_WORKERS = 8
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 64
@@ -394,8 +413,8 @@ class TerraFMBEmbedder(EmbedderBase):
             "backend": ["provider", "tensor"],
             "inputs": {
                 "s2_sr": {
-                    "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                    "bands": _S2_SR_12_BANDS,
+                    "collection": self.input_spec.collection,
+                    "bands": list(self.input_spec.bands),
                 },
                 "s1": {
                     "collection": "COPERNICUS/S1_GRD_FLOAT (default) or COPERNICUS/S1_GRD",
