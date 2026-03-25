@@ -11,7 +11,14 @@ import numpy as np
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import (
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    SensorSpec,
+    SpatialSpec,
+    TemporalSpec,
+)
 from ..providers import ProviderBase
 from ._vit_mae_utils import (
     base_meta,
@@ -407,6 +414,15 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
     DEFAULT_BATCH_CPU = 4
     DEFAULT_BATCH_CUDA = 16
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(PRITHVI_S2_BANDS_DST),
+        scale_m=30,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        expected_channels=6,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "onthefly",
@@ -418,10 +434,10 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 "model_key": self.DEFAULT_MODEL_KEY,
                 "variant": self.DEFAULT_MODEL_KEY,
                 "image_size": self.DEFAULT_IMAGE_SIZE,
-                "scale_m": self.DEFAULT_IMAGE_SCALE_M,
-                "cloudy_pct": self.DEFAULT_CLOUDY_PCT,
-                "composite": self.DEFAULT_COMPOSITE,
-                "fill_value": 0.0,
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
+                "fill_value": self.input_spec.fill_value,
             },
             "model_config": {
                 "variant": {
@@ -441,14 +457,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
         }
 
     def _default_sensor(self) -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(PRITHVI_S2_BANDS_DST),
-            scale_m=self.DEFAULT_IMAGE_SCALE_M,
-            cloudy_pct=self.DEFAULT_CLOUDY_PCT,
-            composite=self.DEFAULT_COMPOSITE,
-            fill_value=0.0,
-        )
+        return self.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

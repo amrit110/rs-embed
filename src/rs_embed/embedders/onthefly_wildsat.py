@@ -15,7 +15,14 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import (
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    SensorSpec,
+    SpatialSpec,
+    TemporalSpec,
+)
 from ._vit_mae_utils import (
     ensure_torch,
     pool_from_tokens,
@@ -666,6 +673,16 @@ def _wildsat_forward(
 
 @register("wildsat")
 class WildSATEmbedder(EmbedderBase):
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=("B4", "B3", "B2"),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        image_size=224,
+        expected_channels=3,
+    )
+
     DEFAULT_IMAGE_SIZE = 224
     DEFAULT_FETCH_WORKERS = 8
 
@@ -674,8 +691,8 @@ class WildSATEmbedder(EmbedderBase):
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": ["B4", "B3", "B2"],
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
@@ -699,13 +716,7 @@ class WildSATEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=("B4", "B3", "B2"),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-        )
+        return WildSATEmbedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

@@ -13,7 +13,14 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import (
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    SensorSpec,
+    SpatialSpec,
+    TemporalSpec,
+)
 from ..providers import ProviderBase
 from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
 from .base import EmbedderBase
@@ -537,14 +544,24 @@ class DOFAEmbedder(EmbedderBase):
     DEFAULT_BATCH_CPU = 8
     DEFAULT_BATCH_CUDA = 64
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_SR_12_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        image_size=224,
+        expected_channels=12,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider", "tensor"],
             "inputs": {
                 "provider_default": {
-                    "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                    "bands": _S2_SR_12_BANDS,
+                    "collection": self.input_spec.collection,
+                    "bands": list(self.input_spec.bands),
                     "wavelengths_um": "auto for S2 bands",
                 }
             },
@@ -552,10 +569,10 @@ class DOFAEmbedder(EmbedderBase):
             "output": ["pooled", "grid"],
             "defaults": {
                 "variant": "base",
-                "image_size": 224,
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "image_size": self.input_spec.image_size,
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "preprocess": "resize_to_224_bilinear",
             },
             "model_config": {
@@ -569,14 +586,7 @@ class DOFAEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_SR_12_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return DOFAEmbedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:
@@ -727,7 +737,6 @@ class DOFAEmbedder(EmbedderBase):
         # Model + forward
         # -----------------
         model, mmeta = _load_dofa_model(variant=variant, device=device)
-        dev = mmeta.get("device", device)
         tokens, pooled, tmeta = _dofa_forward_tokens_and_pooled(
             model, x_bchw, wavelengths_um=wavelengths_um, device=device
         )

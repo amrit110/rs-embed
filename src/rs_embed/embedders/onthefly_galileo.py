@@ -14,7 +14,14 @@ import xarray as xr
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
 from ..core.registry import register
-from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import (
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    SensorSpec,
+    SpatialSpec,
+    TemporalSpec,
+)
 from ..providers import ProviderBase
 from ..tools.temporal import temporal_frame_midpoints
 from ._vit_mae_utils import ensure_torch
@@ -471,13 +478,25 @@ class GalileoEmbedder(EmbedderBase):
     DEFAULT_FETCH_WORKERS = 8
     _allow_auto_backend = True
 
+    input_spec = ModelInputSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=tuple(_S2_10_BANDS),
+        scale_m=10,
+        cloudy_pct=30,
+        temporal_mode="multi",
+        n_frames=8,
+        normalization=NormalizationSpec(mode="s2_sr_raw"),  # Galileo normalizes internally
+        image_size=64,
+        expected_channels=10,
+    )
+
     def describe(self) -> dict[str, Any]:
         return {
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": "COPERNICUS/S2_SR_HARMONIZED",
-                "bands": _S2_10_BANDS,
+                "collection": self.input_spec.collection,
+                "bands": list(self.input_spec.bands),
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],
@@ -486,9 +505,9 @@ class GalileoEmbedder(EmbedderBase):
                 "patch_size": self.DEFAULT_PATCH,
                 "image_size": self.DEFAULT_IMAGE_SIZE,
                 "n_frames": self.DEFAULT_FRAMES,
-                "scale_m": 10,
-                "cloudy_pct": 30,
-                "composite": "median",
+                "scale_m": self.input_spec.scale_m,
+                "cloudy_pct": self.input_spec.cloudy_pct,
+                "composite": self.input_spec.composite,
                 "normalization": "unit_scale",
             },
             "notes": [
@@ -501,14 +520,7 @@ class GalileoEmbedder(EmbedderBase):
 
     @staticmethod
     def _default_sensor() -> SensorSpec:
-        return SensorSpec(
-            collection="COPERNICUS/S2_SR_HARMONIZED",
-            bands=tuple(_S2_10_BANDS),
-            scale_m=10,
-            cloudy_pct=30,
-            composite="median",
-            fill_value=0.0,
-        )
+        return GalileoEmbedder.input_spec.to_sensor_spec()
 
     @staticmethod
     def _resolve_fetch_workers(n_items: int) -> int:

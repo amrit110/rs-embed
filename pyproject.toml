@@ -66,6 +66,7 @@ full = [
 dev = [
   "pytest>=7.4",
   "pytest-cov>=4.1",
+  "pytest-xdist>=3.0",
   "ruff>=0.5.0",
 ]
 
@@ -103,18 +104,19 @@ select = [
     "W",    # pycodestyle warnings
     "F",    # pyflakes (unused imports, undefined names)
     "UP",   # pyupgrade (modernize type hints, etc.)
-    # "B",    # flake8-bugbear — TODO: enable once existing patterns are addressed
-    # "BLE",  # blind/broad exceptions — TODO: enable once Exception handlers are narrowed
+    "B",    # flake8-bugbear
+    "BLE",  # blind/broad exceptions
     "I",    # isort
 ]
 ignore = [
     "E501",   # line too long
-    "F811",   # redefinition of unused name (dataclass field vs staticmethod)
-    "F841",   # local variable assigned but never used
     "E741",   # ambiguous variable name
     "UP047",  # generic functions should use type parameters (Python 3.12 syntax)
+    "B008",   # OutputSpec.pooled() default is safe (frozen dataclass)
+    "BLE001", # broad except catches are intentional fallbacks throughout
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"src/rs_embed/__init__.py" = ["F401"]  # public re-exports
-"src/rs_embed/api.py" = ["F401"]       # public re-exports
+"src/rs_embed/__init__.py" = ["F401"]     # public re-exports
+"src/rs_embed/api.py" = ["F401"]          # public re-exports
+"src/rs_embed/core/specs.py" = ["F811"]  # dataclass field vs staticmethod name collision
