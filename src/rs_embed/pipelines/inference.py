@@ -44,6 +44,7 @@ class _ModelContext(NamedTuple):
     skey: str | None
     needs_provider_input: bool
 
+
 class InferenceEngine:
     """Manages embedder lifecycle and dispatches single/batch inference.
 
@@ -635,7 +636,9 @@ class InferenceEngine:
 
         return out
 
+
 # ── module-level helpers ───────────────────────────────────────────
+
 
 def _device_has_gpu(device: str) -> bool:
     dev = str(device or "").strip().lower()

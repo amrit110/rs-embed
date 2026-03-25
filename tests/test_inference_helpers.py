@@ -97,6 +97,7 @@ class _VariantBatchEmbedder:
             for _ in spatials
         ]
 
+
 def _engine() -> InferenceEngine:
     return InferenceEngine(device="cpu", output=OutputSpec.pooled(), config=ExportConfig())
 

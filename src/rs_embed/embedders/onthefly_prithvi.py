@@ -94,7 +94,9 @@ def _resolve_prithvi_model_key(
         model_key = _normalize_prithvi_variant(variant_v)
         return model_key, model_key
 
-    model_key = os.environ.get("RS_EMBED_PRITHVI_KEY", default_model_key).strip() or default_model_key
+    model_key = (
+        os.environ.get("RS_EMBED_PRITHVI_KEY", default_model_key).strip() or default_model_key
+    )
     return str(model_key), str(model_key)
 
 
@@ -145,6 +147,7 @@ def _load_prithvi_module():
 
     return PrithviMAE
 
+
 def _fetch_s2_prithvi6_chw(
     provider: ProviderBase,
     spatial: SpatialSpec,
@@ -178,6 +181,7 @@ def _fetch_s2_prithvi6_chw(
     x_chw = np.nan_to_num(x_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
     return x_chw
 
+
 def _pad_chw_to_multiple(x_chw: np.ndarray, mult: int = 16, value: float = 0.0) -> np.ndarray:
     """
     Pad CHW to make H and W divisible by mult.
@@ -194,6 +198,7 @@ def _pad_chw_to_multiple(x_chw: np.ndarray, mult: int = 16, value: float = 0.0) 
     out[:, :h, :w] = x_chw.astype(np.float32)
     return out
 
+
 def _resize_chw(x_chw: np.ndarray, *, size: int = 224) -> np.ndarray:
     """Resize CHW to square (size,size) using bilinear interpolation."""
     ensure_torch()
@@ -205,6 +210,7 @@ def _resize_chw(x_chw: np.ndarray, *, size: int = 224) -> np.ndarray:
     x = torch.from_numpy(x_chw.astype(np.float32, copy=False)).unsqueeze(0)
     y = F.interpolate(x, size=(int(size), int(size)), mode="bilinear", align_corners=False)
     return y[0].detach().cpu().numpy().astype(np.float32)
+
 
 def _prepare_prithvi_chw(
     x_chw: np.ndarray,
@@ -235,6 +241,7 @@ def _prepare_prithvi_chw(
         "target_image_size": int(target_size),
     }
 
+
 def _spatial_center_lon_lat(spatial: SpatialSpec) -> tuple[float, float]:
     from ..core.specs import BBox, PointBuffer  # local import to avoid cycles
 
@@ -248,9 +255,11 @@ def _spatial_center_lon_lat(spatial: SpatialSpec) -> tuple[float, float]:
         return float(spatial.lon), float(spatial.lat)
     raise ModelError(f"Unsupported SpatialSpec: {type(spatial)}")
 
+
 # -------------------------
 # Prithvi model loading (vendored HF runtime)
 # -------------------------
+
 
 @lru_cache(maxsize=8)
 def _load_prithvi_cached(
@@ -265,7 +274,7 @@ def _load_prithvi_cached(
     spec = _resolve_prithvi_hf_spec(model_key)
     cache_dir = _prithvi_cache_dir()
     cfg_path = _download_prithvi_file(spec["repo_id"], "config.json", cache_dir)
-    with open(cfg_path, "r", encoding="utf-8") as f:
+    with open(cfg_path, encoding="utf-8") as f:
         config = json.load(f).get("pretrained_cfg", {})
 
     if not isinstance(config, dict) or not config:
@@ -328,6 +337,7 @@ def _load_prithvi_cached(
     }
     return m, meta
 
+
 def _load_prithvi(
     model_key: str,
     *,
@@ -352,6 +362,7 @@ def _load_prithvi(
     )
     m, meta = loaded
     return m, meta, dev
+
 
 def _prithvi_forward_tokens(
     model,
@@ -416,6 +427,7 @@ def _prithvi_forward_tokens(
     raise ModelError(
         f"Unexpected Prithvi tokens shape/type: {type(tokens)} {getattr(tokens, 'shape', None)}"
     )
+
 
 def _prithvi_forward_tokens_batch(
     model,
@@ -482,6 +494,7 @@ def _prithvi_forward_tokens_batch(
 
     toks_np = tokens.detach().float().cpu().numpy().astype(np.float32)  # [B,N,D]
     return [toks_np[i] for i in range(bsz)]
+
 
 # -------------------------
 # Embedder

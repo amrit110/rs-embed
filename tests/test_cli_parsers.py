@@ -5,7 +5,6 @@ import pytest
 from rs_embed import cli
 from rs_embed.core.specs import BBox, PointBuffer
 
-
 # ══════════════════════════════════════════════════════════════════════
 # _parse_bands / _parse_models
 # ══════════════════════════════════════════════════════════════════════

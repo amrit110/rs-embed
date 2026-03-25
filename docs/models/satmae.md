@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 RGB (`B4,B3,B2`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | range window in practice (normalized via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |

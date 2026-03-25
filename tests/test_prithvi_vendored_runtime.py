@@ -140,7 +140,9 @@ def test_load_prithvi_cached_uses_vendored_runtime(monkeypatch, tmp_path):
     monkeypatch.setattr(
         pr,
         "_download_prithvi_file",
-        lambda repo_id, filename, cache_dir: str(cfg_path if filename == "config.json" else ckpt_path),
+        lambda repo_id, filename, cache_dir: str(
+            cfg_path if filename == "config.json" else ckpt_path
+        ),
     )
 
     def _fake_loader():

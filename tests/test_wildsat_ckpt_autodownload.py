@@ -2,9 +2,8 @@ import os
 
 import pytest
 
-from rs_embed.core.errors import ModelError
 import rs_embed.embedders.onthefly_wildsat as ws
-
+from rs_embed.core.errors import ModelError
 
 _ENV_KEYS = [
     "RS_EMBED_WILDSAT_CKPT",

@@ -3,20 +3,29 @@ import pytest
 import xarray as xr
 
 from rs_embed.core import registry
-from rs_embed.core.specs import BBox, SensorSpec
 from rs_embed.core.embedding import Embedding
-from rs_embed.tools.serialization import (
-    sanitize_key as _sanitize_key,
-    sha1 as _sha1,
-    jsonable as _jsonable,
-    utc_ts as _utc_ts,
-    embedding_to_numpy as _embedding_to_numpy,
-)
+from rs_embed.core.specs import BBox, SensorSpec
 from rs_embed.tools.model_defaults import (
     default_sensor_for_model as _default_sensor_for_model,
+)
+from rs_embed.tools.model_defaults import (
     resolve_sensor_for_model as _resolve_sensor_for_model,
 )
-
+from rs_embed.tools.serialization import (
+    embedding_to_numpy as _embedding_to_numpy,
+)
+from rs_embed.tools.serialization import (
+    jsonable as _jsonable,
+)
+from rs_embed.tools.serialization import (
+    sanitize_key as _sanitize_key,
+)
+from rs_embed.tools.serialization import (
+    sha1 as _sha1,
+)
+from rs_embed.tools.serialization import (
+    utc_ts as _utc_ts,
+)
 
 # ── fixture to isolate registry ────────────────────────────────────
 

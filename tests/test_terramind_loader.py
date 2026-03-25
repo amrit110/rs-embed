@@ -57,5 +57,7 @@ def test_ensure_terramind_backbone_registered_lists_available_keys(monkeypatch):
 
     monkeypatch.setattr(tm.importlib, "import_module", lambda name: object())
 
-    with pytest.raises(ModelError, match="Available TerraMind backbones: terramind_v1_base, terramind_v1_large"):
+    with pytest.raises(
+        ModelError, match="Available TerraMind backbones: terramind_v1_base, terramind_v1_large"
+    ):
         tm._ensure_terramind_backbone_registered(registry, model_key="terramind_v1_small")

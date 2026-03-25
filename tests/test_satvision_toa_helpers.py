@@ -4,10 +4,10 @@ import pytest
 from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.embedders.onthefly_satvision_toa import (
-    _coerce_fetch_result,
-    _normalize_satvision_toa_input,
-    _normalize_indices,
     SatVisionTOAEmbedder,
+    _coerce_fetch_result,
+    _normalize_indices,
+    _normalize_satvision_toa_input,
 )
 
 

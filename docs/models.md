@@ -37,32 +37,32 @@ Some detail-page filenames still use older names for compatibility, but the cano
 
 ### Precomputed Embeddings
 
-| Model ID | Type | Primary Input / Source | Outputs | Temporal mode | Notes | Detail |
-|---|---|---|---|---|---|---|
-| `tessera` | Precomputed | GeoTessera embedding tiles | `pooled`, `grid` | yearly coverage product | Fast baseline, source-fixed precomputed workflow | [detail](models/tessera.md) |
-| `gse` | Precomputed | Google Satellite Embedding (annual) | `pooled`, `grid` | `TemporalSpec.year(...)` | Annual product via provider path | [detail](models/gse.md) |
-| `copernicus` | Precomputed | Copernicus embeddings | `pooled`, `grid` | limited (2021) | Coarse resolution product | [detail](models/copernicus.md) |
+| Model ID | Type | Primary Input / Source | Default Resolution | Outputs | Temporal mode | Notes | Detail |
+|---|---|---|---|---|---|---|---|
+| `tessera` | Precomputed | GeoTessera embedding tiles | 10m | `pooled`, `grid` | yearly coverage product | Fast baseline, source-fixed precomputed workflow | [detail](models/tessera.md) |
+| `gse` | Precomputed | Google Satellite Embedding (annual) | 10m | `pooled`, `grid` | `TemporalSpec.year(...)` | Annual product via provider path | [detail](models/gse.md) |
+| `copernicus` | Precomputed | Copernicus embeddings | 0.25° | `pooled`, `grid` | limited (2021) | Coarse resolution product | [detail](models/copernicus.md) |
 
 ### On-the-fly Foundation Models
 
-| Model ID | Primary Input | Temporal style | Outputs | Notable requirements | Detail |
-|---|---|---|---|---|---|
-| `remoteclip` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | provider backend; RGB preprocessing | [detail](models/remoteclip.md) |
-| `satmae` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | RGB path; ViT token/grid behavior | [detail](models/satmae.md) |
-| `satmaepp` | S2 RGB (`B4,B3,B2`) | single composite window | `pooled`, `grid` | SatMAE++ fMoW-style eval preprocessing; channel order control | [detail](models/satmaepp.md) |
-| `satmaepp_s2_10b` | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) | single composite window | `pooled`, `grid` | strict 10-band order; grouped-channel token handling | [detail](models/satmaepp.md) |
-| `scalemae` | S2 RGB + scale | single composite window | `pooled`, `grid` | requires `sensor.scale_m` / `input_res_m` | [detail](models/scalemae.md) |
-| `wildsat` | S2 RGB | single composite window | `pooled`, `grid` | normalization options | [detail](models/wildsat.md) |
-| `prithvi` | S2 6-band | single composite window | `pooled`, `grid` | required temporal + location side inputs | [detail](models/prithvi.md) |
-| `terrafm` | S2 12-band or S1 VV/VH | single composite window | `pooled`, `grid` | choose modality per call | [detail](models/terrafm.md) |
-| `terramind` | S2 SR 12-band | single composite window | `pooled`, `grid` | strict normalization/channel semantics | [detail](models/terramind.md) |
-| `dofa` | Multispectral + wavelengths | single composite window | `pooled`, `grid` | wavelength vector required/inferred | [detail](models/dofa.md) |
-| `fomo` | S2 12-band | single composite window | `pooled`, `grid` | normalization mode choices | [detail](models/fomo.md) |
-| `thor` | S2 SR 10-band | single composite window | `pooled`, `grid` | strict stats-based normalization | [detail](models/thor.md) |
-| `satvision` | TOA 14-channel | single composite window | `pooled`, `grid` | strict channel order + calibration | [detail](models/satvision.md) |
-| `anysat` | S2 10-band time series | multi-frame | `pooled`, `grid` | frame dates (`s2_dates`) side input | [detail](models/anysat.md) |
-| `galileo` | S2 10-band time series | multi-frame | `pooled`, `grid` | month tokens + grouped tensors | [detail](models/galileo.md) |
-| `agrifm` | S2 10-band time series | multi-frame | `pooled`, `grid` | fixed `T` frame stack behavior | [detail](models/agrifm.md) |
+| Model ID | Primary Input | Default Resolution | Temporal style | Outputs | Notable requirements | Detail |
+|---|---|---|---|---|---|---|
+| `remoteclip` | S2 RGB (`B4,B3,B2`) | 10m | single composite window | `pooled`, `grid` | provider backend; RGB preprocessing | [detail](models/remoteclip.md) |
+| `satmae` | S2 RGB (`B4,B3,B2`) | 10m | single composite window | `pooled`, `grid` | RGB path; ViT token/grid behavior | [detail](models/satmae.md) |
+| `satmaepp` | S2 RGB (`B4,B3,B2`) | 10m | single composite window | `pooled`, `grid` | SatMAE++ fMoW-style eval preprocessing; channel order control | [detail](models/satmaepp.md) |
+| `satmaepp_s2_10b` | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) | 10m | single composite window | `pooled`, `grid` | strict 10-band order; grouped-channel token handling | [detail](models/satmaepp.md) |
+| `scalemae` | S2 RGB + scale | 10m | single composite window | `pooled`, `grid` | requires `sensor.scale_m` / `input_res_m` | [detail](models/scalemae.md) |
+| `wildsat` | S2 RGB | 10m | single composite window | `pooled`, `grid` | normalization options | [detail](models/wildsat.md) |
+| `prithvi` | S2 6-band | 30m | single composite window | `pooled`, `grid` | required temporal + location side inputs | [detail](models/prithvi.md) |
+| `terrafm` | S2 12-band or S1 VV/VH | 10m | single composite window | `pooled`, `grid` | choose modality per call | [detail](models/terrafm.md) |
+| `terramind` | S2 SR 12-band | 10m | single composite window | `pooled`, `grid` | strict normalization/channel semantics | [detail](models/terramind.md) |
+| `dofa` | Multispectral + wavelengths | 10m | single composite window | `pooled`, `grid` | wavelength vector required/inferred | [detail](models/dofa.md) |
+| `fomo` | S2 12-band | 10m | single composite window | `pooled`, `grid` | normalization mode choices | [detail](models/fomo.md) |
+| `thor` | S2 SR 10-band | 10m | single composite window | `pooled`, `grid` | strict stats-based normalization | [detail](models/thor.md) |
+| `satvision` | TOA 14-channel | 1000m | single composite window | `pooled`, `grid` | strict channel order + calibration | [detail](models/satvision.md) |
+| `anysat` | S2 10-band time series | 10m | multi-frame | `pooled`, `grid` | frame dates (`s2_dates`) side input | [detail](models/anysat.md) |
+| `galileo` | S2 10-band time series | 10m | multi-frame | `pooled`, `grid` | month tokens + grouped tensors | [detail](models/galileo.md) |
+| `agrifm` | S2 10-band time series | 10m | multi-frame | `pooled`, `grid` | fixed `T` frame stack behavior | [detail](models/agrifm.md) |
 
 ---
 
@@ -71,6 +71,7 @@ Some detail-page filenames still use older names for compatibility, but the cano
 - `TemporalSpec.range(start, end)` is usually a **window for compositing**, not a single-scene acquisition selector.
 - `OutputSpec.grid()` may be a **token/patch grid**, not a georeferenced raster grid (especially for ViT-like backbones).
 - Cross-model comparisons are easiest with `OutputSpec.pooled()` and fixed ROI/temporal/compositing settings.
+- "Default Resolution" on this page means the default source/provider fetch resolution, not the final resized tensor shape fed into the backbone.
 - Multi-frame models (`agrifm`, `anysat`, `galileo`) need extra attention to frame count and temporal side inputs.
 
 Read the details in [Supported Models (Advanced Reference)](models_reference.md).

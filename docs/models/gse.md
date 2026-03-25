@@ -12,6 +12,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | Provider-sampled annual embedding image collection |
+| Default resolution | 10m default provider sampling (`OutputSpec.scale_m`) |
 | Temporal mode | **strict** `TemporalSpec.year(...)` |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |

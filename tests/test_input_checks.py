@@ -3,18 +3,17 @@ import os
 import numpy as np
 import pytest
 
+from rs_embed.core.specs import SensorSpec
 from rs_embed.tools.inspection import (
+    _env_flag,
+    _safe_float,
+    checks_enabled,
+    checks_save_dir,
+    checks_should_raise,
     inspect_chw,
     maybe_inspect_chw,
-    checks_enabled,
-    checks_should_raise,
-    checks_save_dir,
     save_quicklook_rgb,
-    _safe_float,
-    _env_flag,
 )
-from rs_embed.core.specs import SensorSpec
-
 
 # ══════════════════════════════════════════════════════════════════════
 # _env_flag / _safe_float helpers

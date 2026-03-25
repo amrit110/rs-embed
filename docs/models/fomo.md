@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 12-band (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (normalized via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | **required modality keys** (adapter provides S2 defaults, configurable via env) |

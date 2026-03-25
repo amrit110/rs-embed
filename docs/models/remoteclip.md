@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 RGB (`B4,B3,B2`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `TemporalSpec.range(...)` required |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |

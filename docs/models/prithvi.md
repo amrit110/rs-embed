@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee` via public API) |
 | Primary input | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) |
+| Default resolution | 30m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` preferred; adapter normalizes `year`/`None` to a range |
 | Output modes | `pooled`, `grid` |
 | Model config keys | `model_config["variant"]` (default: `prithvi_eo_v2_100_tl`) |

@@ -12,6 +12,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
 | Primary input | `BBox` / `PointBuffer` in EPSG:4326, sliced via vendored GeoTIFF bbox indexing |
+| Default resolution | 0.25° source product resolution |
 | Temporal mode | **strict** `TemporalSpec.year(2021)` in v0.1 |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |

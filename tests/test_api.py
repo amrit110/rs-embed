@@ -10,10 +10,9 @@ import pytest
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
-from rs_embed.core.specs import PointBuffer, TemporalSpec, OutputSpec, SensorSpec
+from rs_embed.core.specs import FetchSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.core.types import ExportConfig, ExportModelRequest, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
-
 
 # ── mock embedder ──────────────────────────────────────────────────
 
@@ -235,6 +234,37 @@ def test_get_embedding_modality_resolves_default_sensor():
     assert sensor.modality == "s1"
     assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
     assert sensor.bands == ("VV", "VH")
+
+
+def test_get_embedding_fetch_resolves_default_sensor():
+    from rs_embed.api import get_embedding
+
+    registry.register("mock_multi")(_MockMultimodalEmbedder)
+
+    emb = get_embedding(
+        "mock_multi",
+        spatial=_SPATIAL,
+        fetch=FetchSpec(scale_m=30, cloudy_pct=5),
+        backend="gee",
+    )
+    sensor = emb.meta["sensor"]
+    assert sensor is not None
+    assert sensor.modality == "s2"
+    assert sensor.collection == "COPERNICUS/S2_SR_HARMONIZED"
+    assert sensor.scale_m == 30
+    assert sensor.cloudy_pct == 5
+
+
+def test_get_embedding_rejects_sensor_and_fetch_together():
+    from rs_embed.api import get_embedding
+
+    with pytest.raises(ModelError, match="Use either sensor=... or fetch=..., not both"):
+        get_embedding(
+            "mock_model",
+            spatial=_SPATIAL,
+            sensor=SensorSpec(collection="COLL", bands=("B1",)),
+            fetch=FetchSpec(scale_m=20),
+        )
 
 
 def test_get_embedding_rejects_unsupported_modality():
@@ -800,6 +830,66 @@ def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
     assert sensor is not None
     assert sensor.modality == "s1"
     assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
+
+
+def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
+    from rs_embed.api import export_batch
+
+    registry.register("mock_multi")(_MockMultimodalEmbedder)
+    captured = {}
+
+    def _fake_run(self):
+        captured["sensor"] = self.models[0].sensor
+        return {"status": "ok"}
+
+    monkeypatch.setattr("rs_embed.pipelines.exporter.BatchExporter.run", _fake_run)
+
+    result = export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=["mock_multi"],
+        out_path=str(tmp_path / "combined"),
+        fetch=FetchSpec(scale_m=30, cloudy_pct=5),
+        backend="gee",
+        show_progress=False,
+    )
+
+    assert result == {"status": "ok"}
+    sensor = captured["sensor"]
+    assert sensor is not None
+    assert sensor.modality == "s2"
+    assert sensor.collection == "COPERNICUS/S2_SR_HARMONIZED"
+    assert sensor.scale_m == 30
+    assert sensor.cloudy_pct == 5
+
+
+def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
+    from rs_embed.api import export_batch
+
+    registry.register("mock_multi")(_MockMultimodalEmbedder)
+
+    monkeypatch.setattr(
+        "rs_embed.pipelines.exporter.BatchExporter.run",
+        lambda self: {"status": "unexpected"},
+    )
+
+    with pytest.raises(ModelError, match="Use either sensor=... or fetch=..., not both"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=[
+                ExportModelRequest(
+                    "mock_multi",
+                    sensor=SensorSpec(
+                        collection="COPERNICUS/S2_SR_HARMONIZED", bands=("B4", "B3", "B2")
+                    ),
+                    fetch=FetchSpec(scale_m=20),
+                )
+            ],
+            out_path=str(tmp_path / "combined"),
+            backend="gee",
+            show_progress=False,
+        )
 
 
 def test_export_batch_export_model_request_applies_per_model_overrides(monkeypatch, tmp_path):

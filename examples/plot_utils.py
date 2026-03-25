@@ -1,8 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from collections import defaultdict
 import json
+from collections import defaultdict
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def _npz_keys(npz_obj):
@@ -207,7 +208,7 @@ def plot_embedding_pseudocolor(
 
     rgbs = [
         transform_pca_rgb(item, item_pca, robust_lo=robust_lo, robust_hi=robust_hi)
-        for item, item_pca in zip(embeddings, pcas)
+        for item, item_pca in zip(embeddings, pcas, strict=True)
     ]
 
     width_scale = len(embeddings)
@@ -217,7 +218,7 @@ def plot_embedding_pseudocolor(
         figsize=(figsize[0] * width_scale, figsize[1]),
         squeeze=False,
     )
-    for ax, rgb, item_title in zip(axes[0], rgbs, titles):
+    for ax, rgb, item_title in zip(axes[0], rgbs, titles, strict=True):
         ax.imshow(rgb)
         ax.set_title(item_title)
         ax.axis("off")
@@ -228,7 +229,7 @@ def plot_embedding_pseudocolor(
     plt.show()
 
     if show_colorbars:
-        for item, item_pca, item_title in zip(embeddings, pcas, titles):
+        for item, item_pca, item_title in zip(embeddings, pcas, titles, strict=True):
             data = getattr(item, "data", item)
             dhw = _to_dhw(data)
             D, H, W = dhw.shape
@@ -307,7 +308,7 @@ def show_s1_vvvh_chw(
         raise ValueError(f"Expected at least 2 channels for VV/VH, got C={int(x.shape[0])}")
 
     fig, axes = plt.subplots(1, 2, figsize=figsize)
-    for ax, band_img, band_name in zip(axes, x[:2], tuple(band_names)[:2]):
+    for ax, band_img, band_name in zip(axes, x[:2], tuple(band_names)[:2], strict=True):
         img = _robust_scale01(band_img, lo=float(p_low), hi=float(p_high))
         if bool(flipud):
             img = np.flipud(img)
@@ -500,7 +501,7 @@ def load_export_npz(npz_path, json_path=None):
         raise FileNotFoundError(f"Missing: {json_path}")
 
     z = np.load(npz_path)
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(json_path, encoding="utf-8") as f:
         manifest = json.load(f)
     return manifest, z
 

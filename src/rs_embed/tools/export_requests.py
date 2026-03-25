@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from ..core.errors import ModelError
 from ..core.registry import get_embedder_cls
-from ..core.specs import InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import FetchSpec, InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import (
     ExportConfig,
     ExportLayout,
@@ -29,6 +29,7 @@ def normalize_export_layout(layout: str) -> ExportLayout:
         return ExportLayout.PER_ITEM
     raise ModelError(f"Unsupported export layout: {layout!r}. Supported: 'combined', 'per_item'.")
 
+
 def normalize_export_format(format_name: str) -> tuple[str, str]:
     fmt = str(format_name).strip().lower()
     from ..writers import SUPPORTED_FORMATS, get_extension
@@ -38,6 +39,7 @@ def normalize_export_format(format_name: str) -> tuple[str, str]:
             f"Unsupported export format: {format_name!r}. Supported: {SUPPORTED_FORMATS}."
         )
     return fmt, get_extension(fmt)
+
 
 def _resolve_export_batch_target(
     *,
@@ -74,6 +76,7 @@ def _resolve_export_batch_target(
     if len(point_names) != n_spatials:
         raise ModelError("names must have the same length as spatials.")
     return ExportTarget(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names)
+
 
 def normalize_export_target(
     *,
@@ -120,6 +123,7 @@ def normalize_export_target(
         out_path=out_path,
         names=names,
     )
+
 
 def normalize_export_config(
     *,
@@ -191,6 +195,7 @@ def normalize_export_config(
         input_prep=input_prep,
     )
 
+
 def resolve_export_model_configs(
     *,
     models: list[str | ExportModelRequest],
@@ -198,14 +203,17 @@ def resolve_export_model_configs(
     temporal: TemporalSpec | None,
     output: OutputSpec,
     sensor: SensorSpec | None,
+    fetch: FetchSpec | None,
     modality: str | None,
     per_model_sensors: dict[str, SensorSpec] | None,
+    per_model_fetches: dict[str, FetchSpec] | None,
     per_model_modalities: dict[str, str] | None,
 ) -> tuple[list[ModelConfig], dict[str, str]]:
     if not isinstance(models, list) or len(models) == 0:
         raise ModelError("models must be a non-empty list[str] or list[ExportModelRequest].")
 
     per_model_sensors = per_model_sensors or {}
+    per_model_fetches = per_model_fetches or {}
     per_model_modalities = per_model_modalities or {}
 
     requests: list[ExportModelRequest] = []
@@ -247,6 +255,10 @@ def resolve_export_model_configs(
         if sensor_eff is None:
             sensor_eff = per_model_sensors.get(model_name, sensor)
 
+        fetch_eff = req.fetch
+        if fetch_eff is None:
+            fetch_eff = per_model_fetches.get(model_name, fetch)
+
         model_configs.append(
             ModelConfig(
                 name=model_name,
@@ -254,6 +266,7 @@ def resolve_export_model_configs(
                 sensor=resolve_sensor_for_model(
                     model_n,
                     sensor=sensor_eff,
+                    fetch=fetch_eff,
                     modality=modality_eff,
                     default_when_missing=True,
                 ),
@@ -263,6 +276,7 @@ def resolve_export_model_configs(
         )
 
     return model_configs, resolved_backend
+
 
 def maybe_return_completed_combined_resume(
     *,

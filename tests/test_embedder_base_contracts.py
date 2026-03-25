@@ -3,10 +3,10 @@ import sys
 import numpy as np
 import pytest
 
-from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, TemporalSpec
 from rs_embed.core.errors import ModelError
-from rs_embed.embedders.precomputed_copernicus_embed import CopernicusEmbedder
+from rs_embed.core.specs import BBox, OutputSpec, PointBuffer, TemporalSpec
 from rs_embed.embedders._vendor.copernicus_embed import _bbox_to_window, _infer_axis_order
+from rs_embed.embedders.precomputed_copernicus_embed import CopernicusEmbedder
 from rs_embed.embedders.precomputed_gse_annual import GSEAnnualEmbedder
 from rs_embed.embedders.precomputed_tessera import TesseraEmbedder
 

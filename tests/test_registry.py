@@ -2,7 +2,6 @@ import pytest
 
 from rs_embed.core import registry
 
-
 # ── fixture to isolate registry between tests ──────────────────────
 
 
