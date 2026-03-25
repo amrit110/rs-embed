@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -56,6 +57,20 @@ _PRITHVI_VARIANT_TO_MODEL_KEY = {
     "600_tl": "prithvi_eo_v2_600_tl",
     "600m_tl": "prithvi_eo_v2_600_tl",
 }
+_PRITHVI_HF_SPECS = {
+    "prithvi_eo_v2_100_tl": {
+        "repo_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-100M-TL",
+        "checkpoint": "Prithvi_EO_V2_100M_TL.pt",
+    },
+    "prithvi_eo_v2_300_tl": {
+        "repo_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL",
+        "checkpoint": "Prithvi_EO_V2_300M_TL.pt",
+    },
+    "prithvi_eo_v2_600_tl": {
+        "repo_id": "ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL",
+        "checkpoint": "Prithvi_EO_V2_600M_TL.pt",
+    },
+}
 
 
 def _normalize_prithvi_variant(variant: Any) -> str:
@@ -81,6 +96,54 @@ def _resolve_prithvi_model_key(
 
     model_key = os.environ.get("RS_EMBED_PRITHVI_KEY", default_model_key).strip() or default_model_key
     return str(model_key), str(model_key)
+
+
+def _resolve_prithvi_hf_spec(model_key: str) -> dict[str, str]:
+    spec = _PRITHVI_HF_SPECS.get(str(model_key).strip())
+    if spec is None:
+        raise ModelError(
+            f"Unknown Prithvi model_key='{model_key}' "
+            "(expected one of: prithvi_eo_v2_100_tl, prithvi_eo_v2_300_tl, prithvi_eo_v2_600_tl)."
+        )
+    return dict(spec)
+
+
+def _prithvi_cache_dir() -> str | None:
+    raw = str(os.environ.get("RS_EMBED_PRITHVI_CACHE_DIR", "")).strip()
+    return raw or None
+
+
+def _torch_load_checkpoint_compat(path: str):
+    ensure_torch()
+    import torch
+
+    weights_only = str(os.environ.get("RS_EMBED_PRITHVI_WEIGHTS_ONLY", "1")).strip() not in (
+        "0",
+        "false",
+        "False",
+    )
+    try:
+        return torch.load(path, map_location="cpu", weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location="cpu")
+
+
+@lru_cache(maxsize=16)
+def _download_prithvi_file(repo_id: str, filename: str, cache_dir: str | None) -> str:
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as e:
+        raise ModelError(
+            "Prithvi checkpoint download requires huggingface_hub. "
+            "Install: pip install huggingface_hub"
+        ) from e
+    return str(hf_hub_download(repo_id=repo_id, filename=filename, cache_dir=cache_dir))
+
+
+def _load_prithvi_module():
+    from ._vendor.prithvi_mae import PrithviMAE
+
+    return PrithviMAE
 
 def _fetch_s2_prithvi6_chw(
     provider: ProviderBase,
@@ -186,7 +249,7 @@ def _spatial_center_lon_lat(spatial: SpatialSpec) -> tuple[float, float]:
     raise ModelError(f"Unsupported SpatialSpec: {type(spatial)}")
 
 # -------------------------
-# Prithvi model loading (TerraTorch)
+# Prithvi model loading (vendored HF runtime)
 # -------------------------
 
 @lru_cache(maxsize=8)
@@ -199,35 +262,52 @@ def _load_prithvi_cached(
     dev: str,
 ):
     ensure_torch()
+    spec = _resolve_prithvi_hf_spec(model_key)
+    cache_dir = _prithvi_cache_dir()
+    cfg_path = _download_prithvi_file(spec["repo_id"], "config.json", cache_dir)
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        config = json.load(f).get("pretrained_cfg", {})
+
+    if not isinstance(config, dict) or not config:
+        raise ModelError(f"Invalid Prithvi config at {cfg_path!r}.")
+
+    config = dict(config)
+    config["num_frames"] = int(num_frames)
+    config["in_chans"] = int(len(bands))
+    config["coords_encoding"] = list(coords_encoding)
+    if isinstance(config.get("patch_size"), list):
+        config["patch_size"] = tuple(int(v) for v in config["patch_size"])
 
     try:
-        from terratorch.registry import BACKBONE_REGISTRY
-    except ModuleNotFoundError as e:
-        if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError("Prithvi requires terratorch. Install: pip install terratorch") from e
-        raise ModelError(
-            "Failed to import terratorch registry while loading Prithvi. "
-            f"Missing dependency: {getattr(e, 'name', None) or e}. "
-            "Check optional mmseg/mmengine deps or process-level shim/module conflicts."
-        ) from e
+        PrithviMAE = _load_prithvi_module()
+        m = PrithviMAE(**config)
     except Exception as e:
         raise ModelError(
-            f"Failed to import terratorch registry while loading Prithvi: {type(e).__name__}: {e}"
+            f"Failed to initialize vendored Prithvi runtime for '{model_key}': "
+            f"{type(e).__name__}: {e}"
         ) from e
 
-    try:
-        m = BACKBONE_REGISTRY.build(
-            model_key,
-            pretrained=bool(pretrained),
-            bands=list(bands),
-            num_frames=int(num_frames),
-            coords_encoding=list(coords_encoding),
-        )
-    except Exception as e:
-        raise ModelError(
-            f"Failed to build Prithvi backbone '{model_key}'. "
-            f"Check terratorch install and model_key/bands/num_frames."
-        ) from e
+    ckpt_path = None
+    if pretrained:
+        ckpt_path = _download_prithvi_file(spec["repo_id"], spec["checkpoint"], cache_dir)
+        state_dict = _torch_load_checkpoint_compat(ckpt_path)
+        if not isinstance(state_dict, dict):
+            raise ModelError(
+                f"Unexpected Prithvi checkpoint object from {ckpt_path!r}: {type(state_dict)}"
+            )
+        state_dict = dict(state_dict)
+        # HF inference.py replaces fixed positional embeddings with runtime-sized tensors.
+        for key in list(state_dict.keys()):
+            if key == "encoder.pos_embed":
+                state_dict[key] = m.encoder.pos_embed
+            elif key == "decoder.decoder_pos_embed":
+                state_dict[key] = m.decoder.decoder_pos_embed
+        try:
+            m.load_state_dict(state_dict, strict=True)
+        except Exception as e:
+            raise ModelError(
+                f"Failed to load Prithvi checkpoint '{ckpt_path}': {type(e).__name__}: {e}"
+            ) from e
 
     try:
         m = m.to(dev).eval()
@@ -236,6 +316,10 @@ def _load_prithvi_cached(
 
     meta = {
         "model_key": model_key,
+        "repo_id": spec["repo_id"],
+        "checkpoint": spec["checkpoint"],
+        "config_path": cfg_path,
+        "checkpoint_path": ckpt_path,
         "pretrained": bool(pretrained),
         "bands": tuple(bands),
         "num_frames": int(num_frames),
@@ -253,7 +337,7 @@ def _load_prithvi(
     coords_encoding: tuple[str, ...],
     device: str = "auto",
 ):
-    """Load (and cache) a Prithvi backbone via TerraTorch.
+    """Load (and cache) a vendored Prithvi backbone.
 
     Returns: (model, meta, resolved_device)
     """
@@ -280,7 +364,6 @@ def _prithvi_forward_tokens(
 ) -> np.ndarray:
     """
     Run Prithvi forward and return token sequence [N,D] (may include CLS).
-    TerraTorch Prithvi commonly returns tokens as the last element in tuple/list.
     """
     ensure_torch()
     import pandas as pd
@@ -293,20 +376,26 @@ def _prithvi_forward_tokens(
 
     d = pd.to_datetime(date_str)
     temporal_coords = torch.tensor(
-        [[[float(d.year), float(d.dayofyear - 1)]]], dtype=torch.float32, device=device
+        [[[float(d.year), float(d.dayofyear)]]], dtype=torch.float32, device=device
     )  # [1,1,2]
-    # Prithvi location_coords order follows (lon, lat).
+    # Vendored Prithvi runtime expects location_coords in (lat, lon) order.
     location_coords = torch.tensor(
-        [[float(lon), float(lat)]], dtype=torch.float32, device=device
+        [[float(lat), float(lon)]], dtype=torch.float32, device=device
     )  # [1,2]
 
     with torch.no_grad():
-        out = model(x, temporal_coords=temporal_coords, location_coords=location_coords)
+        if hasattr(model, "forward_features"):
+            out = model.forward_features(
+                x,
+                temporal_coords=temporal_coords,
+                location_coords=location_coords,
+            )
+        else:
+            out = model(x, temporal_coords=temporal_coords, location_coords=location_coords)
 
     # normalize output -> tokens
     tokens = None
     if isinstance(out, (tuple, list)):
-        # notebook assumed last is tokens
         tokens = out[-1]
     elif hasattr(out, "last_hidden_state"):
         tokens = out.last_hidden_state
@@ -352,16 +441,23 @@ def _prithvi_forward_tokens_batch(
     lcoords = []
     for i in range(bsz):
         d = pd.to_datetime(date_str_batch[i])
-        tcoords.append([float(d.year), float(d.dayofyear - 1)])
+        tcoords.append([float(d.year), float(d.dayofyear)])
         lon, lat = lon_lat_batch[i]
-        lcoords.append([float(lon), float(lat)])
+        lcoords.append([float(lat), float(lon)])
     temporal_coords = torch.tensor(tcoords, dtype=torch.float32, device=device).unsqueeze(
         1
     )  # [B,1,2]
     location_coords = torch.tensor(lcoords, dtype=torch.float32, device=device)  # [B,2]
 
     with torch.inference_mode():
-        out = model(xb, temporal_coords=temporal_coords, location_coords=location_coords)
+        if hasattr(model, "forward_features"):
+            out = model.forward_features(
+                xb,
+                temporal_coords=temporal_coords,
+                location_coords=location_coords,
+            )
+        else:
+            out = model(xb, temporal_coords=temporal_coords, location_coords=location_coords)
 
     tokens = None
     if isinstance(out, (tuple, list)):
@@ -393,7 +489,7 @@ def _prithvi_forward_tokens_batch(
 @register("prithvi")
 class PrithviEOV2S2_6B_Embedder(EmbedderBase):
     """
-    Prithvi-EO v2 (TerraTorch) on-the-fly embeddings from Sentinel-2 6-band patch.
+    Prithvi-EO v2 (vendored HF runtime) on-the-fly embeddings from Sentinel-2 6-band patch.
 
     Inputs:
       - spatial: BBox/PointBuffer (EPSG:4326)
@@ -451,8 +547,8 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                 }
             },
             "notes": [
-                "Uses TerraTorch BACKBONE_REGISTRY.build(...)",
-                "Requires temporal_coords (year, dayofyear-1) and location_coords (lon, lat).",
+                "Uses vendored PrithviMAE runtime with weights downloaded from Hugging Face.",
+                "Requires temporal_coords (year, dayofyear) and location_coords (lat, lon).",
             ],
         }
 
@@ -611,7 +707,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
 
         meta = base_meta(
             model_name=self.model_name,
-            hf_id=model_key,  # for terratorch we store model key here
+            hf_id=str(wmeta.get("repo_id") or model_key),
             backend=str(backend).lower(),
             image_size=int(x_chw.shape[-1]),  # not fixed 224; depends on ROI/scale
             sensor=sensor,
@@ -838,7 +934,7 @@ class PrithviEOV2S2_6B_Embedder(EmbedderBase):
                     x_chw = x_prepared[i]
                     meta = base_meta(
                         model_name=self.model_name,
-                        hf_id=model_key,
+                        hf_id=str(wmeta.get("repo_id") or model_key),
                         backend=str(backend).lower(),
                         image_size=int(x_chw.shape[-1]),
                         sensor=sensor,

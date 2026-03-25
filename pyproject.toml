@@ -46,9 +46,6 @@ dependencies = [
   "Pillow>=10",
   "pandas>=2.3",
   "xarray>=2024.06.0",
-  
-  # Keep direct dependency explicit because multiple embedders import terratorch directly.
-  "terratorch==1.2.1", 
 
 ]
 
@@ -59,9 +56,14 @@ plot = [
 copernicus = [
   "tifffile>=2024.0.0",
 ]
+terramind = [
+  # TerraMind still loads its backbone through the TerraTorch registry.
+  "terratorch==1.2.1",
+]
 full = [
   "matplotlib>=3.10",
   "tifffile>=2024.0.0",
+  "terratorch==1.2.1",
 ]
 dev = [
   "pytest>=7.4",

@@ -1,6 +1,6 @@
 # Prithvi-EO v2 (`prithvi`)
 
-> TerraTorch-backed Prithvi adapter for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed and `model_config["variant"]` support for TL checkpoints.
+> Vendored Prithvi runtime for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed and `model_config["variant"]` support for TL checkpoints.
 
 ## Quick Facts
 
@@ -8,7 +8,7 @@
 |---|---|
 | Model ID | `prithvi` |
 | Aliases | `prithvi_eo_v2_s2_6b` |
-| Family / Backbone | Prithvi-EO v2 via TerraTorch `BACKBONE_REGISTRY` |
+| Family / Backbone | Prithvi-EO v2 via vendored `PrithviMAE` runtime |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee` via public API) |
 | Primary input | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) |
@@ -46,8 +46,8 @@
   - `year`: normalized to full-year half-open range `[YYYY-01-01, (YYYY+1)-01-01)`
   - `None`: normalized to adapter default range via shared helper (not recommended for reproducible experiments)
 - Adapter derives:
-  - temporal coordinates from temporal midpoint date
-  - location coordinates from ROI center `(lon, lat)` in EPSG:4326
+  - temporal coordinates as `(year, day_of_year)` from the temporal midpoint date
+  - location coordinates from ROI center, encoded as `(lat, lon)` for the vendored runtime
 
 ### Sensor / channels
 
@@ -82,8 +82,10 @@ Default `SensorSpec` if omitted:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `RS_EMBED_PRITHVI_KEY` | `prithvi_eo_v2_100_tl` | TerraTorch model key |
+| `RS_EMBED_PRITHVI_KEY` | `prithvi_eo_v2_100_tl` | Prithvi variant selector |
 | `RS_EMBED_PRITHVI_PRETRAINED` | `1` | Use pretrained weights vs random init |
+| `RS_EMBED_PRITHVI_CACHE_DIR` | unset | Optional Hugging Face cache dir for config/checkpoint downloads |
+| `RS_EMBED_PRITHVI_WEIGHTS_ONLY` | `1` | `torch.load(..., weights_only=...)` compatibility toggle |
 | `RS_EMBED_PRITHVI_PREP` | `resize` | Input prep mode: `resize` or `pad` |
 | `RS_EMBED_PRITHVI_IMG` | `224` | Target square size for `resize` mode |
 | `RS_EMBED_PRITHVI_PATCH_MULT` | `16` | Pad multiple for `pad` mode |
@@ -166,7 +168,7 @@ emb = get_embedding(
 
 - non-provider backend passed to adapter path
 - wrong `input_chw` channel count (must be 6)
-- missing TerraTorch/torch dependencies
+- missing torch / huggingface_hub dependencies
 - inconsistent comparisons due to hidden changes in `RS_EMBED_PRITHVI_PREP` / `RS_EMBED_PRITHVI_IMG`
 - confusion about `year` input semantics (adapter converts to full-year range)
 
