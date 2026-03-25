@@ -138,7 +138,7 @@ If you want to implement the extension yourself, you can also follow the guide i
 
 
 ## 🎖 Acknowledgements
-We would like to thank the following organizations and projects that make rs-embed possible: [Google Earth Engine](https://earthengine.google.com), [TorchGeo](https://github.com/torchgeo/torchgeo), [GeoTessera](https://github.com/ucam-eo/geotessera), [TerraTorch](https://github.com/terrastackai/terratorch), [rshf](https://github.com/mvrl/rshf), and the [Copernicus-Embed dataset on Hugging Face](https://huggingface.co/datasets/torchgeo/copernicus_embed).
+We would like to thank the following organizations and projects that make rs-embed possible: [Google Earth Engine](https://earthengine.google.com), [TorchGeo](https://github.com/torchgeo/torchgeo), [GeoTessera](https://github.com/ucam-eo/geotessera), [TerraTorch](https://github.com/terrastackai/terratorch), [rshf](https://github.com/mvrl/rshf), and the [Copernicus-Embed](https://huggingface.co/datasets/torchgeo/copernicus_embed).
 
 This library also builds upon the incredible work of the Remote Sensing community!(Full list and citations available in our Documentation)
 
