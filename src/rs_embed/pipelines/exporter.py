@@ -399,6 +399,13 @@ class BatchExporter:
             if mapping is None:
                 continue
             fetch_key = mapping[0]
+            member_keys = prefetch.fetch_members.get(fetch_key, [])
+            # A merged fetch group may represent a union of channels needed by
+            # multiple models. Model-specific fetch_input() implementations
+            # generally return only that model's own contract, so using one of
+            # them for a shared union fetch can truncate the prefetched tensor.
+            if len(member_keys) != 1:
+                continue
             if fetch_key in fetcher_by_key:
                 continue
             embedder, _lock = get_embedder_bundle_cached(

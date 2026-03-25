@@ -5,6 +5,8 @@ import pytest
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.specs import PointBuffer, TemporalSpec, SensorSpec, OutputSpec
+from rs_embed.core.types import FetchResult
+from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.runtime import get_embedder_bundle_cached
 
 
@@ -285,6 +287,137 @@ def test_export_batch_prefetch_reuses_superset_and_slices_subset(tmp_path, monke
     assert all(set(bands) == {"B2", "B3", "B4", "B8"} for bands in fetch_calls["bands"])
     assert DummyRGB.seen == [(4.0, 3.0, 2.0), (4.0, 3.0, 2.0)]
     assert DummyS2Superset.seen == [(2.0, 3.0, 4.0, 8.0), (2.0, 3.0, 4.0, 8.0)]
+
+
+def test_export_batch_prefetch_merged_groups_skip_custom_fetcher(tmp_path, monkeypatch):
+    class DummyRGBCustomFetch(EmbedderBase):
+        model_name = "dummy_rgb_custom_fetch"
+        fetch_calls = 0
+
+        def describe(self):
+            return {
+                "type": "on_the_fly",
+                "inputs": {"collection": "C", "bands": ["B4", "B3", "B2"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def fetch_input(self, provider, *, spatial, temporal, sensor):
+            _ = provider, spatial, temporal, sensor
+            DummyRGBCustomFetch.fetch_calls += 1
+            return FetchResult(data=np.ones((3, 2, 2), dtype=np.float32), meta={})
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            _ = spatial, temporal, sensor, output, backend, device
+            assert input_chw is not None
+            assert tuple(input_chw.shape) == (3, 2, 2)
+            return Embedding(data=np.array([1.0], dtype=np.float32), meta={})
+
+    class DummyS2Superset(EmbedderBase):
+        model_name = "dummy_s2_superset_custom_group"
+        seen = []
+
+        def describe(self):
+            return {
+                "type": "on_the_fly",
+                "inputs": {
+                    "collection": "C",
+                    "bands": [
+                        "B1", "B2", "B3", "B4", "B5", "B6",
+                        "B7", "B8", "B8A", "B9", "B11", "B12",
+                    ],
+                },
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            _ = spatial, temporal, sensor, output, backend, device
+            assert input_chw is not None
+            DummyS2Superset.seen.append(tuple(input_chw.shape))
+            assert tuple(input_chw.shape) == (12, 2, 2)
+            return Embedding(data=np.array([2.0], dtype=np.float32), meta={})
+
+    registry.register("dummy_rgb_custom_fetch")(DummyRGBCustomFetch)
+    registry.register("dummy_s2_superset_custom_group")(DummyS2Superset)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    generic_fetch = {"n": 0, "bands": []}
+
+    def fake_fetch(provider, *, spatial, temporal, sensor):
+        _ = provider, spatial, temporal
+        generic_fetch["n"] += 1
+        generic_fetch["bands"].append(tuple(sensor.bands))
+        return np.zeros((len(sensor.bands), 2, 2), dtype=np.float32)
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr("rs_embed.providers.gee_utils.fetch_gee_patch_raw", fake_fetch)
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    spatials = [
+        PointBuffer(lon=0, lat=0, buffer_m=10),
+        PointBuffer(lon=0.1, lat=0.1, buffer_m=10),
+    ]
+    out_dir = tmp_path / "merged_group_custom_fetch"
+    api.export_batch(
+        spatials=spatials,
+        temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
+        models=["dummy_rgb_custom_fetch", "dummy_s2_superset_custom_group"],
+        out_dir=str(out_dir),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+        save_inputs=False,
+        save_embeddings=True,
+        show_progress=False,
+    )
+
+    assert generic_fetch["n"] == len(spatials)
+    assert all(len(bands) == 12 for bands in generic_fetch["bands"])
+    assert DummyRGBCustomFetch.fetch_calls == 0
+    assert DummyS2Superset.seen == [(12, 2, 2), (12, 2, 2)]
 
 
 def test_export_batch_combined_npz_dedup(tmp_path, monkeypatch):
