@@ -16,6 +16,7 @@ from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import ExportConfig, ModelConfig, TaskResult
 from ..tools.output import normalize_embedding_output
 from ..tools.runtime import (
+    call_embedder_get_embedding as _runtime_call_embedder_get_embedding,
     embedder_accepts_model_config,
     get_embedder_bundle_cached,
     require_model_config_support,
@@ -29,6 +30,9 @@ from ..tools.tiling import (
     _resolve_input_prep_spec,
 )
 from .runner import run_with_retry
+
+# Backward-compatible module attribute for tests/monkeypatches.
+call_embedder_get_embedding = _runtime_call_embedder_get_embedding
 
 
 class _ModelContext(NamedTuple):
