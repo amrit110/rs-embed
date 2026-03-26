@@ -239,7 +239,7 @@ def test_dofa_tensor_get_embedding_uses_input_chw(monkeypatch):
 
     sensor = SensorSpec(
         collection="COPERNICUS/S2_SR_HARMONIZED",
-        bands=tuple(["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12"]),
+        bands=tuple(["B4", "B3", "B2", "B5", "B6", "B7", "B8", "B11", "B12"]),
     )
     out = emb.get_embedding(
         spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
@@ -247,11 +247,11 @@ def test_dofa_tensor_get_embedding_uses_input_chw(monkeypatch):
         sensor=sensor,
         output=OutputSpec.pooled(),
         backend="tensor",
-        input_chw=np.ones((12, 8, 8), dtype=np.float32),
+        input_chw=np.full((9, 8, 8), 5000.0, dtype=np.float32),
     )
 
-    assert seen["shape"] == (1, 12, 8, 8)
-    assert len(seen["wavelengths"]) == 12
+    assert seen["shape"] == (1, 9, 8, 8)
+    assert len(seen["wavelengths"]) == 9
     assert out.data.shape == (2,)
 
 
@@ -288,7 +288,7 @@ def test_dofa_tensor_get_embedding_uses_model_config_variant(monkeypatch):
 
     sensor = SensorSpec(
         collection="COPERNICUS/S2_SR_HARMONIZED",
-        bands=tuple(["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B9", "B11", "B12"]),
+        bands=tuple(["B4", "B3", "B2", "B5", "B6", "B7", "B8", "B11", "B12"]),
     )
     emb.get_embedding(
         spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
@@ -297,7 +297,7 @@ def test_dofa_tensor_get_embedding_uses_model_config_variant(monkeypatch):
         model_config={"variant": "large"},
         output=OutputSpec.pooled(),
         backend="tensor",
-        input_chw=np.ones((12, 8, 8), dtype=np.float32),
+        input_chw=np.full((9, 8, 8), 5000.0, dtype=np.float32),
     )
 
     assert seen["variant"] == "large"

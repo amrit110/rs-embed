@@ -38,22 +38,54 @@ from .runtime_utils import (
 )
 
 # -----------------------------
-# Defaults: Sentinel-2 SR (12 bands)
+# Defaults: Sentinel-2 SR (official DOFA 9-band order)
 # -----------------------------
-_S2_SR_12_BANDS = [
-    "B1",
-    "B2",
-    "B3",
+_DOFA_S2_BANDS = [
     "B4",
+    "B3",
+    "B2",
     "B5",
     "B6",
     "B7",
     "B8",
-    "B8A",
-    "B9",
     "B11",
     "B12",
 ]
+
+_DOFA_S2_MEAN = np.array(
+    [
+        114.1099739,
+        114.81779093,
+        126.63977424,
+        84.33539309,
+        97.84789168,
+        103.94461911,
+        101.435633,
+        72.32804172,
+        56.66528851,
+    ],
+    dtype=np.float32,
+)
+
+_DOFA_S2_STD = np.array(
+    [
+        77.84352553,
+        69.96844919,
+        67.42465279,
+        64.57022983,
+        61.72545487,
+        61.34187099,
+        60.29744676,
+        47.88519516,
+        42.55886798,
+    ],
+    dtype=np.float32,
+)
+
+_DOFA_S2_STATS_BY_BAND = {
+    band: (float(mean), float(std))
+    for band, mean, std in zip(_DOFA_S2_BANDS, _DOFA_S2_MEAN, _DOFA_S2_STD, strict=True)
+}
 
 # Sentinel-2 MSI band central wavelengths (µm)
 _S2_WAVELENGTHS_UM = {
@@ -79,6 +111,64 @@ def _infer_wavelengths_um(bands: list[str]) -> list[float] | None:
             return None
         wv.append(float(_S2_WAVELENGTHS_UM[b]))
     return wv
+
+
+def _resolve_dofa_s2_stats(
+    bands: list[str],
+) -> tuple[np.ndarray, np.ndarray] | None:
+    means: list[float] = []
+    stds: list[float] = []
+    for band in bands:
+        stats = _DOFA_S2_STATS_BY_BAND.get(str(band))
+        if stats is None:
+            return None
+        mean, std = stats
+        means.append(mean)
+        stds.append(std)
+    return np.asarray(means, dtype=np.float32), np.asarray(stds, dtype=np.float32)
+
+
+def _normalize_dofa_input_chw(
+    raw_chw: np.ndarray,
+    *,
+    bands: list[str],
+    input_name: str,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    x = np.asarray(raw_chw, dtype=np.float32)
+    if x.ndim != 3:
+        raise ModelError(f"{input_name} must be CHW, got shape={getattr(raw_chw, 'shape', None)}")
+    if int(x.shape[0]) != len(bands):
+        raise ModelError(
+            f"{input_name} channel mismatch: got C={int(x.shape[0])}, expected {len(bands)} for bands={bands}"
+        )
+
+    stats = _resolve_dofa_s2_stats(bands)
+    if stats is None:
+        raise ModelError(
+            "DOFA official preprocessing is only defined for Sentinel-2 subsets of "
+            f"{_DOFA_S2_BANDS}. Got bands={bands}."
+        )
+
+    max_v = float(np.nanmax(x)) if x.size else 0.0
+    min_v = float(np.nanmin(x)) if x.size else 0.0
+    if min_v >= 0.0 and max_v <= 2.0:
+        raise ModelError(
+            f"{input_name} appears already normalized (min={min_v:.4f}, max={max_v:.4f}). "
+            "DOFA now expects raw Sentinel-2 SR values in approximately [0,10000]."
+        )
+
+    mean, std = stats
+    std = np.maximum(std, 1e-6)
+    # Official DOFA demo normalizes uint8-like Sentinel-2 values using per-band
+    # statistics. Convert raw SR reflectance to the same 0..255-like scale first.
+    x = np.clip(x / 10000.0, 0.0, 1.0) * 255.0
+    x = (x - mean[:, None, None]) / std[:, None, None]
+    meta = {
+        "normalization": "official_dofa_s2_stats",
+        "normalization_source": "zhu_xlab_dofa_readme_demo",
+        "normalization_input_scale": "raw_sr_0_10000_to_0_255",
+    }
+    return x.astype(np.float32, copy=False), meta
 
 
 def _resize_chw(
@@ -108,7 +198,7 @@ def _resize_chw(
 
 
 # -----------------------------
-# Provider fetch (generic SR scaling /10000)
+# Provider fetch (raw SR values)
 # -----------------------------
 def _fetch_provider_multiband_sr_chw(
     provider: ProviderBase,
@@ -133,7 +223,7 @@ def _fetch_provider_multiband_sr_chw(
         composite=str(composite),
         fill_value=float(default_value),
     )
-    x = np.clip(raw / 10000.0, 0.0, 1.0).astype(np.float32)
+    x = np.clip(raw, 0.0, 10000.0).astype(np.float32)
 
     meta: dict[str, Any] = {
         "provider_collection": collection,
@@ -552,12 +642,12 @@ class DOFAEmbedder(EmbedderBase):
 
     input_spec = ModelInputSpec(
         collection="COPERNICUS/S2_SR_HARMONIZED",
-        bands=tuple(_S2_SR_12_BANDS),
+        bands=tuple(_DOFA_S2_BANDS),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_clip"),
+        normalization=NormalizationSpec(mode="s2_sr_raw"),
         image_size=224,
-        expected_channels=12,
+        expected_channels=9,
     )
 
     def describe(self) -> dict[str, Any]:
@@ -579,7 +669,7 @@ class DOFAEmbedder(EmbedderBase):
                 "scale_m": self.input_spec.scale_m,
                 "cloudy_pct": self.input_spec.cloudy_pct,
                 "composite": self.input_spec.composite,
-                "preprocess": "resize_to_224_bilinear",
+                "preprocess": "official_dofa_s2_stats_then_resize_to_224_bilinear",
             },
             "model_config": {
                 "variant": {
@@ -644,12 +734,21 @@ class DOFAEmbedder(EmbedderBase):
                 expected_channels=None,
                 model_name="DOFA",
             )
+            bands = list(getattr(sensor, "bands", [])) if hasattr(sensor, "bands") else []
+            if not bands:
+                raise ModelError(
+                    "DOFA tensor backend now requires sensor.bands so official preprocessing can be applied."
+                )
+            x_chw, norm_meta = _normalize_dofa_input_chw(
+                x_chw,
+                bands=bands,
+                input_name="input_chw",
+            )
             x_chw, resize_meta = _resize_chw(x_chw, size=image_size)
             x_bchw = x_chw[None, ...]
 
             wavelengths_um = getattr(sensor, "wavelengths", None)
             if wavelengths_um is None:
-                bands = list(getattr(sensor, "bands", [])) if hasattr(sensor, "bands") else []
                 if bands:
                     wavelengths_um = _infer_wavelengths_um(bands)
             if wavelengths_um is None:
@@ -659,7 +758,7 @@ class DOFAEmbedder(EmbedderBase):
                 )
             wavelengths_um = [float(v) for v in wavelengths_um]
 
-            provider_meta = {"backend_tensor": True}
+            provider_meta = {"backend_tensor": True, **norm_meta}
 
         else:
             provider = self._get_provider(backend)
@@ -676,7 +775,7 @@ class DOFAEmbedder(EmbedderBase):
                 else "COPERNICUS/S2_SR_HARMONIZED"
             )
             bands = (
-                list(getattr(sensor, "bands", _S2_SR_12_BANDS)) if sensor else list(_S2_SR_12_BANDS)
+                list(getattr(sensor, "bands", _DOFA_S2_BANDS)) if sensor else list(_DOFA_S2_BANDS)
             )
             scale_m = int(getattr(sensor, "scale_m", 10)) if sensor else 10
             cloudy_pct = int(getattr(sensor, "cloudy_pct", 30)) if sensor else 30
@@ -692,7 +791,7 @@ class DOFAEmbedder(EmbedderBase):
             wavelengths_um = [float(v) for v in wavelengths_um]
 
             if input_chw is None:
-                x_chw, provider_meta = _fetch_gee_multiband_sr_chw(
+                raw_chw, provider_meta = _fetch_gee_multiband_sr_chw(
                     provider,
                     spatial,
                     temporal,
@@ -709,9 +808,9 @@ class DOFAEmbedder(EmbedderBase):
                     raise ModelError(
                         f"input_chw must be CHW with {len(bands)} bands for DOFA, got {getattr(input_chw, 'shape', None)}"
                     )
-                x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0).astype(np.float32)
+                raw_chw = np.clip(input_chw.astype(np.float32), 0.0, 10000.0).astype(np.float32)
                 provider_meta = {
-                    "raw_chw_shape": tuple(x_chw.shape),
+                    "raw_chw_shape": tuple(raw_chw.shape),
                     "input_override": True,
                 }
 
@@ -720,11 +819,11 @@ class DOFAEmbedder(EmbedderBase):
 
             check_meta.clear()
             report = maybe_inspect_chw(
-                x_chw,
+                raw_chw,
                 sensor=sensor,
-                name="provider_multiband_sr_chw",
+                name="provider_multiband_sr_raw_chw",
                 expected_channels=len(bands),
-                value_range=(0.0, 1.0),
+                value_range=(0.0, 10000.0),
                 fill_value=0.0,
                 meta=check_meta,
             )
@@ -733,6 +832,12 @@ class DOFAEmbedder(EmbedderBase):
                     "Provider input inspection failed: " + "; ".join(report.get("issues", []))
                 )
 
+            x_chw, norm_meta = _normalize_dofa_input_chw(
+                raw_chw,
+                bands=bands,
+                input_name="provider_raw_chw",
+            )
+            provider_meta.update(norm_meta)
             x_chw, resize_meta = _resize_chw(x_chw, size=image_size)
             x_bchw = x_chw[None, ...].astype(np.float32)
         c = int(x_bchw.shape[1])
@@ -755,7 +860,7 @@ class DOFAEmbedder(EmbedderBase):
             "output_mode": output.mode,
             "device": str(device),
             "preprocess": {
-                "strategy": "resize_to_224_bilinear",
+                "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
                 "resize_meta": resize_meta,
             },
             "input_channels": int(c),
@@ -829,7 +934,7 @@ class DOFAEmbedder(EmbedderBase):
 
         ss = sensor or self._default_sensor()
         collection = str(getattr(ss, "collection", "COPERNICUS/S2_SR_HARMONIZED"))
-        bands = list(getattr(ss, "bands", _S2_SR_12_BANDS))
+        bands = list(getattr(ss, "bands", _DOFA_S2_BANDS))
         scale_m = int(getattr(ss, "scale_m", 10))
         cloudy_pct = int(getattr(ss, "cloudy_pct", 30))
         composite = str(getattr(ss, "composite", "median"))
@@ -838,7 +943,7 @@ class DOFAEmbedder(EmbedderBase):
         prefetched_raw: list[np.ndarray | None] = [None] * n
 
         def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray]:
-            x_chw, _ = _fetch_gee_multiband_sr_chw(
+            raw_chw, _ = _fetch_gee_multiband_sr_chw(
                 provider,
                 sp,
                 temporal,
@@ -849,8 +954,7 @@ class DOFAEmbedder(EmbedderBase):
                 composite=composite,
                 default_value=0.0,
             )
-            # get_embedding(input_chw=...) expects raw SR in [0..10000]
-            raw = np.clip(x_chw * 10000.0, 0.0, 10000.0).astype(np.float32)
+            raw = np.clip(raw_chw, 0.0, 10000.0).astype(np.float32)
             return i, raw
 
         mw = self._resolve_fetch_workers(n)
@@ -921,7 +1025,7 @@ class DOFAEmbedder(EmbedderBase):
 
         ss = sensor or self._default_sensor()
         variant = _resolve_dofa_variant(model_config=model_config)
-        bands = list(getattr(ss, "bands", _S2_SR_12_BANDS))
+        bands = list(getattr(ss, "bands", _DOFA_S2_BANDS))
         wavelengths_um = getattr(ss, "wavelengths", None)
         if wavelengths_um is None:
             wavelengths_um = _infer_wavelengths_um(bands)
@@ -939,7 +1043,11 @@ class DOFAEmbedder(EmbedderBase):
                     f"input_chw must be CHW with {len(bands)} bands for DOFA, got "
                     f"{getattr(input_chw, 'shape', None)} at index={i}"
                 )
-            x_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0).astype(np.float32)
+            x_chw, _ = _normalize_dofa_input_chw(
+                input_chw,
+                bands=bands,
+                input_name=f"input_chw[{i}]",
+            )
             x_chw, resize_meta = _resize_chw(x_chw, size=224)
             x_bchw_all.append(x_chw)
             resize_meta_all.append(resize_meta)
@@ -971,7 +1079,7 @@ class DOFAEmbedder(EmbedderBase):
                     "output_mode": output.mode,
                     "device": str(dev),
                     "preprocess": {
-                        "strategy": "resize_to_224_bilinear",
+                        "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
                         "resize_meta": resize_meta_all[i],
                     },
                     "input_channels": int(x_bchw_all[i].shape[0]),
@@ -983,6 +1091,9 @@ class DOFAEmbedder(EmbedderBase):
                     "token_meta": tmeta,
                     "batch_infer": True,
                     "input_override": True,
+                    "normalization": "official_dofa_s2_stats",
+                    "normalization_source": "zhu_xlab_dofa_readme_demo",
+                    "normalization_input_scale": "raw_sr_0_10000_to_0_255",
                     **mmeta,
                     "raw_chw_shape": tuple(input_chws[i].shape),
                 }

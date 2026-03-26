@@ -214,7 +214,7 @@ def test_dofa_auto_uses_cached_provider_path(monkeypatch):
     ):
         assert provider is fake_provider
         seen["provider_ok"] = True
-        x = np.ones((len(bands), 8, 8), dtype=np.float32)
+        x = np.full((len(bands), 8, 8), 5000.0, dtype=np.float32)
         return x, {"raw_chw_shape": tuple(x.shape)}
 
     def _fake_resize(x_chw, *, size=224):

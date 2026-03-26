@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
 import torch
 import torch.nn as nn
 
@@ -94,3 +96,32 @@ def test_resolve_dofa_variant_defaults_to_base():
     variant = dofa._resolve_dofa_variant(model_config=None)
 
     assert variant == "base"
+
+
+def test_normalize_dofa_input_chw_uses_official_s2_stats_by_band():
+    raw = np.full((2, 1, 1), 5000.0, dtype=np.float32)
+
+    x, meta = dofa._normalize_dofa_input_chw(
+        raw,
+        bands=["B4", "B12"],
+        input_name="input_chw",
+    )
+
+    expected_b4 = ((5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B4"][0]) / dofa._DOFA_S2_STATS_BY_BAND["B4"][1]
+    expected_b12 = ((5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B12"][0]) / dofa._DOFA_S2_STATS_BY_BAND["B12"][1]
+
+    assert x.shape == (2, 1, 1)
+    assert np.isclose(float(x[0, 0, 0]), expected_b4)
+    assert np.isclose(float(x[1, 0, 0]), expected_b12)
+    assert meta["normalization"] == "official_dofa_s2_stats"
+
+
+def test_normalize_dofa_input_chw_rejects_already_normalized_inputs():
+    raw = np.full((1, 2, 2), 1.0, dtype=np.float32)
+
+    with pytest.raises(dofa.ModelError, match="expects raw Sentinel-2 SR values"):
+        dofa._normalize_dofa_input_chw(
+            raw,
+            bands=["B4"],
+            input_name="input_chw",
+        )

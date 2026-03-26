@@ -10,7 +10,7 @@
 | Family / Backbone | DOFA ViT (`base` / `large`, official checkpoints) |
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
-| Primary input | Multiband SR CHW + wavelengths (µm) |
+| Primary input | Raw Sentinel-2 SR CHW + wavelengths (µm) |
 | Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` |
 | Output modes | `pooled`, `grid` |
@@ -48,25 +48,28 @@
 Default `SensorSpec` if omitted:
 
 - Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: S2 SR 12-band set (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`)
+- Bands: official DOFA S2 9-band order (`B4,B3,B2,B5,B6,B7,B8,B11,B12`)
 - `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
 
 Wavelengths:
 
 - Adapter requires one wavelength (µm) per channel
-- If `sensor.wavelengths` is not provided, adapter tries to infer from `sensor.bands` (works for recognized S2 band names)
+- If `sensor.wavelengths` is not provided, adapter tries to infer from `sensor.bands`
 - `len(wavelengths_um)` must equal channel count `C`
+- official preprocessing currently only supports subsets/re-orderings of the default DOFA S2 9-band set
 
 `input_chw` contract (provider override path):
 
 - must be `CHW` with `C == len(bands)`
-- raw SR values expected (`0..10000`), adapter converts to `[0,1]`
+- raw SR values expected (`0..10000`)
 
 ### Tensor backend contract
 
 - `backend="tensor"` requires `input_chw` as `CHW`
 - batch tensor inputs should use `get_embeddings_batch_from_inputs(...)`
+- `sensor.bands` is required so official preprocessing can be applied
 - `sensor.wavelengths` should be provided, or `sensor.bands` must allow wavelength inference
+- `input_chw` is expected to contain raw SR values (`0..10000`), not pre-normalized `[0,1]`
 
 ---
 
@@ -74,23 +77,27 @@ Wavelengths:
 
 ### Provider path
 
-1. Fetch multiband SR patch and scale to `[0,1]`
-2. Optional input inspection (`expected_channels=len(bands)`, value range `[0,1]`)
-3. Resize to fixed `224x224` (bilinear; no crop/pad)
-4. Load DOFA model variant (`base` / `large`)
-5. Forward with image tensor + wavelength vector
-6. Return pooled embedding or reshape tokens to patch-token grid
+1. Fetch raw multiband Sentinel-2 SR patch
+2. Optional input inspection on raw SR (`expected_channels=len(bands)`, value range `[0,10000]`)
+3. Convert raw SR `0..10000` to `0..255`-like scale
+4. Apply official DOFA S2 per-band mean/std normalization
+5. Resize to fixed `224x224` (bilinear; no crop/pad)
+6. Load DOFA model variant (`base` / `large`)
+7. Forward with image tensor + wavelength vector
+8. Return pooled embedding or reshape tokens to patch-token grid
 
 ### Tensor path
 
-1. Read `input_chw` (`CHW`)
-2. Resize to `224x224`
-3. Resolve wavelengths from `sensor.wavelengths` or infer from `sensor.bands`
-4. Forward DOFA with image + wavelengths
+1. Read raw SR `input_chw` (`CHW`)
+2. Apply the same official DOFA S2 per-band normalization used by the provider path
+3. Resize to `224x224`
+4. Resolve wavelengths from `sensor.wavelengths` or infer from `sensor.bands`
+5. Forward DOFA with image + wavelengths
 
 Fixed adapter behavior:
 
 - image size fixed to `224` in current implementation
+- current official preprocessing path is defined for Sentinel-2 subsets of `B4,B3,B2,B5,B6,B7,B8,B11,B12`
 
 ---
 
@@ -185,7 +192,8 @@ sensor = SensorSpec(
 
 - provider path called with non-`range` temporal spec
 - wavelength vector missing or wrong length for channel count
-- unsupported band names for automatic wavelength inference
+- unsupported bands for the official S2 preprocessing path
+- tensor backend called with already-normalized `[0,1]` inputs
 - tensor backend called without `input_chw`
 - unknown `variant` (must be `base` or `large`)
 
