@@ -210,7 +210,7 @@ def _import_terramind_backbone_registry() -> Any:
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
             raise ModelError(
-                "TerraMind requires terratorch. Install: pip install terratorch"
+                'TerraMind requires terratorch. Install: pip install -e ".[terratorch]"'
             ) from e
         raise ModelError(
             "Failed to import terratorch registry while loading TerraMind. "
@@ -257,7 +257,7 @@ def _ensure_terramind_backbone_registered(backbone_registry: Any, *, model_key: 
         except ModuleNotFoundError as e:
             if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
                 raise ModelError(
-                    "TerraMind requires terratorch. Install: pip install terratorch"
+                    'TerraMind requires terratorch. Install: pip install -e ".[terratorch]"'
                 ) from e
             raise ModelError(
                 f"Failed to import TerraMind registration module '{module_name}': "

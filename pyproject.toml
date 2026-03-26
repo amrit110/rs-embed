@@ -50,6 +50,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# terratorch is required by TerraMind (and temporarily Prithvi until it is isolated).
+# Install with: pip install rs-embed[terratorch]
+#           or: uv add rs-embed[terratorch]
+terratorch = [
+  "terratorch==1.2.1",
+]
 plot = [
   "matplotlib>=3.10",
 ]
