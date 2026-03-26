@@ -7,6 +7,7 @@ import re
 import sys
 import types
 import urllib.request
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from typing import Any
@@ -650,6 +651,9 @@ class AgriFMEmbedder(EmbedderBase):
         norm_mode = os.environ.get("RS_EMBED_AGRIFM_NORM", self.DEFAULT_NORM).strip()
 
         ckpt_path = _resolve_ckpt_path()
+        input_mode = "provider_multiframe"
+        input_original_frames: int | None = None
+        input_repeated_to_t = False
         if input_chw is None:
             raw_tchw = _fetch_s2_10_raw_tchw(
                 self._get_provider(backend),
@@ -668,20 +672,33 @@ class AgriFMEmbedder(EmbedderBase):
                     raise ModelError(
                         f"input_chw must be CHW with 10 bands for agrifm, got {raw.shape}"
                     )
+                warnings.warn(
+                    f"AgriFM received CHW input and is repeating it to T={n_frames}. "
+                    "This changes temporal semantics; prefer real TCHW input when available.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
                 raw_tchw = np.repeat(raw[None, ...], repeats=n_frames, axis=0).astype(np.float32)
+                input_mode = "chw_repeated_to_t"
+                input_original_frames = 1
+                input_repeated_to_t = True
             elif raw.ndim == 4:
                 if int(raw.shape[1]) != len(_S2_10_BANDS):
                     raise ModelError(
                         f"input_chw must be TCHW with C=10 for agrifm, got {raw.shape}"
                     )
                 raw_tchw = raw.astype(np.float32, copy=False)
+                input_original_frames = int(raw_tchw.shape[0])
+                input_mode = "tchw_exact"
                 if raw_tchw.shape[0] < n_frames:
                     raw_tchw = np.concatenate(
                         [raw_tchw] + [raw_tchw[-1:]] * (n_frames - raw_tchw.shape[0]),
                         axis=0,
                     )
+                    input_mode = "tchw_padded_last"
                 elif raw_tchw.shape[0] > n_frames:
                     raw_tchw = raw_tchw[:n_frames]
+                    input_mode = "tchw_truncated"
             else:
                 raise ModelError(
                     f"input_chw must be CHW (10 bands) or TCHW (T,10,H,W), got {getattr(raw, 'shape', None)}"
@@ -692,7 +709,12 @@ class AgriFMEmbedder(EmbedderBase):
         # Optional: inspect first frame on normalized [0,1] scale.
         from ..tools.inspection import checks_should_raise, maybe_inspect_chw
 
-        check_meta: dict[str, Any] = {"input_frames": int(raw_tchw.shape[0])}
+        check_meta: dict[str, Any] = {
+            "input_frames": int(raw_tchw.shape[0]),
+            "input_mode": input_mode,
+            "input_original_frames": input_original_frames,
+            "input_repeated_to_t": bool(input_repeated_to_t),
+        }
         report = maybe_inspect_chw(
             np.clip(raw_tchw[0] / 10000.0, 0.0, 1.0).astype(np.float32),
             sensor=sensor,
