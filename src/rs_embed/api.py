@@ -26,6 +26,7 @@ Flow summary
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from .core.embedding import Embedding
@@ -56,9 +57,6 @@ from .core.validation import (
 from .embedders.catalog import MODEL_ALIASES, MODEL_SPECS
 from .tools.export_requests import (
     maybe_return_completed_combined_resume as _maybe_return_completed_combined_resume,
-)
-from .tools.export_requests import (
-    normalize_export_config as _normalize_export_config,
 )
 from .tools.export_requests import (
     normalize_export_format as _normalize_export_format,
@@ -339,13 +337,8 @@ def export_batch(
     spatials: list[SpatialSpec],
     temporal: TemporalSpec | None,
     models: list[str | ExportModelRequest],
-    target: ExportTarget | None = None,
-    config: ExportConfig | None = None,
-    out: str | None = None,
-    layout: str | None = None,
-    out_dir: str | None = None,
-    out_path: str | None = None,
-    names: list[str] | None = None,
+    target: ExportTarget,
+    config: ExportConfig = ExportConfig(),
     backend: str = "auto",
     device: str = "auto",
     output: OutputSpec = OutputSpec.pooled(),
@@ -355,22 +348,6 @@ def export_batch(
     per_model_sensors: dict[str, SensorSpec] | None = None,
     per_model_fetches: dict[str, FetchSpec] | None = None,
     per_model_modalities: dict[str, str] | None = None,
-    format: str = "npz",
-    save_inputs: bool = True,
-    save_embeddings: bool = True,
-    save_manifest: bool = True,
-    fail_on_bad_input: bool = False,
-    chunk_size: int = 16,
-    infer_batch_size: int | None = None,
-    num_workers: int = 8,
-    continue_on_error: bool = False,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.0,
-    async_write: bool = True,
-    writer_workers: int = 2,
-    resume: bool = False,
-    show_progress: bool = True,
-    input_prep: InputPrepSpec | str | None = "resize",
 ) -> Any:
     """Export inputs + embeddings for many spatials and many models.
 
@@ -385,21 +362,12 @@ def export_batch(
         Optional temporal filter applied to all spatial requests.
     models : list[str | ExportModelRequest]
         Model identifiers or per-model request objects.
-    target : ExportTarget or None
-        Preferred output target object for new code.
-    config : ExportConfig or None
-        Preferred export runtime configuration object for new code.
-    out : str or None
-        Legacy output path hint. Combined layout when file-like, per-item
-        layout when directory-like.
-    layout : str or None
-        Explicit layout override (``"combined"`` or ``"per_item"``).
-    out_dir : str or None
-        Directory path for per-item exports.
-    out_path : str or None
-        File path for combined exports.
-    names : list[str] or None
-        Legacy names aligned with ``spatials`` for per-item outputs.
+    target : ExportTarget
+        Output destination: use :meth:`ExportTarget.per_item` for per-item
+        directory exports or :meth:`ExportTarget.combined` for a single file.
+    config : ExportConfig
+        Runtime configuration (format, workers, resume, etc.).
+        Defaults to :class:`ExportConfig` with all defaults applied.
     backend : str
         Backend/provider selector.
     device : str
@@ -421,11 +389,6 @@ def export_batch(
         combined with sensor overrides for the same model.
     per_model_modalities : dict[str, str] or None
         Optional per-model modality overrides keyed by model name.
-    format / save_* / fail_on_bad_input / chunk_size / infer_batch_size /
-    num_workers / continue_on_error / max_retries / retry_backoff_s /
-    async_write / writer_workers / resume / show_progress / input_prep
-        Legacy config-style keyword arguments. New code should prefer
-        ``config=ExportConfig(...)``.
 
     Returns
     -------
@@ -448,36 +411,13 @@ def export_batch(
     backend_n = _normalize_backend_name(backend)
     device_n = _normalize_device_name(device)
 
-    export_config = _normalize_export_config(
-        config=config,
-        format=format,
-        save_inputs=save_inputs,
-        save_embeddings=save_embeddings,
-        save_manifest=save_manifest,
-        fail_on_bad_input=fail_on_bad_input,
-        chunk_size=chunk_size,
-        infer_batch_size=infer_batch_size,
-        num_workers=num_workers,
-        continue_on_error=continue_on_error,
-        max_retries=max_retries,
-        retry_backoff_s=retry_backoff_s,
-        async_write=async_write,
-        writer_workers=writer_workers,
-        resume=resume,
-        show_progress=show_progress,
-        input_prep=input_prep,
-    )
-    _fmt, ext = _normalize_export_format(export_config.format)
+    fmt, ext = _normalize_export_format(config.format)
+    export_config = replace(config, format=fmt)
 
     export_target = _normalize_export_target(
         n_spatials=len(spatials),
         ext=ext,
         target=target,
-        out=out,
-        layout=layout,
-        out_dir=out_dir,
-        out_path=out_path,
-        names=names,
     )
 
     _validate_spatial_list(spatials=spatials, temporal=temporal, output=output)

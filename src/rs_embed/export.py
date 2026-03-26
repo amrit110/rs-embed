@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from typing import Any
 
-from .core.specs import FetchSpec, InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from .core.specs import FetchSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from .core.types import ExportConfig, ExportTarget
 
 
 def export_npz(
@@ -24,17 +26,14 @@ def export_npz(
     fetch: FetchSpec | None = None,
     per_model_sensors: dict[str, SensorSpec] | None = None,
     per_model_fetches: dict[str, FetchSpec] | None = None,
-    save_inputs: bool = True,
-    save_embeddings: bool = True,
-    save_manifest: bool = True,
-    fail_on_bad_input: bool = False,
-    infer_batch_size: int | None = None,
-    continue_on_error: bool = False,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.0,
-    input_prep: InputPrepSpec | str | None = "resize",
+    config: ExportConfig = ExportConfig(),
 ) -> dict[str, Any]:
-    """Export inputs + embeddings for one spatial query to a single `.npz`."""
+    """Export inputs + embeddings for one spatial query to a single `.npz`.
+
+    The output format is always ``"npz"`` regardless of any ``config.format``
+    value passed in; ``config`` controls all other runtime settings (workers,
+    resume, show_progress, input_prep, etc.).
+    """
     from .api import export_batch as _api_export_batch
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
@@ -45,7 +44,8 @@ def export_npz(
         spatials=[spatial],
         temporal=temporal,
         models=models,
-        out_path=out_path,
+        target=ExportTarget.combined(out_path),
+        config=replace(config, format="npz"),
         backend=backend,
         device=device,
         output=output,
@@ -53,14 +53,4 @@ def export_npz(
         fetch=fetch,
         per_model_sensors=per_model_sensors,
         per_model_fetches=per_model_fetches,
-        format="npz",
-        save_inputs=save_inputs,
-        save_embeddings=save_embeddings,
-        save_manifest=save_manifest,
-        fail_on_bad_input=fail_on_bad_input,
-        infer_batch_size=infer_batch_size,
-        continue_on_error=continue_on_error,
-        max_retries=max_retries,
-        retry_backoff_s=retry_backoff_s,
-        input_prep=input_prep,
     )

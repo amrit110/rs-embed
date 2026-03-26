@@ -6,7 +6,7 @@ import pytest
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.specs import InputPrepSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
-from rs_embed.core.types import ExportConfig, FetchResult
+from rs_embed.core.types import ExportConfig, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.runtime import get_embedder_bundle_cached
 
@@ -146,15 +146,17 @@ def test_export_batch_prefetch_dedup_across_models(tmp_path, monkeypatch):
         spatials=spatials,
         temporal=temporal,
         models=["dummy_a", "dummy_b"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(
+            save_inputs=True,
+            save_embeddings=True,
+            chunk_size=10,
+            num_workers=4,
+        ),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
         sensor=sensor,
-        save_inputs=True,
-        save_embeddings=True,
-        chunk_size=10,
-        num_workers=4,
     )
 
     # One fetch per spatial (dedup across models sharing identical sensor)
@@ -275,13 +277,11 @@ def test_export_batch_prefetch_reuses_superset_and_slices_subset(tmp_path, monke
         spatials=spatials,
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_rgb_subset", "dummy_s2_superset"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert fetch_calls["n"] == len(spatials)
@@ -416,13 +416,11 @@ def test_export_batch_prefetch_merged_groups_skip_custom_fetcher(tmp_path, monke
         spatials=spatials,
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_rgb_custom_fetch", "dummy_s2_superset_custom_group"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert generic_fetch["n"] == len(spatials)
@@ -504,14 +502,12 @@ def test_export_batch_combined_npz_dedup(tmp_path, monkeypatch):
         spatials=spatials,
         temporal=temporal,
         models=["dummy_c"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, num_workers=4),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
         sensor=sensor,
-        save_inputs=True,
-        save_embeddings=True,
-        num_workers=4,
     )
 
     assert out_path.exists()
@@ -582,13 +578,11 @@ def test_export_batch_combined_prefetch_checkpoint_handles_variable_input_shapes
         spatials=spatials,
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_var_shape"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=True,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert out_path.exists()
@@ -674,13 +668,11 @@ def test_export_batch_combined_falls_back_to_single_when_batch_api_fails(tmp_pat
         ],
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_batch_fail"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=True,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert out_path.exists()
@@ -792,13 +784,11 @@ def test_export_batch_combined_prefetch_reuses_superset_and_slices_subset(tmp_pa
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_rgb_subset_combined", "dummy_s2_superset_combined"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert out_path.exists()
@@ -860,13 +850,11 @@ def test_export_batch_per_item_prefers_batch_inference_on_gpu(tmp_path, monkeypa
         ],
         temporal=TemporalSpec.year(2022),
         models=["dummy_batch_gpu_dir"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cuda",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert (out_dir / "p00000.npz").exists()
@@ -925,13 +913,11 @@ def test_export_batch_per_item_cpu_defaults_to_single_inference(tmp_path, monkey
         ],
         temporal=TemporalSpec.year(2022),
         models=["dummy_batch_gpu_dir_single"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert DummyBatchGPUOff.batch_calls == 0
@@ -1002,15 +988,17 @@ def test_export_batch_netcdf_per_item(tmp_path, monkeypatch):
         spatials=spatials,
         temporal=temporal,
         models=["dummy_nc"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(
+            format="netcdf",
+            save_inputs=True,
+            save_embeddings=True,
+            save_manifest=True,
+        ),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
         sensor=sensor,
-        format="netcdf",
-        save_inputs=True,
-        save_embeddings=True,
-        save_manifest=True,
     )
 
     assert len(res) == len(spatials)
@@ -1095,14 +1083,12 @@ def test_export_batch_netcdf_combined(tmp_path, monkeypatch):
         spatials=spatials,
         temporal=temporal,
         models=["dummy_comb"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(format="netcdf", save_inputs=True, save_embeddings=True),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
         sensor=sensor,
-        format="netcdf",
-        save_inputs=True,
-        save_embeddings=True,
     )
 
     assert out_path.exists()
@@ -1172,13 +1158,11 @@ def test_export_batch_combined_fail_on_bad_input(tmp_path, monkeypatch):
             spatials=[PointBuffer(lon=0, lat=0, buffer_m=10)],
             temporal=TemporalSpec.year(2022),
             models=["dummy_bad"],
-            out_path=str(tmp_path / "bad.npz"),
+            target=ExportTarget.combined(str(tmp_path / "bad.npz")),
+            config=ExportConfig(save_inputs=True, save_embeddings=False, fail_on_bad_input=True),
             backend="gee",
             output=OutputSpec.pooled(),
             sensor=SensorSpec(collection="C", bands=("B1",)),
-            save_inputs=True,
-            save_embeddings=False,
-            fail_on_bad_input=True,
         )
 
 
@@ -1242,14 +1226,16 @@ def test_export_batch_combined_partial_inputs_include_indices(tmp_path, monkeypa
         ],
         temporal=TemporalSpec.year(2022),
         models=["dummy_input_only"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(
+            save_inputs=True,
+            save_embeddings=False,
+            continue_on_error=True,
+            show_progress=False,
+        ),
         backend="gee",
         output=OutputSpec.pooled(),
         sensor=SensorSpec(collection="C", bands=("B1",)),
-        save_inputs=True,
-        save_embeddings=False,
-        continue_on_error=True,
-        show_progress=False,
     )
 
     assert out_path.exists()
@@ -1327,12 +1313,11 @@ def test_export_batch_prefetch_used_even_without_saving_inputs(tmp_path, monkeyp
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_need_input"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True),
         backend="gee",
         output=OutputSpec.pooled(),
         sensor=sensor,
-        save_inputs=False,
-        save_embeddings=True,
     )
 
     assert calls["fetch"] == len(spatials)
@@ -1421,13 +1406,11 @@ def test_export_batch_continue_on_error_partial_manifest(tmp_path, monkeypatch):
         spatials=[PointBuffer(lon=0, lat=0, buffer_m=10)],
         temporal=TemporalSpec.year(2022),
         models=["dummy_good", "dummy_bad2"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, continue_on_error=True),
         backend="gee",
         output=OutputSpec.pooled(),
         sensor=SensorSpec(collection="C", bands=("B1",)),
-        save_inputs=True,
-        save_embeddings=True,
-        continue_on_error=True,
     )
 
     assert len(res) == 1
@@ -1488,11 +1471,10 @@ def test_export_batch_combined_prefers_model_batch_api(tmp_path):
         ],
         temporal=TemporalSpec.year(2022),
         models=["dummy_batch"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
     )
 
     assert out_path.exists()
@@ -1585,11 +1567,7 @@ def test_export_batch_per_item_cpu_honors_config_input_prep_tile(tmp_path, monke
         spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=10)],
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_tile_per_item"],
-        out_dir=str(out_dir),
-        backend="gee",
-        device="cpu",
-        output=OutputSpec.pooled(),
-        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
+        target=ExportTarget.per_item(str(out_dir)),
         config=ExportConfig(
             save_inputs=True,
             save_embeddings=True,
@@ -1597,6 +1575,10 @@ def test_export_batch_per_item_cpu_honors_config_input_prep_tile(tmp_path, monke
             async_write=False,
             input_prep=InputPrepSpec.tile(tile_size=4, max_tiles=9),
         ),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
     )
 
     assert len(res) == 1
@@ -1691,17 +1673,17 @@ def test_export_batch_combined_honors_config_input_prep_tile(tmp_path, monkeypat
         spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=10)],
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=["dummy_tile_combined"],
-        out_path=str(out_path),
-        backend="gee",
-        device="cpu",
-        output=OutputSpec.pooled(),
-        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
+        target=ExportTarget.combined(str(out_path)),
         config=ExportConfig(
             save_inputs=True,
             save_embeddings=True,
             show_progress=False,
             input_prep=InputPrepSpec.tile(tile_size=4, max_tiles=9),
         ),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+        sensor=SensorSpec(collection="C", bands=("B1", "B2", "B3"), scale_m=10),
     )
 
     assert out_path.exists()
@@ -1794,12 +1776,11 @@ def test_export_batch_dedup_inputs_across_models_in_file(tmp_path, monkeypatch):
         spatials=[PointBuffer(lon=0, lat=0, buffer_m=10)],
         temporal=TemporalSpec.year(2022),
         models=["dummy_dedup_a", "dummy_dedup_b"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True),
         backend="gee",
         output=OutputSpec.pooled(),
         sensor=SensorSpec(collection="C", bands=("B1",)),
-        save_inputs=True,
-        save_embeddings=True,
     )
 
     npz = np.load(out_dir / "p00000.npz")
@@ -1849,12 +1830,10 @@ def test_export_batch_resume_out_dir_skips_existing(tmp_path):
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_resume_dir"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
     assert len(first) == len(spatials)
     assert DummyResumeDir.calls == len(spatials)
@@ -1863,13 +1842,12 @@ def test_export_batch_resume_out_dir_skips_existing(tmp_path):
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_resume_dir"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, resume=True, show_progress=False
+        ),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        resume=True,
-        show_progress=False,
     )
     assert len(second) == len(spatials)
     assert DummyResumeDir.calls == len(spatials)
@@ -1913,12 +1891,10 @@ def test_export_batch_resume_out_path_skips_existing(tmp_path):
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_resume_combined"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
     assert DummyResumeCombined.calls == len(spatials)
 
@@ -1926,13 +1902,12 @@ def test_export_batch_resume_out_path_skips_existing(tmp_path):
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_resume_combined"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, resume=True, show_progress=False
+        ),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        resume=True,
-        show_progress=False,
     )
     assert bool(skipped.get("resume_skipped"))
     assert DummyResumeCombined.calls == len(spatials)
@@ -1997,13 +1972,11 @@ def test_export_batch_combined_saves_prefetch_checkpoint_before_inference(tmp_pa
             ],
             temporal=TemporalSpec.year(2022),
             models=["dummy_crash_after_fetch"],
-            out_path=str(out_path),
+            target=ExportTarget.combined(str(out_path)),
+            config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
             backend="gee",
             output=OutputSpec.pooled(),
             sensor=SensorSpec(collection="C", bands=("B1", "B2")),
-            save_inputs=False,
-            save_embeddings=True,
-            show_progress=False,
         )
 
     assert out_path.exists()
@@ -2119,13 +2092,11 @@ def test_export_batch_combined_resume_continues_remaining_models(tmp_path, monke
             spatials=spatials,
             temporal=TemporalSpec.year(2022),
             models=["dummy_resume_good_ckpt", "dummy_resume_flaky_ckpt"],
-            out_path=str(out_path),
+            target=ExportTarget.combined(str(out_path)),
+            config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
             backend="gee",
             output=OutputSpec.pooled(),
             sensor=SensorSpec(collection="C", bands=("B1", "B2")),
-            save_inputs=False,
-            save_embeddings=True,
-            show_progress=False,
         )
 
     first_good_calls = DummyResumeGood.calls
@@ -2138,14 +2109,13 @@ def test_export_batch_combined_resume_continues_remaining_models(tmp_path, monke
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_resume_good_ckpt", "dummy_resume_flaky_ckpt"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, resume=True, show_progress=False
+        ),
         backend="gee",
         output=OutputSpec.pooled(),
         sensor=SensorSpec(collection="C", bands=("B1", "B2")),
-        save_inputs=False,
-        save_embeddings=True,
-        resume=True,
-        show_progress=False,
     )
 
     assert result["status"] == "ok"
@@ -2222,13 +2192,12 @@ def test_export_batch_progress_updates_point_and_model_bars(tmp_path, monkeypatc
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_progress"],
-        out_dir=str(tmp_path / "progress"),
+        target=ExportTarget.per_item(str(tmp_path / "progress")),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, chunk_size=1, show_progress=True
+        ),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        chunk_size=1,
-        show_progress=True,
     )
 
     assert state["export_batch"]["total"] == len(spatials)
@@ -2320,13 +2289,12 @@ def test_export_batch_combined_progress_updates_model_inference(tmp_path, monkey
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_batch_progress", "dummy_single_progress"],
-        out_path=str(tmp_path / "combined_progress.npz"),
+        target=ExportTarget.combined(str(tmp_path / "combined_progress.npz")),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, chunk_size=1, show_progress=True
+        ),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        chunk_size=1,
-        show_progress=True,
     )
 
     assert state["export_batch[combined]"]["total"] == 2
@@ -2387,13 +2355,12 @@ def test_export_batch_combined_progress_fills_on_model_init_failure(tmp_path, mo
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_init_fail"],
-        out_path=str(tmp_path / "combined_progress_init_fail.npz"),
+        target=ExportTarget.combined(str(tmp_path / "combined_progress_init_fail.npz")),
+        config=ExportConfig(
+            save_inputs=False, save_embeddings=True, continue_on_error=True, show_progress=True
+        ),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        continue_on_error=True,
-        show_progress=True,
     )
 
     assert result["status"] == "failed"
@@ -2429,12 +2396,10 @@ def test_export_batch_combined_embedder_without_input_chw_kwarg(tmp_path):
         spatials=spatials,
         temporal=TemporalSpec.year(2022),
         models=["dummy_no_input_kwarg"],
-        out_path=str(out_path),
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=False, save_embeddings=True, show_progress=False),
         backend="local",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     assert out_path.exists()
