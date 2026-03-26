@@ -8,10 +8,9 @@ precomputed models.
 
 from unittest.mock import patch
 
-
 from rs_embed.api import (
-    _resolve_embedding_api_backend,
     _default_provider_backend_for_api,
+    _resolve_embedding_api_backend,
 )
 from rs_embed.tools.runtime import provider_factory_for_backend
 

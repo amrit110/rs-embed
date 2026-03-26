@@ -67,7 +67,7 @@ class _FakeTileEmbedder:
                 device=device,
                 input_chw=x,
             )
-            for sp, x in zip(spatials, input_chws)
+            for sp, x in zip(spatials, input_chws, strict=True)
         ]
 
 

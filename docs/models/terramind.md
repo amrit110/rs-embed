@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
 | Primary input | S2 SR 12-band (`B1..B12` subset used by adapter order) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` (provider path normalized via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none required in current adapter |

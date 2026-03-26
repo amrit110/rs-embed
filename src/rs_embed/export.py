@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .core.specs import InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from .core.specs import FetchSpec, InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 
 
 def export_npz(
@@ -21,7 +21,9 @@ def export_npz(
     device: str = "auto",
     output: OutputSpec = OutputSpec.pooled(),
     sensor: SensorSpec | None = None,
+    fetch: FetchSpec | None = None,
     per_model_sensors: dict[str, SensorSpec] | None = None,
+    per_model_fetches: dict[str, FetchSpec] | None = None,
     save_inputs: bool = True,
     save_embeddings: bool = True,
     save_manifest: bool = True,
@@ -48,7 +50,9 @@ def export_npz(
         device=device,
         output=output,
         sensor=sensor,
+        fetch=fetch,
         per_model_sensors=per_model_sensors,
+        per_model_fetches=per_model_fetches,
         format="npz",
         save_inputs=save_inputs,
         save_embeddings=save_embeddings,

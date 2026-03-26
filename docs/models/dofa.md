@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
 | Primary input | Multiband SR CHW + wavelengths (µm) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` |
 | Output modes | `pooled`, `grid` |
 | Model config keys | `model_config["variant"]` (default: `base`; choices: `base`, `large`) |

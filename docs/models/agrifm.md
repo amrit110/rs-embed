@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band time series (`T,10,H,W`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (window split into `T` frames) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none required (adapter builds fixed frame stack) |

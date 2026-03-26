@@ -1,7 +1,7 @@
 import numpy as np
 
-from rs_embed.core.specs import BBox, SensorSpec
 import rs_embed.inspect as inspect_mod
+from rs_embed.core.specs import BBox, SensorSpec
 
 
 def test_inspect_gee_patch_uses_shared_fetch_helper(monkeypatch):

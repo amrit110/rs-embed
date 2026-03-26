@@ -32,6 +32,7 @@ from .core.embedding import Embedding
 from .core.errors import ModelError
 from .core.registry import get_embedder_cls as _get_embedder_cls
 from .core.specs import (
+    FetchSpec,
     InputPrepSpec,
     OutputSpec,
     SensorSpec,
@@ -99,6 +100,7 @@ from .tools.runtime import (
 # Public: embeddings
 # -----------------------------------------------------------------------------
 
+
 def list_models(*, include_aliases: bool = False) -> list[str]:
     """Return the stable model catalog, independent of runtime lazy-load state.
 
@@ -155,12 +157,14 @@ def describe_model(model: str) -> dict[str, Any]:
     cls = _get_embedder_cls(model_n)
     return cls().describe()
 
+
 def get_embedding(
     model: str,
     *,
     spatial: SpatialSpec,
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
+    fetch: FetchSpec | None = None,
     model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
@@ -180,6 +184,9 @@ def get_embedding(
         Optional temporal filter.
     sensor : SensorSpec or None
         Optional sensor override.
+    fetch : FetchSpec or None
+        Lightweight fetch-policy override applied to the model default sensor.
+        Cannot be combined with ``sensor``.
     model_config : dict[str, Any] or None
         Optional model-specific settings such as variant selection.
     modality : str or None
@@ -216,6 +223,7 @@ def get_embedding(
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
         sensor=sensor,
+        fetch=fetch,
         modality=modality,
         default_when_missing=False,
     )
@@ -237,12 +245,14 @@ def get_embedding(
         ctx=ctx,
     )[0]
 
+
 def get_embeddings_batch(
     model: str,
     *,
     spatials: list[SpatialSpec],
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
+    fetch: FetchSpec | None = None,
     model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
@@ -262,6 +272,9 @@ def get_embeddings_batch(
         Optional temporal filter.
     sensor : SensorSpec or None
         Optional sensor override.
+    fetch : FetchSpec or None
+        Lightweight fetch-policy override applied to the model default sensor.
+        Cannot be combined with ``sensor``.
     model_config : dict[str, Any] or None
         Optional model-specific settings such as variant selection.
     modality : str or None
@@ -293,6 +306,7 @@ def get_embeddings_batch(
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
         sensor=sensor,
+        fetch=fetch,
         modality=modality,
         default_when_missing=False,
     )
@@ -314,9 +328,11 @@ def get_embeddings_batch(
         ctx=ctx,
     )
 
+
 # -----------------------------------------------------------------------------
 # Public: batch export (core)
 # -----------------------------------------------------------------------------
+
 
 def export_batch(
     *,
@@ -334,8 +350,10 @@ def export_batch(
     device: str = "auto",
     output: OutputSpec = OutputSpec.pooled(),
     sensor: SensorSpec | None = None,
+    fetch: FetchSpec | None = None,
     modality: str | None = None,
     per_model_sensors: dict[str, SensorSpec] | None = None,
+    per_model_fetches: dict[str, FetchSpec] | None = None,
     per_model_modalities: dict[str, str] | None = None,
     format: str = "npz",
     save_inputs: bool = True,
@@ -390,11 +408,17 @@ def export_batch(
         Embedding output representation policy.
     sensor : SensorSpec or None
         Default sensor for all models unless overridden.
+    fetch : FetchSpec or None
+        Default fetch-policy override for all models unless overridden.
+        Cannot be combined with ``sensor``.
     modality : str or None
         Optional global modality selector applied to models that expose
         public modality switching.
     per_model_sensors : dict[str, SensorSpec] or None
         Per-model sensor overrides keyed by model name.
+    per_model_fetches : dict[str, FetchSpec] or None
+        Per-model fetch-policy overrides keyed by model name. Cannot be
+        combined with sensor overrides for the same model.
     per_model_modalities : dict[str, str] or None
         Optional per-model modality overrides keyed by model name.
     format / save_* / fail_on_bad_input / chunk_size / infer_batch_size /
@@ -476,8 +500,10 @@ def export_batch(
         temporal=temporal,
         output=output,
         sensor=sensor,
+        fetch=fetch,
         modality=modality,
         per_model_sensors=per_model_sensors,
+        per_model_fetches=per_model_fetches,
         per_model_modalities=per_model_modalities,
     )
 

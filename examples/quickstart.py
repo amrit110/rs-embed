@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 rs-embed quickstart script.
 
@@ -9,9 +7,11 @@ Examples:
   python examples/quickstart.py --mode all --run-export
 """
 
+from __future__ import annotations
+
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 
@@ -51,9 +51,9 @@ def run_auto_demo(*, run_export: bool, out_dir: Path) -> None:
     from rs_embed import (
         ExportConfig,
         ExportTarget,
+        OutputSpec,
         PointBuffer,
         TemporalSpec,
-        OutputSpec,
         export_batch,
         get_embedding,
         get_embeddings_batch,
@@ -119,10 +119,10 @@ def run_gee_demo(*, device: str, run_export: bool, out_dir: Path) -> None:
     from rs_embed import (
         ExportConfig,
         ExportTarget,
+        OutputSpec,
         PointBuffer,
         SensorSpec,
         TemporalSpec,
-        OutputSpec,
         export_batch,
         get_embedding,
         get_embeddings_batch,

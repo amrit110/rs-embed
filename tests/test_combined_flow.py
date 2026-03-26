@@ -10,7 +10,7 @@ not real model inference.
 """
 
 from threading import RLock
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,7 +20,6 @@ from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpe
 from rs_embed.pipelines import combined_flow
 from rs_embed.pipelines import inference as inference_mod
 from rs_embed.pipelines.combined_flow import run_pending_models
-
 
 # ── Helpers ────────────────────────────────────────────────────────
 
@@ -118,14 +117,14 @@ def _make_spatials(n: int) -> list:
 
 def _base_kwargs(
     *,
-    models: List[str],
+    models: list[str],
     spatials: list,
     provider_enabled: bool = True,
     save_embeddings: bool = True,
     continue_on_error: bool = False,
     inference_strategy: str = "auto",
 ) -> dict:
-    manifest: Dict[str, Any] = {"models": []}
+    manifest: dict[str, Any] = {"models": []}
     return dict(
         pending_models=models,
         arrays={},

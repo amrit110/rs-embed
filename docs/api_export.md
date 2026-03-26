@@ -26,6 +26,7 @@ export_batch(
     device: str = "auto",
     output: OutputSpec = OutputSpec.pooled(),
     sensor: Optional[SensorSpec] = None,
+    fetch: Optional[FetchSpec] = None,
     modality: Optional[str] = None,
 ) -> Any
 ```
@@ -52,6 +53,7 @@ Think about `export_batch(...)` as 4 decisions:
 2. Where to write: `target=ExportTarget(...)`
 3. How to run: `config=ExportConfig(...)`
 4. Any shared model settings: `backend`, `sensor`, `modality`, `output`
+   - in most public usage, prefer `fetch` over `sensor`
 
 For new code, prefer the object-style API:
 
@@ -115,10 +117,17 @@ These usually apply to all models in the call:
 - `backend`: keep `backend="auto"` unless you need a specific provider such as `"gee"`
 - `device`: `"auto"` is the normal choice
 - `output`: usually `OutputSpec.pooled()`
-- `sensor`: shared `SensorSpec` for on-the-fly models
+- `fetch`: shared `FetchSpec` for resolution/compositing overrides
+- `sensor`: shared `SensorSpec` for advanced on-the-fly source overrides
 - `modality`: shared modality override for models that expose multiple public branches
 
 Use per-model overrides only when one model needs different settings.
+
+Recommended rule:
+
+- use `fetch=FetchSpec(...)` for shared resolution/composite overrides
+- use `sensor=SensorSpec(...)` only when one job really needs custom `collection` / `bands`
+- `fetch` and `sensor` cannot be passed together
 
 ### 4. ExportConfig: the knobs that matter most
 
@@ -177,14 +186,14 @@ Most runs should pass plain model IDs:
 models=["remoteclip", "prithvi"]
 ```
 
-Use `ExportModelRequest(...)` only when a specific model needs its own sensor or modality:
+Use `ExportModelRequest(...)` only when a specific model needs its own fetch, sensor, or modality:
 
 ```python
-from rs_embed import ExportModelRequest
+from rs_embed import ExportModelRequest, FetchSpec
 
 models=[
     "remoteclip",
-    ExportModelRequest("terrafm", modality="s1"),
+    ExportModelRequest("prithvi", fetch=FetchSpec(scale_m=30)),
 ]
 ```
 
@@ -201,6 +210,7 @@ models=[
 
 Typical use cases:
 
+- one model needs a different `FetchSpec`
 - one model needs `modality="s1"`
 - one model needs a different `SensorSpec`
 - one model needs a different `model_config` such as `{"variant": "large"}`
@@ -287,6 +297,20 @@ export_batch(
     models=[ExportModelRequest("terrafm", modality="s1")],
     target=ExportTarget.combined("exports/terrafm_s1_run"),
     backend="gee",
+)
+```
+
+### Shared fetch override across models
+
+```python
+from rs_embed import FetchSpec, export_batch, ExportTarget, PointBuffer, TemporalSpec
+
+export_batch(
+    spatials=[PointBuffer(121.5, 31.2, 2048)],
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    models=["remoteclip", "prithvi"],
+    fetch=FetchSpec(scale_m=10),
+    target=ExportTarget.combined("exports/shared_sampling"),
 )
 ```
 

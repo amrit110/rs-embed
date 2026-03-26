@@ -41,6 +41,13 @@ Model-specific configuration:
 - valid `variant` values still depend on the selected model and currently exposed published checkpoints, so check the corresponding model detail page
 - unsupported `model_config` usage raises `ModelError` instead of being ignored silently
 
+Sampling / fetch configuration:
+
+- public embedding and export APIs accept `fetch=FetchSpec(...)`
+- use `fetch` for common overrides such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`
+- reserve `sensor=SensorSpec(...)` for advanced source overrides (`collection`, `bands`, modality-specific contracts)
+- `fetch` and `sensor` cannot be passed together
+
 If you need a stable model list in code:
 
 ```python

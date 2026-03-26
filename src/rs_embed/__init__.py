@@ -11,6 +11,7 @@ from ._version import __version__
 from .api import describe_model, export_batch, get_embedding, get_embeddings_batch, list_models
 from .core.specs import (
     BBox,
+    FetchSpec,
     InputPrepSpec,
     OutputSpec,
     PointBuffer,
@@ -35,6 +36,7 @@ __all__ = [
     "PointBuffer",
     "TemporalSpec",
     "SensorSpec",
+    "FetchSpec",
     "OutputSpec",
     "InputPrepSpec",
     # Types

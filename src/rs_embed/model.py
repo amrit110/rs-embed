@@ -12,6 +12,7 @@ from typing import Any
 from .core.embedding import Embedding
 from .core.errors import ModelError
 from .core.specs import (
+    FetchSpec,
     InputPrepSpec,
     OutputSpec,
     SensorSpec,
@@ -55,6 +56,9 @@ class Model:
         Target device (``"auto"`` / ``"cpu"`` / ``"cuda"`` / …).
     sensor : SensorSpec or None
         Sensor spec override.
+    fetch : FetchSpec or None
+        Lightweight fetch-policy override applied to the model default sensor.
+        Cannot be combined with ``sensor``.
     model_config : dict[str, Any] or None
         Optional model-specific settings such as variant selection.
     modality : str or None
@@ -73,6 +77,7 @@ class Model:
         backend: str = "auto",
         device: str = "auto",
         sensor: SensorSpec | None = None,
+        fetch: FetchSpec | None = None,
         model_config: dict[str, Any] | None = None,
         modality: str | None = None,
         output: OutputSpec = OutputSpec.pooled(),
@@ -91,6 +96,7 @@ class Model:
         self._sensor = resolve_sensor_for_model(
             self._model_n,
             sensor=sensor,
+            fetch=fetch,
             modality=modality,
             default_when_missing=(self._input_prep_resolved.mode == "tile"),
         )

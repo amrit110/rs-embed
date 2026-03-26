@@ -11,6 +11,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
 | Primary input | `BBox` / `PointBuffer` in EPSG:4326 (converted to bbox) |
+| Default resolution | 10m source product resolution |
 | Temporal mode | year-like selection (`year`; `range` uses start year fallback) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |

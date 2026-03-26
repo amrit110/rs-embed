@@ -12,7 +12,6 @@ from rs_embed.core.errors import ProviderError
 from rs_embed.core.specs import SensorSpec, TemporalSpec
 from rs_embed.providers.gee import GEEProvider, _resolve_band_aliases
 
-
 # ══════════════════════════════════════════════════════════════════════
 # Sentinel-2 aliases
 # ══════════════════════════════════════════════════════════════════════

@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | 14-channel TOA `CHW` (default MODIS/061/MOD021KM band order) |
+| Default resolution | 1000m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (normalized via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none (but channel calibration settings matter) |

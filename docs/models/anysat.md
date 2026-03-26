@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (adapter normalizes `year`/`None` to range) |
 | Output modes | `pooled`, `grid` |
 | Model config keys | `model_config["variant"]` (default: `base`; choices: `base`) |
@@ -72,13 +73,13 @@ Default `SensorSpec` if omitted:
 4. Build AnySat side input dict:
    - `s2`: `[1,T,10,H,W]`
    - `s2_dates`: `[1,T]` (DOY values from frame-bin midpoints)
-5. Forward with `output="patch"` and `patch_size=output.scale_m`
+5. Forward with `output="patch"` and `patch_size=sensor.scale_m`
 6. Map AnySat patch output `[B,H,W,D]` -> rs-embed grid `[D,H,W]`
 7. Optionally spatial-pool grid to vector (`mean` or `max`)
 
 Important constraint:
 
-- `output.scale_m` / patch size must be a **positive multiple of 10 meters**
+- `sensor.scale_m` / `fetch.scale_m` must be a **positive multiple of 10 meters**
 
 ---
 
@@ -147,7 +148,7 @@ emb = get_embedding(
 
 - backend is not provider-compatible
 - wrong channel count for `input_chw` (must be 10 channels)
-- `output.scale_m` is not a positive multiple of 10
+- `fetch.scale_m` / `sensor.scale_m` is not a positive multiple of 10
 - missing `torch` / `einops` / `huggingface_hub` dependency for vendored runtime + checkpoint path
 - local checkpoint missing / too small / invalid format
 - inconsistent results from untracked changes to `FRAMES`, `NORM`, or image size
@@ -166,7 +167,7 @@ For fair comparisons and stable reruns, record:
 - `RS_EMBED_ANYSAT_FRAMES`
 - `RS_EMBED_ANYSAT_NORM`
 - `RS_EMBED_ANYSAT_IMG`
-- `output.scale_m` (patch size)
+- `fetch.scale_m` / `sensor.scale_m` (provider resolution and patch size)
 - AnySat checkpoint source (local path vs HF repo/file, pretrained flag)
 
 ---

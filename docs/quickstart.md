@@ -94,6 +94,10 @@ Before looking at the APIs, keep these three ideas in mind:
 - `temporal`: when to extract from, either `TemporalSpec.year(...)` or `TemporalSpec.range(...)`
 - `output`: what shape you want, usually `OutputSpec.pooled()` first
 
+For on-the-fly models, there is one more practical knob:
+
+- `fetch`: how imagery should be sampled, usually `FetchSpec(scale_m=..., cloudy_pct=...)`
+
 Two details matter a lot:
 
 - `TemporalSpec.range(start, end)` is usually a time window for filtering and compositing, not a guarantee of one exact acquisition date.
@@ -125,6 +129,7 @@ meta = emb.meta
 ```
 
 Use `backend="auto"` unless you need to force a provider path such as `backend="gee"`.
+
 
 ### 2. Many ROIs, one model: `get_embeddings_batch(...)`
 

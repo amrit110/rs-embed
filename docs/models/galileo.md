@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | S2 10-band time series (`T,C,H,W`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (adapter normalizes via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | **required** `months` (per-frame month tokens), plus Galileo masks/tensors built by adapter |

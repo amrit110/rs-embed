@@ -46,6 +46,7 @@ dependencies = [
   "Pillow>=10",
   "pandas>=2.3",
   "xarray>=2024.06.0",
+
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,10 @@ plot = [
 ]
 copernicus = [
   "tifffile>=2024.0.0",
+]
+terramind = [
+  # TerraMind still loads its backbone through the TerraTorch registry.
+  "terratorch==1.2.1",
 ]
 full = [
   "matplotlib>=3.10",

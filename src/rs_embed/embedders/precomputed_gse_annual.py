@@ -38,6 +38,11 @@ class GSEAnnualEmbedder(EmbedderBase):
             "temporal": {"mode": "year"},
             "output": ["grid", "pooled"],
             "source": "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
+            "defaults": {
+                "scale_m": 10,
+                "fill_value": -9999.0,
+                "composite": "mosaic",
+            },
             "notes": "Uses sampleRectangle in EPSG:3857; returns [C,H,W] or pooled [C].",
         }
 
@@ -70,13 +75,15 @@ class GSEAnnualEmbedder(EmbedderBase):
         if temporal.mode != "year":
             raise ModelError("gse_annual only supports TemporalSpec.year in v0.1.")
 
+        scale_m = int(getattr(sensor, "scale_m", 10) if sensor is not None else 10)
+
         provider = self._get_provider(backend)
         emb_chw, band_names = _fetch_collection_patch_all_bands_chw(
             provider,
             spatial=spatial,
             temporal=temporal,
             collection="GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
-            scale_m=int(output.scale_m),
+            scale_m=scale_m,
             fill_value=-9999.0,
             composite="mosaic",
         )
@@ -94,7 +101,7 @@ class GSEAnnualEmbedder(EmbedderBase):
             input_time=temporal_midpoint_str(temporal),
             extra={
                 "year": temporal.year,
-                "scale_m": output.scale_m,
+                "scale_m": scale_m,
                 "bands": band_names,
             },
         )

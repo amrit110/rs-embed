@@ -28,9 +28,7 @@ class _FakeTHORModel(torch.nn.Module):
             "S2:SWIR1": {"num_patch": 9},
             "S2:SWIR2": {"num_patch": 9},
         }
-        features = [
-            torch.arange(batch * 405 * 8, dtype=torch.float32).reshape(batch, 405, 8)
-        ]
+        features = [torch.arange(batch * 405 * 8, dtype=torch.float32).reshape(batch, 405, 8)]
         return features, channel_params
 
 
@@ -71,8 +69,9 @@ def test_thor_loads_vendored_runtime_without_external_thor_dependency(monkeypatc
 
 
 def test_enable_alibi_for_timm_patches_block_and_attention():
-    from rs_embed.embedders._vendor.thor.models.patch_timm import enable_alibi_for_timm
     from timm.models.vision_transformer import Attention, Block
+
+    from rs_embed.embedders._vendor.thor.models.patch_timm import enable_alibi_for_timm
 
     enable_alibi_for_timm._done = False
     enable_alibi_for_timm()

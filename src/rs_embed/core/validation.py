@@ -38,14 +38,17 @@ def validate_specs(
 
     if output.mode not in ("grid", "pooled"):
         raise ModelError(f"Unknown output mode: {output.mode}")
-    if output.scale_m <= 0:
-        raise ModelError("output.scale_m must be positive.")
+    if hasattr(output, "scale_m"):
+        raise ModelError(
+            "output.scale_m is no longer supported. Use fetch=FetchSpec(scale_m=...) instead."
+        )
     if output.mode == "pooled" and output.pooling not in ("mean", "max"):
         raise ModelError(f"Unknown pooling method: {output.pooling}")
     if getattr(output, "grid_orientation", "north_up") not in ("north_up", "native"):
         raise ModelError(
             f"Unknown grid orientation policy: {getattr(output, 'grid_orientation', None)}"
         )
+
 
 def validate_spatial_list(
     *,
@@ -58,6 +61,7 @@ def validate_spatial_list(
         raise ModelError("spatials must be a non-empty list[SpatialSpec].")
     for spatial in spatials:
         validate_specs(spatial=spatial, temporal=temporal, output=output)
+
 
 def assert_supported(
     embedder, *, backend: str, output: OutputSpec, temporal: TemporalSpec | None

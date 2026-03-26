@@ -215,9 +215,7 @@ def build_one_point_payload(
             # Resolve fetch-time metadata from the prefetch cache.
             _fmeta: dict[str, Any] | None = None
             if fetch_meta_cache and sspec is not None:
-                _fmeta = fetch_meta_cache.get(
-                    (point_index, sensor_cache_key(sspec))
-                ) or None
+                _fmeta = fetch_meta_cache.get((point_index, sensor_cache_key(sspec))) or None
             if _fmeta is None and sspec is not None:
                 _fmeta = local_fetch_meta.get(sensor_cache_key(sspec)) or None
             if _fmeta:
@@ -294,6 +292,7 @@ def build_one_point_payload(
         "ok_models": len(manifest["models"]) - n_failed,
     }
     return arrays, manifest
+
 
 def write_one_payload(
     *,

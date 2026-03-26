@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 SR 10-band `CHW` |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (composite window) |
 | Output modes | `pooled`, `grid` |
 | Model config keys | `model_config["variant"]` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |

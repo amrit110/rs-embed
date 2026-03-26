@@ -10,6 +10,7 @@ from ..tools.serialization import sensor_cache_key as _sensor_cache_key
 
 _LEGACY_RESOLVE_BANDS_WARNED = False
 
+
 def sensor_fetch_group_key(
     sensor: SensorSpec,
 ) -> tuple[str, int, int, float, str, str | None, str | None, bool, bool, bool]:
@@ -28,10 +29,12 @@ def sensor_fetch_group_key(
         bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
     )
 
+
 def select_prefetched_channels(x_chw: np.ndarray, idx: tuple[int, ...]) -> np.ndarray:
     if len(idx) == x_chw.shape[0] and all(i == j for j, i in enumerate(idx)):
         return x_chw
     return x_chw[list(idx), :, :]
+
 
 def build_prefetch_plan(
     *,
@@ -141,6 +144,7 @@ def build_prefetch_plan(
         sensor_models,
         fetch_members,
     )
+
 
 # Backwards-compatible alias kept for existing imports/tests.
 build_gee_prefetch_plan = build_prefetch_plan

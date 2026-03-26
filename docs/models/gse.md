@@ -12,6 +12,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | provider-backed; prefer `backend="auto"` in public API |
 | Primary input | Provider-sampled annual embedding image collection |
+| Default resolution | 10m default provider sampling (`fetch.scale_m` / `sensor.scale_m`) |
 | Temporal mode | **strict** `TemporalSpec.year(...)` |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none |
@@ -31,7 +32,7 @@
 
 - using `TemporalSpec.range(...)` (not supported in v0.1)
 - assuming native imagery semantics (this is an embedding product)
-- forgetting that `output.scale_m` affects provider sampling resolution
+- forgetting that `fetch.scale_m` affects provider sampling resolution
 
 ---
 
@@ -47,7 +48,7 @@
 
 - accepts normal `SpatialSpec` provider sampling path
 - fetches all embedding bands from annual collection using provider helper
-- `OutputSpec.scale_m` controls sampling scale passed to provider
+- `fetch.scale_m` / `sensor.scale_m` control sampling scale passed to provider
 
 Fixed provider fetch settings in current adapter:
 
@@ -77,7 +78,7 @@ Fixed provider fetch settings in current adapter:
 
 Primary non-env sampling knob:
 
-- `OutputSpec.scale_m` (passed to provider sampling)
+- `fetch.scale_m` (or advanced `sensor.scale_m`)
 
 ---
 
@@ -115,9 +116,9 @@ emb = get_embedding(
 ### Sampling resolution example
 
 ```python
-from rs_embed import OutputSpec
+from rs_embed import FetchSpec
 
-out = OutputSpec.pooled(scale_m=30)
+fetch = FetchSpec(scale_m=30)
 ```
 
 ---
@@ -134,7 +135,7 @@ Recommended first checks:
 
 - inspect metadata `year`, `scale_m`, `bands`
 - try `OutputSpec.pooled()` first to validate access
-- adjust `OutputSpec.scale_m` if sampling is too coarse/fine
+- adjust `fetch.scale_m` if sampling is too coarse/fine
 
 ---
 
@@ -144,7 +145,7 @@ Keep fixed and record:
 
 - `TemporalSpec.year(...)`
 - provider backend config / auth context
-- `OutputSpec.scale_m`
+- `fetch.scale_m`
 - output mode and pooling choice
 
 ---

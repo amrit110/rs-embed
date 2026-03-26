@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from ..core.errors import ModelError
 from ..core.registry import get_embedder_cls
-from ..core.specs import SensorSpec
+from ..core.specs import FetchSpec, SensorSpec
 
 
 def _probe_model_desc(model_id: str) -> dict:
@@ -15,6 +15,7 @@ def _probe_model_desc(model_id: str) -> dict:
     except Exception as _e:
         desc = {}
     return desc if isinstance(desc, dict) else {}
+
 
 def _normalize_modality_name(modality: str | None) -> str | None:
     if modality is None:
@@ -29,6 +30,7 @@ def _normalize_modality_name(modality: str | None) -> str | None:
         "s2l2a": "s2_l2a",
     }
     return aliases.get(key, key)
+
 
 def _mk_sensor(
     *,
@@ -50,6 +52,53 @@ def _mk_sensor(
         s1_require_iw=bool(defaults.get("s1_require_iw", True)),
         s1_relax_iw_on_empty=bool(defaults.get("s1_relax_iw_on_empty", True)),
     )
+
+
+def apply_fetch_to_sensor(sensor: SensorSpec, fetch: FetchSpec | None) -> SensorSpec:
+    if fetch is None:
+        return sensor
+
+    updates: dict[str, object] = {}
+    if fetch.scale_m is not None:
+        updates["scale_m"] = int(fetch.scale_m)
+    if fetch.cloudy_pct is not None:
+        updates["cloudy_pct"] = int(fetch.cloudy_pct)
+    if fetch.fill_value is not None:
+        updates["fill_value"] = float(fetch.fill_value)
+    if fetch.composite is not None:
+        updates["composite"] = str(fetch.composite)
+
+    if not updates:
+        return sensor
+    return replace(sensor, **updates)
+
+def _fetch_override_sensor_for_model(model_id: str) -> SensorSpec | None:
+    model_key = str(model_id).strip().lower()
+    if model_key == "gse":
+        return SensorSpec(
+            collection="GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL",
+            bands=tuple(),
+            scale_m=10,
+            cloudy_pct=100,
+            composite="mosaic",
+            fill_value=-9999.0,
+        )
+
+    desc = _probe_model_desc(model_id)
+    source = str(desc.get("source", "")).strip()
+    defaults = desc.get("defaults", {}) or {}
+
+    if source == "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL":
+        return SensorSpec(
+            collection=source,
+            bands=tuple(),
+            scale_m=int(defaults.get("scale_m", 10)),
+            cloudy_pct=int(defaults.get("cloudy_pct", 100)),
+            composite=str(defaults.get("composite", "mosaic")),
+            fill_value=float(defaults.get("fill_value", -9999.0)),
+        )
+    return None
+
 
 def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:
     desc = _probe_model_desc(model_id)
@@ -113,6 +162,7 @@ def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:
             )
     return profiles
 
+
 def supports_modality_for_model(model_id: str, modality: str) -> bool:
     modality_n = _normalize_modality_name(modality)
     if modality_n is None:
@@ -123,6 +173,7 @@ def supports_modality_for_model(model_id: str, modality: str) -> bool:
     desc = _probe_model_desc(model_id)
     default_modality = _normalize_modality_name((desc.get("defaults") or {}).get("modality"))
     return modality_n == default_modality
+
 
 def default_sensor_for_model(model_id: str, modality: str | None = None) -> SensorSpec | None:
     desc = _probe_model_desc(model_id)
@@ -187,13 +238,18 @@ def default_sensor_for_model(model_id: str, modality: str | None = None) -> Sens
 
     return None
 
+
 def resolve_sensor_for_model(
     model_id: str,
     *,
     sensor: SensorSpec | None,
+    fetch: FetchSpec | None = None,
     modality: str | None = None,
     default_when_missing: bool = False,
 ) -> SensorSpec | None:
+    if sensor is not None and fetch is not None:
+        raise ModelError("Use either sensor=... or fetch=..., not both.")
+
     sensor_modality = _normalize_modality_name(getattr(sensor, "modality", None))
     requested_modality = _normalize_modality_name(modality) or sensor_modality
 
@@ -215,6 +271,14 @@ def resolve_sensor_for_model(
         if requested_modality is None or sensor.modality == requested_modality:
             return sensor
         return replace(sensor, modality=requested_modality)
+
+    if fetch is not None:
+        resolved = _fetch_override_sensor_for_model(model_id)
+        if resolved is None:
+            resolved = default_sensor_for_model(model_id, modality=requested_modality)
+        if resolved is None:
+            raise ModelError(f"Model '{model_id}' does not support fetch=... overrides.")
+        return apply_fetch_to_sensor(resolved, fetch)
 
     if requested_modality is not None:
         resolved = default_sensor_for_model(model_id, modality=requested_modality)

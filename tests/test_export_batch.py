@@ -1,10 +1,11 @@
 import json
+
 import numpy as np
 import pytest
 
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
-from rs_embed.core.specs import InputPrepSpec, PointBuffer, TemporalSpec, SensorSpec, OutputSpec
+from rs_embed.core.specs import InputPrepSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.core.types import ExportConfig, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.runtime import get_embedder_bundle_cached
@@ -337,8 +338,18 @@ def test_export_batch_prefetch_merged_groups_skip_custom_fetcher(tmp_path, monke
                 "inputs": {
                     "collection": "C",
                     "bands": [
-                        "B1", "B2", "B3", "B4", "B5", "B6",
-                        "B7", "B8", "B8A", "B9", "B11", "B12",
+                        "B1",
+                        "B2",
+                        "B3",
+                        "B4",
+                        "B5",
+                        "B6",
+                        "B7",
+                        "B8",
+                        "B8A",
+                        "B9",
+                        "B11",
+                        "B12",
                     ],
                 },
                 "defaults": {
@@ -1795,7 +1806,7 @@ def test_export_batch_dedup_inputs_across_models_in_file(tmp_path, monkeypatch):
     input_keys = [k for k in npz.keys() if k.startswith("input_chw__")]
     assert len(input_keys) == 1
 
-    with open(out_dir / "p00000.json", "r", encoding="utf-8") as f:
+    with open(out_dir / "p00000.json", encoding="utf-8") as f:
         manifest = json.load(f)
     model_entries = {m["model"]: m for m in manifest["models"]}
     assert model_entries["dummy_dedup_b"]["input"].get("dedup_reused") is True
@@ -1996,7 +2007,7 @@ def test_export_batch_combined_saves_prefetch_checkpoint_before_inference(tmp_pa
         )
 
     assert out_path.exists()
-    with open(tmp_path / "prefetch_ckpt.json", "r", encoding="utf-8") as f:
+    with open(tmp_path / "prefetch_ckpt.json", encoding="utf-8") as f:
         mani = json.load(f)
     assert bool(mani.get("resume_incomplete"))
     assert mani.get("stage") == "prefetched"

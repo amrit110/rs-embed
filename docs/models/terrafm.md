@@ -12,6 +12,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
 | Primary input | S2 SR 12-band or S1 VV/VH (selected by `sensor.modality`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` (v0.1 behavior) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | modality settings on `sensor` (`modality`, `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`) |

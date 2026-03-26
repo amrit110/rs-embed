@@ -1,11 +1,11 @@
 import numpy as np
 
 from rs_embed.core.specs import BBox, SensorSpec, TemporalSpec
+from rs_embed.providers.base import ProviderBase
 from rs_embed.providers.gee_utils import (
     _stitch_bbox_split_arrays,
     fetch_provider_patch_raw,
 )
-from rs_embed.providers.base import ProviderBase
 
 
 class _FakeBBoxSplitProvider(ProviderBase):

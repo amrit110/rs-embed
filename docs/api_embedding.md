@@ -41,6 +41,7 @@ get_embedding(
     spatial: SpatialSpec,
     temporal: Optional[TemporalSpec] = None,
     sensor: Optional[SensorSpec] = None,
+    fetch: Optional[FetchSpec] = None,
     model_config: Optional[dict[str, Any]] = None,
     modality: Optional[str] = None,
     output: OutputSpec = OutputSpec.pooled(),
@@ -58,12 +59,19 @@ Computes the embedding for a single ROI.
 - `spatial`: `BBox` or `PointBuffer`
 - `temporal`: `TemporalSpec` or `None`
 - `sensor`: input descriptor for on-the-fly models; for most precomputed models this can be `None`
+- `fetch`: lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`
 - `model_config`: optional model-specific runtime settings; for the currently documented variant-aware models, use it mainly as `{"variant": ...}`
 - `modality`: optional model-facing modality selector (for example `s1`, `s2`, `s2_l2a`) for models that expose multiple input branches
 - `output`: `OutputSpec.pooled()` or `OutputSpec.grid(...)`
 - `backend`: access backend. `backend="auto"` is the public default and the recommended choice. For provider-backed on-the-fly models it resolves to a compatible provider backend; for precomputed models it lets rs-embed choose the model-compatible access path.
 - `device`: `"auto" / "cpu" / "cuda"` (if the model depends on torch)
 - `input_prep`: `"resize"` (default), `"tile"`, `"auto"`, or `InputPrepSpec(...)`
+
+`fetch` vs `sensor`:
+
+- prefer `fetch=FetchSpec(...)` when you only want to change sampling behavior
+- use `sensor=SensorSpec(...)` only for advanced source overrides such as custom collections or band lists
+- `fetch` and `sensor` cannot be passed together
 
 Modality contract:
 
@@ -90,13 +98,14 @@ Modality contract:
 **Example**
 
 ```python
-from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
+from rs_embed import FetchSpec, PointBuffer, TemporalSpec, OutputSpec, get_embedding
 
 emb = get_embedding(
     "remoteclip",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(pooling="mean"),
+    fetch=FetchSpec(scale_m=10),
     backend="auto",
     device="auto",
     input_prep="resize",  # default
@@ -130,6 +139,7 @@ get_embeddings_batch(
     spatials: List[SpatialSpec],
     temporal: Optional[TemporalSpec] = None,
     sensor: Optional[SensorSpec] = None,
+    fetch: Optional[FetchSpec] = None,
     model_config: Optional[dict[str, Any]] = None,
     modality: Optional[str] = None,
     output: OutputSpec = OutputSpec.pooled(),
@@ -145,6 +155,12 @@ Batch-computes embeddings for multiple ROIs using the same embedder instance (of
 
 - `spatials`: a non-empty `List[SpatialSpec]`
 - Others are the same as `get_embedding`
+
+Typical use case for `fetch`:
+
+- keep the model default collection / band contract
+- override only `scale_m` or `cloudy_pct`
+- compare multiple models under a shared sampling policy
 
 **Returns**
 

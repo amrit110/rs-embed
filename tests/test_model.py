@@ -10,11 +10,10 @@ import pytest
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
-from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpec
+from rs_embed.core.specs import FetchSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.model import Model
 from rs_embed.tools.runtime import get_embedder_bundle_cached
-
 
 # ── mock embedder ──────────────────────────────────────────────────
 
@@ -145,6 +144,24 @@ def test_model_init_with_modality_resolves_sensor():
     assert m._sensor is not None
     assert m._sensor.modality == "s1"
     assert m._sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
+
+
+def test_model_init_with_fetch_resolves_sensor():
+    registry.register("mock_multi")(_MockMultimodalEmbedder)
+    m = Model("mock_multi", fetch=FetchSpec(scale_m=30), backend="gee")
+    assert m._sensor is not None
+    assert m._sensor.modality == "s2"
+    assert m._sensor.collection == "COPERNICUS/S2_SR_HARMONIZED"
+    assert m._sensor.scale_m == 30
+
+
+def test_model_init_rejects_sensor_and_fetch_together():
+    with pytest.raises(ModelError, match="Use either sensor=... or fetch=..., not both"):
+        Model(
+            "mock_model",
+            sensor=SensorSpec(collection="COLL", bands=("B1",)),
+            fetch=FetchSpec(scale_m=20),
+        )
 
 
 def test_model_init_rejects_unsupported_modality():

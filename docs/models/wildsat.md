@@ -11,6 +11,7 @@
 | Adapter type | `on-the-fly` |
 | Typical backend | provider backend (`gee`) |
 | Primary input | S2 RGB (`B4,B3,B2`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (normalized via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | none (but checkpoint/arch/image-head settings matter) |
@@ -190,4 +191,3 @@ Keep fixed and record:
 - Registration/catalog: `src/rs_embed/embedders/catalog.py`
 - Adapter implementation: `src/rs_embed/embedders/onthefly_wildsat.py`
 - Shared token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
-
