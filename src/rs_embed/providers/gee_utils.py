@@ -8,7 +8,7 @@ import numpy as np
 from ..core.errors import ModelError
 from ..core.specs import BBox, SensorSpec, SpatialSpec, TemporalSpec
 from ..providers.base import ProviderBase
-from ..tools.normalization import normalize_input_chw
+from ..tools.normalization import normalize_input_array, normalize_input_chw
 from ..tools.serialization import jsonable as _jsonable
 
 _WEB_MERCATOR_R = 6378137.0
@@ -370,13 +370,14 @@ fetch_gee_patch_raw = fetch_provider_patch_raw
 def inspect_input_raw(x_chw: np.ndarray, *, sensor: SensorSpec, name: str) -> dict[str, Any]:
     from ..tools.inspection import inspect_chw
 
-    x = normalize_input_chw(
+    x = normalize_input_array(
         x_chw,
         expected_channels=len(sensor.bands),
         name=name,
     )
+    x_inspect = x[0] if x.ndim == 4 else x
     rep = inspect_chw(
-        x,
+        x_inspect,
         name=name,
         expected_channels=len(sensor.bands),
         value_range=None,
@@ -386,4 +387,6 @@ def inspect_input_raw(x_chw: np.ndarray, *, sensor: SensorSpec, name: str) -> di
         "ok": bool(rep.get("ok", False)),
         "report": rep,
         "sensor": _jsonable(sensor),
+        "input_ndim": int(x.ndim),
+        "n_frames": (int(x.shape[0]) if x.ndim == 4 else None),
     }

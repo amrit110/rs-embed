@@ -31,9 +31,18 @@ def sensor_fetch_group_key(
 
 
 def select_prefetched_channels(x_chw: np.ndarray, idx: tuple[int, ...]) -> np.ndarray:
-    if len(idx) == x_chw.shape[0] and all(i == j for j, i in enumerate(idx)):
-        return x_chw
-    return x_chw[list(idx), :, :]
+    x = np.asarray(x_chw, dtype=np.float32)
+    if x.ndim == 3:
+        if len(idx) == x.shape[0] and all(i == j for j, i in enumerate(idx)):
+            return x
+        return x[list(idx), :, :]
+    if x.ndim == 4:
+        if len(idx) == x.shape[1] and all(i == j for j, i in enumerate(idx)):
+            return x
+        return x[:, list(idx), :, :]
+    raise ValueError(
+        f"Prefetched input must be CHW or TCHW, got shape={getattr(x, 'shape', None)}"
+    )
 
 
 def build_prefetch_plan(

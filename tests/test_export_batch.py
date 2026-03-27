@@ -6,7 +6,15 @@ import pytest
 
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
-from rs_embed.core.specs import InputPrepSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
+from rs_embed.core.specs import (
+    InputPrepSpec,
+    ModelInputSpec,
+    NormalizationSpec,
+    OutputSpec,
+    PointBuffer,
+    SensorSpec,
+    TemporalSpec,
+)
 from rs_embed.core.types import ExportConfig, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.runtime import get_embedder_bundle_cached
@@ -2517,3 +2525,92 @@ def test_export_batch_combined_embedder_without_input_chw_kwarg(tmp_path):
     assert out_path.exists()
     assert result["status"] == "ok"
     assert DummyNoInputKwarg.calls == len(spatials)
+
+
+def test_export_batch_multiframe_prefetch_accepts_tchw_inputs(tmp_path, monkeypatch):
+    class DummyMultiFrame(EmbedderBase):
+        input_spec = ModelInputSpec(
+            collection="C_MULTI",
+            bands=("B1", "B2", "B3"),
+            scale_m=10,
+            cloudy_pct=30,
+            temporal_mode="multi",
+            n_frames=4,
+            normalization=NormalizationSpec(mode="s2_sr_raw"),
+            expected_channels=3,
+        )
+
+        def describe(self):
+            return {
+                "type": "on_the_fly",
+                "backend": ["gee"],
+                "inputs": {"collection": "C_MULTI", "bands": ["B1", "B2", "B3"]},
+                "output": ["pooled"],
+            }
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            _ = (spatial, temporal, sensor, output, backend, device)
+            assert input_chw is not None
+            seen.append(tuple(int(v) for v in input_chw.shape))
+            return Embedding(data=np.array([float(np.mean(input_chw))], dtype=np.float32), meta={})
+
+    registry.register("dummy_multiframe")(DummyMultiFrame)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def ensure_ready(self):
+            return None
+
+        def normalize_bands(self, *, collection, bands):
+            _ = collection
+            return tuple(bands)
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr(
+        "rs_embed.embedders.runtime_utils.fetch_s2_multiframe_raw_tchw",
+        lambda provider, **kwargs: np.stack(
+            [
+                np.full((3, 6, 6), fill_value=float(t + 1), dtype=np.float32)
+                for t in range(int(kwargs["n_frames"]))
+            ],
+            axis=0,
+        ),
+    )
+
+    seen = []
+    get_embedder_bundle_cached.cache_clear()
+
+    out_dir = tmp_path / "multiframe_out"
+    manifests = api.export_batch(
+        spatials=[PointBuffer(lon=-122.4, lat=37.8, buffer_m=50)],
+        temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
+        models=["dummy_multiframe"],
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(
+            save_inputs=True,
+            save_embeddings=True,
+            show_progress=False,
+            num_workers=1,
+            chunk_size=1,
+        ),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+    )
+
+    assert len(manifests) == 1
+    assert seen == [(4, 3, 6, 6)]
+    assert (out_dir / "p00000.npz").exists()

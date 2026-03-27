@@ -41,6 +41,28 @@ def normalize_input_chw(
     return x
 
 
+def normalize_input_array(
+    x_input: np.ndarray,
+    *,
+    expected_channels: int | None = None,
+    name: str = "input",
+) -> np.ndarray:
+    x = np.asarray(x_input, dtype=np.float32)
+    if x.ndim == 3:
+        c = int(x.shape[0])
+    elif x.ndim == 4:
+        c = int(x.shape[1])
+    else:
+        raise ModelError(
+            f"{name} must be CHW or TCHW with ndim=3/4, got shape={getattr(x, 'shape', None)}"
+        )
+    if expected_channels is not None and c != int(expected_channels):
+        raise ModelError(
+            f"{name} channel mismatch: got C={c}, expected C={int(expected_channels)}"
+        )
+    return x
+
+
 def _probe_model_describe(model_n: str) -> dict[str, Any]:
     """Best-effort model describe() probe used for API-level routing decisions."""
     try:

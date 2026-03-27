@@ -19,7 +19,7 @@ from ..providers.prefetch_plan import (
     build_gee_prefetch_plan,
     select_prefetched_channels,
 )
-from ..tools.normalization import normalize_input_chw
+from ..tools.normalization import normalize_input_array
 from .runner import run_with_retry
 
 
@@ -182,7 +182,7 @@ class PrefetchManager:
 
                 for member_skey in self.fetch_members.get(skey, []):
                     member_idx = self.sensor_to_fetch[member_skey][1]
-                    x_member = normalize_input_chw(
+                    x_member = normalize_input_array(
                         select_prefetched_channels(x, member_idx),
                         expected_channels=len(member_idx),
                         name=f"gee_input_{member_skey}",
