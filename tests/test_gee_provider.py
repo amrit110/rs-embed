@@ -139,6 +139,52 @@ def test_build_image_empty_collection_raises_clear_error(monkeypatch):
         provider.build_image(sensor=sensor, temporal=temporal, region=object())
 
 
+def test_build_image_sorts_before_mosaic(monkeypatch):
+    calls = []
+
+    class _FakeSize:
+        def getInfo(self):
+            return 2
+
+    class _FakeCollection:
+        def filterBounds(self, _region):
+            calls.append(("filterBounds",))
+            return self
+
+        def filterDate(self, _start, _end):
+            calls.append(("filterDate",))
+            return self
+
+        def sort(self, key):
+            calls.append(("sort", key))
+            return self
+
+        def size(self):
+            return _FakeSize()
+
+        def mosaic(self):
+            calls.append(("mosaic",))
+            return "mosaic-image"
+
+    fake_ee = types.SimpleNamespace(ImageCollection=lambda _collection: _FakeCollection())
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    sensor = SensorSpec(
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=("B4",),
+        cloudy_pct=None,
+        composite="mosaic",
+    )
+    temporal = TemporalSpec.range("2024-01-01", "2024-02-01")
+
+    img = provider.build_image(sensor=sensor, temporal=temporal, region=object())
+
+    assert img == "mosaic-image"
+    assert ("sort", "system:time_start") in calls
+    assert calls.index(("sort", "system:time_start")) < calls.index(("mosaic",))
+
+
 def test_fetch_array_chw_empty_sample_props_raises_clear_error(monkeypatch):
     class _FakeProjection:
         def atScale(self, _scale):
@@ -354,6 +400,107 @@ def test_fetch_s1_vvvh_raw_chw_ignores_orbit_filter(monkeypatch):
     )
 
     assert arr.shape == (2, 2, 2)
+
+
+def test_fetch_s1_vvvh_raw_chw_mosaic_sorts_before_reduce(monkeypatch):
+    calls = []
+
+    class _FakeSize:
+        def __init__(self, n):
+            self._n = n
+
+        def getInfo(self):
+            return self._n
+
+    class _FakeFilter:
+        @staticmethod
+        def eq(field, value):
+            return ("eq", field, value)
+
+        @staticmethod
+        def listContains(field, value):
+            return ("listContains", field, value)
+
+    class _FakeRect:
+        def getInfo(self):
+            return {
+                "properties": {
+                    "VV": [[1.0, 2.0], [3.0, 4.0]],
+                    "VH": [[5.0, 6.0], [7.0, 8.0]],
+                }
+            }
+
+    class _FakeImage:
+        def select(self, _bands):
+            return self
+
+        def reproject(self, **_kwargs):
+            return self
+
+        def sampleRectangle(self, *, region, defaultValue):  # noqa: ARG002
+            return _FakeRect()
+
+    class _FakeCollection:
+        def __init__(self, count=5, stage="base"):
+            self.count = count
+            self.stage = stage
+
+        def filterDate(self, _start, _end):
+            return self
+
+        def filterBounds(self, _region):
+            return self
+
+        def filter(self, filt):
+            kind, field, value = filt
+            if kind == "eq" and field == "instrumentMode" and value == "IW":
+                return _FakeCollection(2, "iw")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VV"
+                and self.stage == "iw"
+            ):
+                return _FakeCollection(1, "vv")
+            if (
+                kind == "listContains"
+                and field == "transmitterReceiverPolarisation"
+                and value == "VH"
+                and self.stage == "vv"
+            ):
+                return _FakeCollection(1, "vh")
+            return self
+
+        def size(self):
+            return _FakeSize(self.count)
+
+        def sort(self, key):
+            calls.append(("sort", key, self.stage))
+            return self
+
+        def mosaic(self):
+            calls.append(("mosaic", self.stage))
+            return _FakeImage()
+
+    fake_ee = types.SimpleNamespace(
+        ImageCollection=lambda _collection: _FakeCollection(),
+        Filter=_FakeFilter,
+    )
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    monkeypatch.setattr(provider, "ensure_ready", lambda: None)
+    monkeypatch.setattr(provider, "get_region", lambda _spatial: object())
+
+    arr = provider.fetch_s1_vvvh_raw_chw(
+        spatial=object(),
+        temporal=TemporalSpec.range("2024-01-01", "2024-02-01"),
+        composite="mosaic",
+    )
+
+    assert arr.shape == (2, 2, 2)
+    assert ("sort", "system:time_start", "vh") in calls
+    assert calls.index(("sort", "system:time_start", "vh")) < calls.index(("mosaic", "vh"))
 
 
 def test_fetch_s1_vvvh_raw_chw_relaxes_iw_and_reports_meta(monkeypatch):

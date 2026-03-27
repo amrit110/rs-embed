@@ -358,6 +358,7 @@ class InferenceEngine:
         models: list[ModelConfig],
         prefetch_cache: dict[tuple[int, str], np.ndarray],
         prefetch_errors: dict[tuple[int, str], str],
+        prefetch_meta: dict[tuple[int, str], dict[str, Any]] | None = None,
         model_progress_cb: Any | None = None,
     ) -> dict[tuple[int, str], TaskResult]:
         """Infer embeddings for a chunk of spatial indices across all models.
@@ -390,6 +391,9 @@ class InferenceEngine:
 
             def _single(i: int, _ctx=ctx, _mc=mc) -> Embedding:
                 inp = _get_input(i) if _ctx.needs_provider_input else None
+                fmeta = None
+                if _ctx.needs_provider_input and _ctx.skey is not None and prefetch_meta is not None:
+                    fmeta = prefetch_meta.get((i, _ctx.skey)) or None
                 return self.infer_single(
                     embedder=_ctx.embedder,
                     lock=_ctx.lock,
@@ -398,6 +402,7 @@ class InferenceEngine:
                     sensor=_mc.sensor,
                     backend=_mc.backend,
                     input_chw=inp,
+                    fetch_meta=fmeta,
                     model_config=_mc.model_config,
                 )
 
@@ -501,6 +506,7 @@ class InferenceEngine:
         temporal: TemporalSpec | None,
         inference_strategy: str,
         get_input_fn: Callable[[int, str, SensorSpec], np.ndarray],
+        get_fetch_meta_fn: Callable[[int, str], dict[str, Any]] | None = None,
         progress_cb: Callable[[int], None] | None = None,
     ) -> dict[int, TaskResult]:
         """Infer embeddings for ALL spatial indices for a single model.
@@ -542,8 +548,11 @@ class InferenceEngine:
 
         def _infer_one(i: int) -> Embedding:
             inp = None
+            fmeta = None
             if ctx.needs_provider_input and ctx.skey is not None and sensor is not None:
                 inp = get_input_fn(i, ctx.skey, sensor)
+                if get_fetch_meta_fn is not None:
+                    fmeta = get_fetch_meta_fn(i, ctx.skey) or None
             with ctx.lock:
                 kwargs: dict[str, Any] = {
                     "embedder": ctx.embedder,
@@ -556,6 +565,8 @@ class InferenceEngine:
                     "input_chw": inp,
                     "input_prep": self.config.input_prep,
                 }
+                if fmeta is not None:
+                    kwargs["fetch_meta"] = fmeta
                 if model_config is not None:
                     kwargs["model_config"] = model_config
                 return _call_embedder_get_embedding_with_input_prep(

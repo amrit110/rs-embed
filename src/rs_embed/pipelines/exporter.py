@@ -196,6 +196,7 @@ class BatchExporter:
                         models=self.models,
                         prefetch_cache=active_prefetch.cache,
                         prefetch_errors=active_prefetch.errors,
+                        prefetch_meta=active_prefetch.fetch_meta,
                         model_progress_cb=on_model_done,
                     )
 
@@ -303,6 +304,9 @@ class BatchExporter:
                 temporal=self.temporal,
             )
 
+        def _get_fetch_meta(i: int, skey: str) -> dict[str, Any]:
+            return prefetch.get_fetch_meta(i, skey)
+
         def _write_ckpt(*, stage: str, final: bool = False) -> dict[str, Any]:
             return self.checkpoint.combined_write_checkpoint(
                 manifest=manifest,
@@ -338,6 +342,7 @@ class BatchExporter:
             show_progress=cfg.show_progress,
             input_refs_by_sensor=input_refs_by_sensor,
             get_or_fetch_input_fn=_get_or_fetch,
+            get_fetch_meta_fn=_get_fetch_meta,
             write_checkpoint_fn=_write_ckpt,
             progress=progress,
             inference_engine=self.inference,

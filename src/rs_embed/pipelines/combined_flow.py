@@ -54,6 +54,7 @@ def run_pending_models(
     show_progress: bool,
     input_refs_by_sensor: dict[str, dict[str, Any]],
     get_or_fetch_input_fn: Callable[[int, str, SensorSpec], np.ndarray],
+    get_fetch_meta_fn: Callable[[int, str], dict[str, Any]] | None = None,
     write_checkpoint_fn: Callable[..., dict[str, Any]],
     progress: Any,
     inference_engine: Any | None = None,
@@ -158,6 +159,7 @@ def run_pending_models(
                     temporal=temporal,
                     inference_strategy=inference_strategy,
                     get_input_fn=get_or_fetch_input_fn,
+                    get_fetch_meta_fn=get_fetch_meta_fn,
                     progress_cb=_progress_cb,
                 )
 

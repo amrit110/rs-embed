@@ -115,6 +115,14 @@ def _raise_if_empty_collection(col: Any, *, collection: str | None = None) -> No
         raise ProviderError(_no_images_found_message(collection=collection))
 
 
+def _order_collection_for_mosaic(col: Any) -> Any:
+    """Stabilize mosaic priority by preferring chronological collection order."""
+    try:
+        return col.sort("system:time_start")
+    except Exception:
+        return col
+
+
 def _format_s1_empty_collection_message(
     *,
     collection_id: str,
@@ -261,7 +269,7 @@ class GEEProvider(ProviderBase):
             if sensor.composite == "median":
                 img = ic.median()
             elif sensor.composite == "mosaic":
-                img = ic.mosaic()
+                img = _order_collection_for_mosaic(ic).mosaic()
             else:
                 img = ic.median()
         except ProviderError:
@@ -427,7 +435,7 @@ class GEEProvider(ProviderBase):
         if comp == "median":
             img = col.median()
         elif comp == "mosaic":
-            img = col.mosaic()
+            img = _order_collection_for_mosaic(col).mosaic()
         else:
             raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
@@ -496,7 +504,7 @@ class GEEProvider(ProviderBase):
             raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
         def _reduce(c: Any) -> Any:
-            return c.median() if comp == "median" else c.mosaic()
+            return c.median() if comp == "median" else _order_collection_for_mosaic(c).mosaic()
 
         fallback_frame = None
         try:
@@ -589,7 +597,7 @@ class GEEProvider(ProviderBase):
         if comp == "median":
             img = col.median()
         elif comp == "mosaic":
-            img = col.mosaic()
+            img = _order_collection_for_mosaic(col).mosaic()
         else:
             raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 

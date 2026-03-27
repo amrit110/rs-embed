@@ -9,6 +9,7 @@ from rs_embed.embedders.onthefly_satvision_toa import (
     _normalize_indices,
     _normalize_satvision_toa_input,
 )
+from rs_embed.tools.model_defaults import default_sensor_for_model
 
 
 def test_normalize_indices_supports_negative():
@@ -57,6 +58,19 @@ def test_satvision_default_sensor_has_14_bands():
     emb = SatVisionTOAEmbedder()
     ss = emb._default_sensor()
     assert len(ss.bands) == 14
+
+
+def test_satvision_model_defaults_matches_embedder_default_sensor():
+    emb = SatVisionTOAEmbedder()
+    direct = emb._default_sensor()
+    resolved = default_sensor_for_model("satvision")
+    assert resolved is not None
+    assert resolved.collection == direct.collection
+    assert resolved.bands == direct.bands
+    assert resolved.scale_m == direct.scale_m
+    assert resolved.cloudy_pct == direct.cloudy_pct
+    assert resolved.fill_value == direct.fill_value
+    assert resolved.composite == direct.composite
 
 
 def test_coerce_fetch_result_supports_array_and_tuple():

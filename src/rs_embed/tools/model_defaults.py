@@ -177,6 +177,7 @@ def supports_modality_for_model(model_id: str, modality: str) -> bool:
 
 def default_sensor_for_model(model_id: str, modality: str | None = None) -> SensorSpec | None:
     desc = _probe_model_desc(model_id)
+    cls = get_embedder_cls(model_id)
 
     typ = str(desc.get("type", "")).lower()
     if "precomputed" in typ:
@@ -199,6 +200,17 @@ def default_sensor_for_model(model_id: str, modality: str | None = None) -> Sens
 
     if default_modality is not None and default_modality in profiles:
         return profiles[default_modality]
+
+    if requested_modality is None:
+        try:
+            emb = cls()
+            default_sensor = getattr(emb, "_default_sensor", None)
+            if callable(default_sensor):
+                sensor = default_sensor()
+                if isinstance(sensor, SensorSpec):
+                    return sensor
+        except Exception as _e:
+            pass
 
     inputs = desc.get("inputs")
 

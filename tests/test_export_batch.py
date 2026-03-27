@@ -599,6 +599,94 @@ def test_export_batch_combined_prefetch_checkpoint_handles_variable_input_shapes
     assert manifest.get("status") == "ok"
 
 
+def test_export_batch_combined_preserves_fetch_meta_for_single_fallback(tmp_path, monkeypatch):
+    class DummyFetchMetaCombined:
+        seen_fetch_meta = []
+
+        def describe(self):
+            return {
+                "type": "onthefly",
+                "inputs": {"collection": "C", "bands": ["B1"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def fetch_input(self, provider, *, spatial, temporal, sensor):
+            _ = provider, spatial, temporal, sensor
+            return FetchResult(
+                data=np.full((1, 2, 2), 0.5, dtype=np.float32),
+                meta={"already_unit_scaled": True, "fallback_used": True},
+            )
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+            fetch_meta=None,
+        ):
+            _ = spatial, temporal, sensor, output, backend, device
+            assert input_chw is not None
+            DummyFetchMetaCombined.seen_fetch_meta.append(dict(fetch_meta or {}))
+            mode = "unit" if bool((fetch_meta or {}).get("already_unit_scaled")) else "raw"
+            return Embedding(
+                data=np.array([1.0], dtype=np.float32),
+                meta={"norm_mode_effective": mode},
+            )
+
+    registry.register("dummy_fetch_meta_combined")(DummyFetchMetaCombined)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    out_path = tmp_path / "combined_fetch_meta.npz"
+    manifest = api.export_batch(
+        spatials=[
+            PointBuffer(lon=0.0, lat=0.0, buffer_m=10),
+            PointBuffer(lon=1.0, lat=1.0, buffer_m=10),
+        ],
+        temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
+        models=["dummy_fetch_meta_combined"],
+        target=ExportTarget.combined(str(out_path)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, show_progress=False),
+        backend="gee",
+        device="cpu",
+        output=OutputSpec.pooled(),
+    )
+
+    assert out_path.exists()
+    assert DummyFetchMetaCombined.seen_fetch_meta == [
+        {"already_unit_scaled": True, "fallback_used": True},
+        {"already_unit_scaled": True, "fallback_used": True},
+    ]
+    metas = manifest["models"][0]["metas"]
+    assert [m["norm_mode_effective"] for m in metas] == ["unit", "unit"]
+
+
 def test_export_batch_combined_falls_back_to_single_when_batch_api_fails(tmp_path, monkeypatch):
     class DummyBatchFail:
         single_calls = 0
@@ -689,6 +777,94 @@ def test_export_batch_combined_falls_back_to_single_when_batch_api_fails(tmp_pat
     assert manifest.get("status") == "ok"
     assert DummyBatchFail.batch_calls >= 1
     assert DummyBatchFail.single_calls == 2
+
+
+def test_export_batch_per_item_gpu_fallback_preserves_fetch_meta(tmp_path, monkeypatch):
+    class DummyFetchMetaPerItem:
+        seen_fetch_meta = []
+
+        def describe(self):
+            return {
+                "type": "onthefly",
+                "inputs": {"collection": "C", "bands": ["B1"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def fetch_input(self, provider, *, spatial, temporal, sensor):
+            _ = provider, spatial, temporal, sensor
+            return FetchResult(
+                data=np.full((1, 2, 2), 0.5, dtype=np.float32),
+                meta={"already_unit_scaled": True, "fallback_used": True},
+            )
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+            fetch_meta=None,
+        ):
+            _ = spatial, temporal, sensor, output, backend, device
+            assert input_chw is not None
+            DummyFetchMetaPerItem.seen_fetch_meta.append(dict(fetch_meta or {}))
+            mode = "unit" if bool((fetch_meta or {}).get("already_unit_scaled")) else "raw"
+            return Embedding(
+                data=np.array([1.0], dtype=np.float32),
+                meta={"norm_mode_effective": mode},
+            )
+
+    registry.register("dummy_fetch_meta_per_item")(DummyFetchMetaPerItem)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    out_dir = tmp_path / "per_item_fetch_meta"
+    manifests = api.export_batch(
+        spatials=[
+            PointBuffer(lon=0.0, lat=0.0, buffer_m=10),
+            PointBuffer(lon=1.0, lat=1.0, buffer_m=10),
+        ],
+        temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
+        models=["dummy_fetch_meta_per_item"],
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, show_progress=False),
+        backend="gee",
+        device="cuda",
+        output=OutputSpec.pooled(),
+    )
+
+    assert len(manifests) == 2
+    assert DummyFetchMetaPerItem.seen_fetch_meta == [
+        {"already_unit_scaled": True, "fallback_used": True},
+        {"already_unit_scaled": True, "fallback_used": True},
+    ]
+    modes = [m["models"][0]["meta"]["norm_mode_effective"] for m in manifests]
+    assert modes == ["unit", "unit"]
 
 
 def test_export_batch_combined_prefetch_reuses_superset_and_slices_subset(tmp_path, monkeypatch):
