@@ -73,7 +73,6 @@ emb = get_embedding(
 
 ```
 
-Use `fetch=FetchSpec(...)` when you want to adjust sampling resolution or compositing without constructing a full `SensorSpec`.
 See the visualization helper and end-to-end notebook in the repository:
 
 - [`examples/plot_utils.py`](https://github.com/cybergis/rs-embed/blob/main/examples/plot_utils.py)
