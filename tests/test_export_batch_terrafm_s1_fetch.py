@@ -5,7 +5,7 @@ import numpy as np
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpec
-from rs_embed.core.types import FetchResult
+from rs_embed.core.types import ExportConfig, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.pipelines.point_payload import build_one_point_payload
 from rs_embed.tools.export_requests import ExportModelRequest
@@ -115,13 +115,11 @@ def test_export_batch_prefetch_preserves_terrafm_s1_sensor_fields(tmp_path, monk
         spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=10)],
         temporal=TemporalSpec.range("2020-01-01", "2020-02-01"),
         models=[ExportModelRequest(name="dummy_terrafm_s1", sensor=sensor)],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(save_inputs=True, save_embeddings=True, show_progress=False),
         backend="gee",
         device="cpu",
         output=OutputSpec.pooled(),
-        save_inputs=True,
-        save_embeddings=True,
-        show_progress=False,
     )
 
     manifest = manifests[0] if isinstance(manifests, list) else manifests

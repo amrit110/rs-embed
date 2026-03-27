@@ -563,7 +563,12 @@ def test_export_batch_empty_spatials():
     from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="non-empty"):
-        export_batch(spatials=[], temporal=_TEMPORAL, models=["mock_model"], out_dir="/tmp")
+        export_batch(
+            spatials=[],
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget.per_item("/tmp"),
+        )
 
 
 def test_export_batch_rejects_non_list_spatials():
@@ -575,58 +580,27 @@ def test_export_batch_rejects_non_list_spatials():
             spatials=(_SPATIAL,),
             temporal=_TEMPORAL,
             models=["mock_model"],
-            out_dir="/tmp",
+            target=ExportTarget.per_item("/tmp"),
         )
 
     with pytest.raises(ModelError, match="non-empty"):
-        export_batch(spatials=_SPATIAL, temporal=_TEMPORAL, models=["mock_model"], out_dir="/tmp")
+        export_batch(
+            spatials=_SPATIAL,
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget.per_item("/tmp"),
+        )
 
 
 def test_export_batch_empty_models():
     from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="non-empty"):
-        export_batch(spatials=[_SPATIAL], temporal=_TEMPORAL, models=[], out_dir="/tmp")
-
-
-def test_export_batch_no_output_arg():
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="out_dir or out_path"):
-        export_batch(spatials=[_SPATIAL], temporal=_TEMPORAL, models=["mock_model"])
-
-
-def test_export_batch_both_output_args():
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="only one"):
         export_batch(
             spatials=[_SPATIAL],
             temporal=_TEMPORAL,
-            models=["mock_model"],
-            out_dir="/tmp/a",
-            out_path="/tmp/b.npz",
-        )
-
-
-def test_export_batch_decoupled_output_api_requires_out_and_layout():
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="both out and layout"):
-        export_batch(spatials=[_SPATIAL], temporal=_TEMPORAL, models=["mock_model"], out="/tmp/x")
-
-
-def test_export_batch_decoupled_output_api_disallows_mixing_with_legacy_args():
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="either out\\+layout or out_dir/out_path"):
-        export_batch(
-            spatials=[_SPATIAL],
-            temporal=_TEMPORAL,
-            models=["mock_model"],
-            out="/tmp/x",
-            layout="combined",
-            out_path="/tmp/y.npz",
+            models=[],
+            target=ExportTarget.per_item("/tmp"),
         )
 
 
@@ -638,8 +612,8 @@ def test_export_batch_unsupported_format():
             spatials=[_SPATIAL],
             temporal=_TEMPORAL,
             models=["mock_model"],
-            out_dir="/tmp",
-            format="parquet",
+            target=ExportTarget.per_item("/tmp"),
+            config=ExportConfig(format="parquet"),
         )
 
 
@@ -651,12 +625,14 @@ def test_export_batch_accepts_netcdf_format(tmp_path):
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_model"],
-        out_dir=str(tmp_path),
-        format="netcdf",
+        target=ExportTarget.per_item(str(tmp_path)),
+        config=ExportConfig(
+            format="netcdf",
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+        ),
         backend="local",
-        save_inputs=False,
-        save_embeddings=True,
-        save_manifest=False,
     )
     assert len(results) == 1
     nc_file = tmp_path / "p00000.nc"
@@ -671,43 +647,70 @@ def test_export_batch_names_length_mismatch(tmp_path):
             spatials=[_SPATIAL, _SPATIAL],
             temporal=_TEMPORAL,
             models=["mock_model"],
-            out_dir=str(tmp_path),
-            names=["only_one"],
+            target=ExportTarget.per_item(str(tmp_path), names=["only_one"]),
         )
 
 
-def test_export_batch_decoupled_layout_per_item(tmp_path):
+def test_export_batch_combined_target_requires_out_file():
+    from rs_embed.api import export_batch
+    from rs_embed.core.types import ExportLayout
+
+    with pytest.raises(ModelError, match="requires out_file"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget(layout=ExportLayout.COMBINED),
+        )
+
+
+def test_export_batch_per_item_target_requires_out_dir():
+    from rs_embed.api import export_batch
+    from rs_embed.core.types import ExportLayout
+
+    with pytest.raises(ModelError, match="requires out_dir"):
+        export_batch(
+            spatials=[_SPATIAL],
+            temporal=_TEMPORAL,
+            models=["mock_model"],
+            target=ExportTarget(layout=ExportLayout.PER_ITEM),
+        )
+
+
+def test_export_batch_per_item_layout(tmp_path):
     from rs_embed.api import export_batch
 
     export_batch(
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_model"],
-        out=str(tmp_path / "dir_out"),
-        layout="per_item",
+        target=ExportTarget.per_item(str(tmp_path / "dir_out")),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+            show_progress=False,
+        ),
         backend="local",
-        save_inputs=False,
-        save_embeddings=True,
-        save_manifest=False,
-        show_progress=False,
     )
     assert (tmp_path / "dir_out" / "p00000.npz").exists()
 
 
-def test_export_batch_decoupled_layout_combined(tmp_path):
+def test_export_batch_combined_layout(tmp_path):
     from rs_embed.api import export_batch
 
     export_batch(
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_model"],
-        out=str(tmp_path / "combined_out"),
-        layout="combined",
+        target=ExportTarget.combined(str(tmp_path / "combined_out.npz")),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+            show_progress=False,
+        ),
         backend="local",
-        save_inputs=False,
-        save_embeddings=True,
-        save_manifest=False,
-        show_progress=False,
     )
     assert (tmp_path / "combined_out.npz").exists()
 
@@ -729,33 +732,6 @@ def test_export_batch_object_style_target_and_config(tmp_path):
         backend="local",
     )
     assert (tmp_path / "sample.npz").exists()
-
-
-def test_export_batch_rejects_mixing_target_and_legacy_output_args(tmp_path):
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="target=ExportTarget"):
-        export_batch(
-            spatials=[_SPATIAL],
-            temporal=_TEMPORAL,
-            models=["mock_model"],
-            target=ExportTarget.combined(str(tmp_path / "combined")),
-            out_path=str(tmp_path / "legacy"),
-        )
-
-
-def test_export_batch_rejects_mixing_config_and_legacy_config_args(tmp_path):
-    from rs_embed.api import export_batch
-
-    with pytest.raises(ModelError, match="config=ExportConfig"):
-        export_batch(
-            spatials=[_SPATIAL],
-            temporal=_TEMPORAL,
-            models=["mock_model"],
-            target=ExportTarget.combined(str(tmp_path / "combined")),
-            config=ExportConfig(show_progress=False),
-            save_inputs=False,
-        )
 
 
 def test_public_list_models_uses_catalog_not_runtime_registry():
@@ -791,10 +767,8 @@ def test_export_batch_infer_batch_size_is_independent_from_chunk_size(monkeypatc
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_model"],
-        out_path=str(tmp_path / "combined"),
-        chunk_size=32,
-        infer_batch_size=5,
-        show_progress=False,
+        target=ExportTarget.combined(str(tmp_path / "combined")),
+        config=ExportConfig(chunk_size=32, infer_batch_size=5, show_progress=False),
     )
 
     assert result == {"status": "ok"}
@@ -817,10 +791,10 @@ def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_multi"],
-        out_path=str(tmp_path / "combined"),
+        target=ExportTarget.combined(str(tmp_path / "combined")),
+        config=ExportConfig(show_progress=False),
         modality="s1",
         backend="gee",
-        show_progress=False,
     )
 
     assert result == {"status": "ok"}
@@ -846,10 +820,10 @@ def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_multi"],
-        out_path=str(tmp_path / "combined"),
+        target=ExportTarget.combined(str(tmp_path / "combined")),
+        config=ExportConfig(show_progress=False),
         fetch=FetchSpec(scale_m=30, cloudy_pct=5),
         backend="gee",
-        show_progress=False,
     )
 
     assert result == {"status": "ok"}
@@ -884,9 +858,9 @@ def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
                     fetch=FetchSpec(scale_m=20),
                 )
             ],
-            out_path=str(tmp_path / "combined"),
+            target=ExportTarget.combined(str(tmp_path / "combined")),
+            config=ExportConfig(show_progress=False),
             backend="gee",
-            show_progress=False,
         )
 
 
@@ -1121,10 +1095,9 @@ def test_export_batch_assert_supported_rejects_incompatible_backend(tmp_path):
             spatials=[_SPATIAL],
             temporal=_TEMPORAL,
             models=["gee_only_export_mock"],
-            out_dir=str(tmp_path),
+            target=ExportTarget.per_item(str(tmp_path)),
+            config=ExportConfig(save_embeddings=False, show_progress=False),
             backend="local",
-            save_embeddings=False,
-            show_progress=False,
         )
 
     registry._REGISTRY.pop("gee_only_export_mock", None)
@@ -1143,11 +1116,10 @@ def test_export_batch_assert_supported_rejects_incompatible_output_mode(tmp_path
             spatials=[_SPATIAL],
             temporal=_TEMPORAL,
             models=["gee_only_export_mock"],
-            out_dir=str(tmp_path),
+            target=ExportTarget.per_item(str(tmp_path)),
+            config=ExportConfig(save_embeddings=False, show_progress=False),
             backend="gee",
             output=OutputSpec.grid(),
-            save_embeddings=False,
-            show_progress=False,
         )
 
     registry._REGISTRY.pop("gee_only_export_mock", None)
@@ -1162,12 +1134,14 @@ def test_export_batch_assert_supported_passes_for_compatible_model(tmp_path):
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_model"],
-        out_dir=str(tmp_path),
+        target=ExportTarget.per_item(str(tmp_path)),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+            show_progress=False,
+        ),
         backend="local",
-        save_inputs=False,
-        save_embeddings=True,
-        save_manifest=False,
-        show_progress=False,
     )
     assert len(results) == 1
     assert results[0]["status"] == "ok"
@@ -1197,12 +1171,14 @@ def test_export_batch_backend_resolution_before_assert_supported(tmp_path, monke
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
         models=["mock_precomputed_local"],
-        out_dir=str(tmp_path),
+        target=ExportTarget.per_item(str(tmp_path)),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            save_manifest=False,
+            show_progress=False,
+        ),
         backend="gee",
-        save_inputs=False,
-        save_embeddings=True,
-        save_manifest=False,
-        show_progress=False,
     )
     assert len(results) == 1
     assert results[0]["status"] == "ok"

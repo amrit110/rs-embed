@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import replace
 
 from ..core.errors import ModelError
 from ..core.registry import get_embedder_cls
-from ..core.specs import FetchSpec, InputPrepSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
+from ..core.specs import FetchSpec, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import (
     ExportConfig,
     ExportLayout,
@@ -21,15 +20,6 @@ from .normalization import _resolve_embedding_api_backend, normalize_model_name
 from .runtime import require_model_config_support
 
 
-def normalize_export_layout(layout: str) -> ExportLayout:
-    layout_n = str(layout).strip().lower().replace("-", "_")
-    if layout_n in {"combined", "single_file", "file"}:
-        return ExportLayout.COMBINED
-    if layout_n in {"per_item", "dir", "directory"}:
-        return ExportLayout.PER_ITEM
-    raise ModelError(f"Unsupported export layout: {layout!r}. Supported: 'combined', 'per_item'.")
-
-
 def normalize_export_format(format_name: str) -> tuple[str, str]:
     fmt = str(format_name).strip().lower()
     from ..writers import SUPPORTED_FORMATS, get_extension
@@ -41,159 +31,30 @@ def normalize_export_format(format_name: str) -> tuple[str, str]:
     return fmt, get_extension(fmt)
 
 
-def _resolve_export_batch_target(
-    *,
-    n_spatials: int,
-    ext: str,
-    out: str | None,
-    layout: str | None,
-    out_dir: str | None,
-    out_path: str | None,
-    names: list[str] | None,
-) -> ExportTarget:
-    if (out is not None) or (layout is not None):
-        if out is None or layout is None:
-            raise ModelError("Provide both out and layout when using the decoupled output API.")
-        if out_dir is not None or out_path is not None:
-            raise ModelError("Use either out+layout or out_dir/out_path, not both.")
-        layout_enum = normalize_export_layout(layout)
-        if layout_enum == ExportLayout.COMBINED:
-            out_path = out
-        else:
-            out_dir = out
-
-    if out_dir is None and out_path is None:
-        raise ModelError("export_batch requires out_dir or out_path.")
-    if out_dir is not None and out_path is not None:
-        raise ModelError("Provide only one of out_dir or out_path.")
-
-    if out_path is not None:
-        out_file = out_path if out_path.endswith(ext) else (out_path + ext)
-        return ExportTarget(layout=ExportLayout.COMBINED, out_file=out_file)
-
-    assert out_dir is not None
-    point_names = names if names is not None else [f"p{i:05d}" for i in range(n_spatials)]
-    if len(point_names) != n_spatials:
-        raise ModelError("names must have the same length as spatials.")
-    return ExportTarget(layout=ExportLayout.PER_ITEM, out_dir=out_dir, names=point_names)
-
-
 def normalize_export_target(
     *,
     n_spatials: int,
     ext: str,
-    target: ExportTarget | None,
-    out: str | None,
-    layout: str | None,
-    out_dir: str | None,
-    out_path: str | None,
-    names: list[str] | None,
+    target: ExportTarget,
 ) -> ExportTarget:
-    if target is not None:
-        if not isinstance(target, ExportTarget):
-            raise ModelError("target must be an ExportTarget instance.")
-        if any(v is not None for v in (out, layout, out_dir, out_path, names)):
-            raise ModelError(
-                "Use either target=ExportTarget(...) or legacy out/layout/out_dir/out_path/names arguments, not both."
-            )
-        if target.layout == ExportLayout.COMBINED:
-            if not target.out_file:
-                raise ModelError("ExportTarget.COMBINED requires out_file.")
-            out_file = target.out_file if target.out_file.endswith(ext) else (target.out_file + ext)
-            return ExportTarget.combined(out_file)
-        if target.layout == ExportLayout.PER_ITEM:
-            if not target.out_dir:
-                raise ModelError("ExportTarget.PER_ITEM requires out_dir.")
-            point_names = (
-                target.names
-                if target.names is not None
-                else [f"p{i:05d}" for i in range(n_spatials)]
-            )
-            if len(point_names) != n_spatials:
-                raise ModelError("target.names must have the same length as spatials.")
-            return ExportTarget.per_item(target.out_dir, names=point_names)
-        raise ModelError(f"Unsupported ExportTarget layout: {target.layout!r}.")
-
-    return _resolve_export_batch_target(
-        n_spatials=n_spatials,
-        ext=ext,
-        out=out,
-        layout=layout,
-        out_dir=out_dir,
-        out_path=out_path,
-        names=names,
-    )
-
-
-def normalize_export_config(
-    *,
-    config: ExportConfig | None,
-    format: str,
-    save_inputs: bool,
-    save_embeddings: bool,
-    save_manifest: bool,
-    fail_on_bad_input: bool,
-    chunk_size: int,
-    infer_batch_size: int | None,
-    num_workers: int,
-    continue_on_error: bool,
-    max_retries: int,
-    retry_backoff_s: float,
-    async_write: bool,
-    writer_workers: int,
-    resume: bool,
-    show_progress: bool,
-    input_prep: InputPrepSpec | str | None,
-) -> ExportConfig:
-    default_cfg = ExportConfig()
-    legacy_config_used = any(
-        [
-            format != default_cfg.format,
-            save_inputs != default_cfg.save_inputs,
-            save_embeddings != default_cfg.save_embeddings,
-            save_manifest != default_cfg.save_manifest,
-            fail_on_bad_input != default_cfg.fail_on_bad_input,
-            chunk_size != default_cfg.chunk_size,
-            infer_batch_size != default_cfg.infer_batch_size,
-            num_workers != default_cfg.num_workers,
-            continue_on_error != default_cfg.continue_on_error,
-            max_retries != default_cfg.max_retries,
-            retry_backoff_s != default_cfg.retry_backoff_s,
-            async_write != default_cfg.async_write,
-            writer_workers != default_cfg.writer_workers,
-            resume != default_cfg.resume,
-            show_progress != default_cfg.show_progress,
-            input_prep != default_cfg.input_prep,
-        ]
-    )
-    if config is not None and legacy_config_used:
-        raise ModelError(
-            "Use either config=ExportConfig(...) or legacy export config keyword arguments, not both."
+    if not isinstance(target, ExportTarget):
+        raise ModelError("target must be an ExportTarget instance.")
+    if target.layout == ExportLayout.COMBINED:
+        if not target.out_file:
+            raise ModelError("ExportTarget.COMBINED requires out_file.")
+        out_file = target.out_file if target.out_file.endswith(ext) else (target.out_file + ext)
+        return ExportTarget.combined(out_file)
+    if target.layout == ExportLayout.PER_ITEM:
+        if not target.out_dir:
+            raise ModelError("ExportTarget.PER_ITEM requires out_dir.")
+        point_names = (
+            target.names if target.names is not None else [f"p{i:05d}" for i in range(n_spatials)]
         )
+        if len(point_names) != n_spatials:
+            raise ModelError("target.names must have the same length as spatials.")
+        return ExportTarget.per_item(target.out_dir, names=point_names)
+    raise ModelError(f"Unsupported ExportTarget layout: {target.layout!r}.")
 
-    if config is not None:
-        fmt, _ext = normalize_export_format(config.format)
-        return replace(config, format=fmt)
-
-    fmt, _ext = normalize_export_format(format)
-    return ExportConfig(
-        format=fmt,
-        save_inputs=save_inputs,
-        save_embeddings=save_embeddings,
-        save_manifest=save_manifest,
-        fail_on_bad_input=fail_on_bad_input,
-        chunk_size=chunk_size,
-        infer_batch_size=infer_batch_size,
-        num_workers=num_workers,
-        continue_on_error=continue_on_error,
-        max_retries=max_retries,
-        retry_backoff_s=retry_backoff_s,
-        async_write=async_write,
-        writer_workers=writer_workers,
-        resume=resume,
-        show_progress=show_progress,
-        input_prep=input_prep,
-    )
 
 
 def resolve_export_model_configs(
