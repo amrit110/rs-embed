@@ -41,7 +41,7 @@ cd rs-embed
 pip install -e .
 ```
 
-For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`, `prithvi`):
+For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`):
 
 ```bash
 pip install -e ".[terratorch]"
