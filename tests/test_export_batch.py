@@ -2464,15 +2464,17 @@ def test_export_batch_per_item_prefetch_pipeline_isolates_next_chunk_cache(tmp_p
         ],
         temporal=TemporalSpec.year(2022),
         models=["dummy_chunked_batch"],
-        out_dir=str(out_dir),
+        target=ExportTarget.per_item(str(out_dir)),
+        config=ExportConfig(
+            save_inputs=False,
+            save_embeddings=True,
+            chunk_size=2,
+            num_workers=1,
+            continue_on_error=False,
+        ),
         backend="gee",
         device="cuda",
         output=OutputSpec.pooled(),
-        save_inputs=False,
-        save_embeddings=True,
-        chunk_size=2,
-        num_workers=1,
-        continue_on_error=False,
     )
 
     assert [m["status"] for m in manifests] == ["ok", "ok", "ok", "ok"]
