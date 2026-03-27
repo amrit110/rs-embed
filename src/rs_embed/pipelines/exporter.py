@@ -161,11 +161,12 @@ class BatchExporter:
 
         prefetch_pipeline_ex: ThreadPoolExecutor | None = None
         prefetched_chunk_fut = None
+        active_prefetch = prefetch
         try:
             if need_prefetch and chunk_groups:
                 prefetch_pipeline_ex = ThreadPoolExecutor(max_workers=1)
                 prefetched_chunk_fut = prefetch_pipeline_ex.submit(
-                    self._prefetch_chunk, prefetch, chunk_groups[0]
+                    self._prefetch_chunk, active_prefetch, chunk_groups[0]
                 )
 
             for chunk_idx, idxs in enumerate(chunk_groups):
@@ -175,10 +176,11 @@ class BatchExporter:
                     prefetched_chunk_fut = None
 
                 # Kick off next chunk prefetch
+                next_prefetch: PrefetchManager | None = None
                 if prefetch_pipeline_ex is not None and (chunk_idx + 1) < len(chunk_groups):
-                    # Clone a fresh prefetch manager for next chunk to avoid
-                    # cache collisions — the current chunk's data is still in use.
-                    next_prefetch = self._clone_prefetch(prefetch)
+                    # Clone a fresh prefetch manager for next chunk so its cache
+                    # is isolated from the current chunk while both are live.
+                    next_prefetch = self._clone_prefetch(active_prefetch)
                     prefetched_chunk_fut = prefetch_pipeline_ex.submit(
                         self._prefetch_chunk, next_prefetch, chunk_groups[chunk_idx + 1]
                     )
@@ -192,15 +194,15 @@ class BatchExporter:
                         spatials=self.spatials,
                         temporal=self.temporal,
                         models=self.models,
-                        prefetch_cache=prefetch.cache,
-                        prefetch_errors=prefetch.errors,
+                        prefetch_cache=active_prefetch.cache,
+                        prefetch_errors=active_prefetch.errors,
                         model_progress_cb=on_model_done,
                     )
 
                 # Build + write each point
                 self._write_per_item_chunk(
                     idxs=idxs,
-                    prefetch=prefetch,
+                    prefetch=active_prefetch,
                     provider_enabled=provider_enabled,
                     chunk_embed_results=chunk_embed_results,
                     use_batch=use_batch,
@@ -210,7 +212,9 @@ class BatchExporter:
                 )
 
                 # Free chunk memory
-                prefetch.clear_chunk()
+                active_prefetch.clear_chunk()
+                if next_prefetch is not None:
+                    active_prefetch = next_prefetch
 
         finally:
             if prefetch_pipeline_ex is not None:
@@ -492,7 +496,7 @@ class BatchExporter:
         prefetch.fetch_chunk(idxs, self.spatials, self.temporal)
 
     def _clone_prefetch(self, src: PrefetchManager) -> PrefetchManager:
-        """Clone a PrefetchManager preserving the plan but with the same cache refs."""
+        """Clone a PrefetchManager preserving the plan with fresh per-chunk caches."""
         clone = PrefetchManager(
             provider=src.provider,
             models=self.model_names,
@@ -508,11 +512,6 @@ class BatchExporter:
         clone.sensor_to_fetch = src.sensor_to_fetch
         clone.sensor_models = src.sensor_models
         clone.fetch_members = src.fetch_members
-        # Share cache references so piped prefetch populates the same dict
-        clone.cache = src.cache
-        clone.errors = src.errors
-        clone.input_reports = src.input_reports
-        clone.fetch_meta = src.fetch_meta
         return clone
 
     def _write_per_item_chunk(

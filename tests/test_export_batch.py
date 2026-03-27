@@ -1,4 +1,5 @@
 import json
+import threading
 
 import numpy as np
 import pytest
@@ -2400,6 +2401,115 @@ def test_export_batch_combined_progress_fills_on_model_init_failure(tmp_path, mo
     assert state["infer[dummy_init_fail]"]["total"] == len(spatials)
     assert state["infer[dummy_init_fail]"]["updates"] == len(spatials)
     assert state["infer[dummy_init_fail]"]["closed"] is True
+
+
+def test_export_batch_per_item_prefetch_pipeline_isolates_next_chunk_cache(tmp_path, monkeypatch):
+    class DummyChunkedBatchModel:
+        batch_calls = []
+
+        def describe(self):
+            return {
+                "type": "onthefly",
+                "inputs": {"collection": "C", "bands": ["B1", "B2", "B3"]},
+                "defaults": {
+                    "scale_m": 10,
+                    "cloudy_pct": 30,
+                    "composite": "median",
+                    "fill_value": 0.0,
+                },
+            }
+
+        def get_embedding(
+            self,
+            *,
+            spatial,
+            temporal,
+            sensor,
+            output,
+            backend,
+            device="auto",
+            input_chw=None,
+        ):
+            assert input_chw is not None
+            return Embedding(data=np.array([float(spatial.lon)], dtype=np.float32), meta={})
+
+        def get_embeddings_batch_from_inputs(
+            self,
+            *,
+            spatials,
+            input_chws,
+            temporal=None,
+            sensor=None,
+            output=OutputSpec.pooled(),
+            backend="auto",
+            device="auto",
+        ):
+            lons = tuple(float(sp.lon) for sp in spatials)
+            if lons == (0.0, 1.0):
+                assert second_chunk_ready.wait(timeout=2.0)
+            DummyChunkedBatchModel.batch_calls.append(lons)
+            return [
+                Embedding(data=np.array([float(sp.lon)], dtype=np.float32), meta={})
+                for sp in spatials
+            ]
+
+    registry.register("dummy_chunked_batch")(DummyChunkedBatchModel)
+
+    import rs_embed.api as api
+
+    class DummyProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ensure_ready(self):
+            return None
+
+    fetched_lons = set()
+    fetched_lock = threading.Lock()
+    second_chunk_ready = threading.Event()
+
+    def fake_fetch(provider, *, spatial, temporal, sensor):
+        lon = float(spatial.lon)
+        arr = np.full((3, 4, 4), lon + 1.0, dtype=np.float32)
+        with fetched_lock:
+            fetched_lons.add(lon)
+            if {2.0, 3.0}.issubset(fetched_lons):
+                second_chunk_ready.set()
+        return arr
+
+    monkeypatch.setattr(
+        "rs_embed.tools.runtime.get_provider", lambda _name, **_kwargs: DummyProvider()
+    )
+    monkeypatch.setattr("rs_embed.providers.gee_utils.fetch_gee_patch_raw", fake_fetch)
+    monkeypatch.setattr(
+        "rs_embed.providers.gee_utils.inspect_input_raw",
+        lambda x_chw, *, sensor, name: {"ok": True},
+    )
+    get_embedder_bundle_cached.cache_clear()
+
+    out_dir = tmp_path / "per_item_chunked_prefetch"
+    manifests = api.export_batch(
+        spatials=[
+            PointBuffer(lon=0, lat=0, buffer_m=10),
+            PointBuffer(lon=1, lat=1, buffer_m=10),
+            PointBuffer(lon=2, lat=2, buffer_m=10),
+            PointBuffer(lon=3, lat=3, buffer_m=10),
+        ],
+        temporal=TemporalSpec.year(2022),
+        models=["dummy_chunked_batch"],
+        out_dir=str(out_dir),
+        backend="gee",
+        device="cuda",
+        output=OutputSpec.pooled(),
+        save_inputs=False,
+        save_embeddings=True,
+        chunk_size=2,
+        num_workers=1,
+        continue_on_error=False,
+    )
+
+    assert [m["status"] for m in manifests] == ["ok", "ok", "ok", "ok"]
+    assert DummyChunkedBatchModel.batch_calls == [(0.0, 1.0), (2.0, 3.0)]
 
 
 def test_export_batch_combined_embedder_without_input_chw_kwarg(tmp_path):
