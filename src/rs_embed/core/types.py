@@ -174,6 +174,9 @@ class ExportModelRequest:
 
     This is the user-facing counterpart to ``ModelConfig``.
 
+    Prefer :meth:`configure` to pass model-specific settings as keyword
+    arguments rather than constructing ``model_config`` dicts manually.
+
     Attributes
     ----------
     name : str
@@ -186,7 +189,8 @@ class ExportModelRequest:
     modality : str or None
         Optional per-model modality selector.
     model_config : dict[str, Any] or None
-        Optional per-model runtime settings such as ``{"variant": "large"}``.
+        Model-specific runtime settings.  Use :meth:`configure` to build
+        this from keyword arguments instead of constructing the dict manually.
     """
 
     name: str
@@ -194,6 +198,48 @@ class ExportModelRequest:
     fetch: FetchSpec | None = None
     modality: str | None = None
     model_config: dict[str, Any] | None = None
+
+    @classmethod
+    def configure(
+        cls,
+        name: str,
+        *,
+        sensor: SensorSpec | None = None,
+        fetch: FetchSpec | None = None,
+        modality: str | None = None,
+        **model_kwargs: Any,
+    ) -> ExportModelRequest:
+        """Create a request with model settings as direct keyword arguments.
+
+        Parameters
+        ----------
+        name : str
+            Model identifier or alias.
+        sensor : SensorSpec or None
+            Optional per-model sensor override.
+        fetch : FetchSpec or None
+            Optional per-model fetch-policy override.
+        modality : str or None
+            Optional per-model modality selector.
+        **model_kwargs
+            Model-specific settings (e.g. ``variant="large"``).
+
+        Returns
+        -------
+        ExportModelRequest
+
+        Examples
+        --------
+        >>> req = ExportModelRequest.configure("dofa", variant="large")
+        >>> export_batch(spatials=[...], models=[req], ...)
+        """
+        return cls(
+            name=name,
+            sensor=sensor,
+            fetch=fetch,
+            modality=modality,
+            model_config=model_kwargs or None,
+        )
 
 
 # ── Export target ──────────────────────────────────────────────────

@@ -6,13 +6,20 @@ GEE, torch, or any real model weights.
 
 import numpy as np
 import pytest
+import rs_embed.api as api
+import rs_embed.tools.runtime as rt
 
+from rs_embed import list_models
+from rs_embed.api import _assert_supported, _validate_specs, export_batch, get_embedding, get_embeddings_batch
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import FetchSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
-from rs_embed.core.types import ExportConfig, ExportModelRequest, ExportTarget, FetchResult
+from rs_embed.core.types import ExportConfig, ExportLayout, ExportModelRequest, ExportTarget, FetchResult
 from rs_embed.embedders.base import EmbedderBase
+from rs_embed.tools.output import normalize_embedding_output
+from rs_embed.tools.runtime import sensor_key
+from rs_embed.tools.serialization import sensor_cache_key as _sensor_cache_key
 
 # ── mock embedder ──────────────────────────────────────────────────
 
@@ -188,7 +195,6 @@ _TEMPORAL = TemporalSpec.year(2024)
 
 
 def test_get_embedding_returns_embedding():
-    from rs_embed.api import get_embedding
 
     emb = get_embedding("mock_model", spatial=_SPATIAL, temporal=_TEMPORAL)
     assert isinstance(emb, Embedding)
@@ -197,7 +203,6 @@ def test_get_embedding_returns_embedding():
 
 
 def test_get_embedding_output_modes():
-    from rs_embed.api import get_embedding
 
     emb_pooled = get_embedding("mock_model", spatial=_SPATIAL, output=OutputSpec.pooled())
     assert emb_pooled.meta["output"] == "pooled"
@@ -207,7 +212,6 @@ def test_get_embedding_output_modes():
 
 
 def test_get_embedding_precomputed_default_backend_auto_resolves_to_auto():
-    from rs_embed.api import get_embedding
 
     registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
 
@@ -217,14 +221,12 @@ def test_get_embedding_precomputed_default_backend_auto_resolves_to_auto():
 
 
 def test_get_embedding_unknown_model():
-    from rs_embed.api import get_embedding
 
     with pytest.raises(ModelError, match="Unknown model"):
         get_embedding("nonexistent", spatial=_SPATIAL)
 
 
 def test_get_embedding_modality_resolves_default_sensor():
-    from rs_embed.api import get_embedding
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
@@ -237,7 +239,6 @@ def test_get_embedding_modality_resolves_default_sensor():
 
 
 def test_get_embedding_fetch_resolves_default_sensor():
-    from rs_embed.api import get_embedding
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
@@ -256,7 +257,6 @@ def test_get_embedding_fetch_resolves_default_sensor():
 
 
 def test_get_embedding_rejects_sensor_and_fetch_together():
-    from rs_embed.api import get_embedding
 
     with pytest.raises(ModelError, match="Use either sensor=... or fetch=..., not both"):
         get_embedding(
@@ -268,21 +268,18 @@ def test_get_embedding_rejects_sensor_and_fetch_together():
 
 
 def test_get_embedding_rejects_unsupported_modality():
-    from rs_embed.api import get_embedding
 
     with pytest.raises(ModelError, match="does not expose modality"):
         get_embedding("mock_model", spatial=_SPATIAL, modality="s1")
 
 
-def test_get_embedding_rejects_model_config_for_unsupported_model():
-    from rs_embed.api import get_embedding
+def test_get_embedding_rejects_model_kwargs_for_unsupported_model():
 
-    with pytest.raises(ModelError, match="does not support model_config"):
-        get_embedding("mock_model", spatial=_SPATIAL, model_config={"variant": "large"})
+    with pytest.raises(ModelError, match="does not accept model-specific keyword arguments"):
+        get_embedding("mock_model", spatial=_SPATIAL, variant="large")
 
 
-def test_get_embedding_passes_model_config_to_variant_aware_model():
-    from rs_embed.api import get_embedding
+def test_get_embedding_passes_model_kwargs_to_variant_aware_model():
 
     registry.register("mock_variant")(_MockVariantEmbedder)
 
@@ -290,7 +287,7 @@ def test_get_embedding_passes_model_config_to_variant_aware_model():
         "mock_variant",
         spatial=_SPATIAL,
         temporal=_TEMPORAL,
-        model_config={"variant": "large"},
+        variant="large",
     )
     assert emb.meta["variant"] == "large"
 
@@ -301,7 +298,6 @@ def test_get_embedding_passes_model_config_to_variant_aware_model():
 
 
 def test_get_embeddings_batch():
-    from rs_embed.api import get_embeddings_batch
 
     spatials = [
         PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
@@ -315,7 +311,6 @@ def test_get_embeddings_batch():
 
 
 def test_get_embeddings_batch_empty():
-    from rs_embed.api import get_embeddings_batch
 
     with pytest.raises(ModelError, match="non-empty"):
         get_embeddings_batch("mock_model", spatials=[], temporal=_TEMPORAL)
@@ -323,7 +318,6 @@ def test_get_embeddings_batch_empty():
 
 def test_get_embeddings_batch_with_sensor():
     """Ensures sensor param flows through _sensor_key without errors."""
-    from rs_embed.api import get_embeddings_batch
 
     sensor = SensorSpec(collection="COLL", bands=("B1",))
     spatials = [PointBuffer(lon=0.0, lat=0.0, buffer_m=256)]
@@ -337,7 +331,6 @@ def test_get_embeddings_batch_with_sensor():
 
 
 def test_get_embeddings_batch_modality_merges_into_sensor():
-    from rs_embed.api import get_embeddings_batch
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     sensor = SensorSpec(collection="COPERNICUS/S1_GRD", bands=("VV", "VH"), scale_m=20)
@@ -356,7 +349,6 @@ def test_get_embeddings_batch_modality_merges_into_sensor():
 
 
 def test_get_embeddings_batch_precomputed_default_backend_auto_resolves_to_auto():
-    from rs_embed.api import get_embeddings_batch
 
     registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
 
@@ -368,8 +360,7 @@ def test_get_embeddings_batch_precomputed_default_backend_auto_resolves_to_auto(
     assert all(emb.meta["backend_used"] == "auto" for emb in results)
 
 
-def test_get_embeddings_batch_passes_model_config_to_variant_aware_model():
-    from rs_embed.api import get_embeddings_batch
+def test_get_embeddings_batch_passes_model_kwargs_to_variant_aware_model():
 
     registry.register("mock_variant")(_MockVariantEmbedder)
 
@@ -377,7 +368,7 @@ def test_get_embeddings_batch_passes_model_config_to_variant_aware_model():
         "mock_variant",
         spatials=[_SPATIAL, PointBuffer(lon=1.0, lat=0.0, buffer_m=512)],
         temporal=_TEMPORAL,
-        model_config={"variant": "large"},
+        variant="large",
     )
     assert [emb.meta["variant"] for emb in results] == ["large", "large"]
 
@@ -388,14 +379,12 @@ def test_get_embeddings_batch_passes_model_config_to_variant_aware_model():
 
 
 def test_validate_specs_invalid_spatial_type():
-    from rs_embed.api import _validate_specs
 
     with pytest.raises(ModelError, match="Invalid spatial spec type"):
         _validate_specs(spatial="not-spatial", temporal=None, output=OutputSpec.pooled())
 
 
 def test_validate_specs_bad_output_mode():
-    from rs_embed.api import _validate_specs
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "unknown")
@@ -405,7 +394,6 @@ def test_validate_specs_bad_output_mode():
 
 
 def test_validate_specs_rejects_legacy_output_scale_m():
-    from rs_embed.api import _validate_specs
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
@@ -416,7 +404,6 @@ def test_validate_specs_rejects_legacy_output_scale_m():
 
 
 def test_validate_specs_bad_pooling():
-    from rs_embed.api import _validate_specs
 
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
@@ -426,7 +413,6 @@ def test_validate_specs_bad_pooling():
 
 
 def test_validate_specs_ok():
-    from rs_embed.api import _validate_specs
 
     _validate_specs(spatial=_SPATIAL, temporal=_TEMPORAL, output=OutputSpec.pooled())
     _validate_specs(spatial=_SPATIAL, temporal=None, output=OutputSpec.grid())
@@ -474,7 +460,6 @@ class _BrokenDescribeEmbedder(EmbedderBase):
 
 
 def test_assert_supported_wrong_backend():
-    from rs_embed.api import _assert_supported
 
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
@@ -483,7 +468,6 @@ def test_assert_supported_wrong_backend():
 
 
 def test_assert_supported_wrong_output():
-    from rs_embed.api import _assert_supported
 
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
@@ -492,7 +476,6 @@ def test_assert_supported_wrong_output():
 
 
 def test_assert_supported_wrong_temporal():
-    from rs_embed.api import _assert_supported
 
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
@@ -506,7 +489,6 @@ def test_assert_supported_wrong_temporal():
 
 
 def test_assert_supported_ok():
-    from rs_embed.api import _assert_supported
 
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
@@ -516,7 +498,6 @@ def test_assert_supported_ok():
 
 
 def test_assert_supported_broken_describe_raises_model_error():
-    from rs_embed.api import _assert_supported
 
     emb = _BrokenDescribeEmbedder()
     emb.model_name = "broken"
@@ -530,13 +511,11 @@ def test_assert_supported_broken_describe_raises_model_error():
 
 
 def test_sensor_key_none():
-    from rs_embed.tools.runtime import sensor_key
 
     assert sensor_key(None) == ("__none__",)
 
 
 def test_sensor_key_deterministic_and_differs():
-    from rs_embed.tools.runtime import sensor_key
 
     s1 = SensorSpec(collection="A", bands=("B1",), modality="s1")
     s2 = SensorSpec(collection="A", bands=("B1",), modality="s2")
@@ -545,7 +524,6 @@ def test_sensor_key_deterministic_and_differs():
 
 
 def test_sensor_cache_key_deterministic_and_differs():
-    from rs_embed.tools.serialization import sensor_cache_key as _sensor_cache_key
 
     s1 = SensorSpec(collection="A", bands=("B1",), modality="s1")
     s2 = SensorSpec(collection="A", bands=("B1",), modality="s2")
@@ -560,7 +538,6 @@ def test_sensor_cache_key_deterministic_and_differs():
 
 
 def test_export_batch_empty_spatials():
-    from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="non-empty"):
         export_batch(
@@ -573,7 +550,6 @@ def test_export_batch_empty_spatials():
 
 def test_export_batch_rejects_non_list_spatials():
     """_validate_spatials requires an actual list, not a tuple or single spec."""
-    from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="non-empty"):
         export_batch(
@@ -593,7 +569,6 @@ def test_export_batch_rejects_non_list_spatials():
 
 
 def test_export_batch_empty_models():
-    from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="non-empty"):
         export_batch(
@@ -605,7 +580,6 @@ def test_export_batch_empty_models():
 
 
 def test_export_batch_unsupported_format():
-    from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="Unsupported export format"):
         export_batch(
@@ -619,7 +593,6 @@ def test_export_batch_unsupported_format():
 
 def test_export_batch_accepts_netcdf_format(tmp_path):
     """format='netcdf' should be accepted and export successfully with the mock embedder."""
-    from rs_embed.api import export_batch
 
     results = export_batch(
         spatials=[_SPATIAL],
@@ -640,7 +613,6 @@ def test_export_batch_accepts_netcdf_format(tmp_path):
 
 
 def test_export_batch_names_length_mismatch(tmp_path):
-    from rs_embed.api import export_batch
 
     with pytest.raises(ModelError, match="same length"):
         export_batch(
@@ -652,8 +624,6 @@ def test_export_batch_names_length_mismatch(tmp_path):
 
 
 def test_export_batch_combined_target_requires_out_file():
-    from rs_embed.api import export_batch
-    from rs_embed.core.types import ExportLayout
 
     with pytest.raises(ModelError, match="requires out_file"):
         export_batch(
@@ -665,8 +635,6 @@ def test_export_batch_combined_target_requires_out_file():
 
 
 def test_export_batch_per_item_target_requires_out_dir():
-    from rs_embed.api import export_batch
-    from rs_embed.core.types import ExportLayout
 
     with pytest.raises(ModelError, match="requires out_dir"):
         export_batch(
@@ -678,7 +646,6 @@ def test_export_batch_per_item_target_requires_out_dir():
 
 
 def test_export_batch_per_item_layout(tmp_path):
-    from rs_embed.api import export_batch
 
     export_batch(
         spatials=[_SPATIAL],
@@ -697,7 +664,6 @@ def test_export_batch_per_item_layout(tmp_path):
 
 
 def test_export_batch_combined_layout(tmp_path):
-    from rs_embed.api import export_batch
 
     export_batch(
         spatials=[_SPATIAL],
@@ -716,7 +682,6 @@ def test_export_batch_combined_layout(tmp_path):
 
 
 def test_export_batch_object_style_target_and_config(tmp_path):
-    from rs_embed.api import export_batch
 
     export_batch(
         spatials=[_SPATIAL],
@@ -735,7 +700,6 @@ def test_export_batch_object_style_target_and_config(tmp_path):
 
 
 def test_public_list_models_uses_catalog_not_runtime_registry():
-    from rs_embed import list_models
 
     models = list_models()
     assert "remoteclip" in models
@@ -744,7 +708,6 @@ def test_public_list_models_uses_catalog_not_runtime_registry():
 
 
 def test_public_list_models_can_include_aliases():
-    from rs_embed import list_models
 
     models = list_models(include_aliases=True)
     assert "remoteclip" in models
@@ -752,7 +715,6 @@ def test_public_list_models_can_include_aliases():
 
 
 def test_export_batch_infer_batch_size_is_independent_from_chunk_size(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     captured = {}
 
@@ -776,7 +738,6 @@ def test_export_batch_infer_batch_size_is_independent_from_chunk_size(monkeypatc
 
 
 def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
@@ -805,7 +766,6 @@ def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
 
 
 def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
@@ -836,7 +796,6 @@ def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
 
 
 def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
@@ -865,7 +824,6 @@ def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
 
 
 def test_export_batch_export_model_request_applies_per_model_overrides(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
@@ -904,7 +862,6 @@ def test_export_batch_export_model_request_applies_per_model_overrides(monkeypat
 
 
 def test_export_batch_export_model_request_preserves_model_config(monkeypatch, tmp_path):
-    from rs_embed.api import export_batch
 
     registry.register("mock_variant")(_MockVariantEmbedder)
     captured = {}
@@ -929,9 +886,8 @@ def test_export_batch_export_model_request_preserves_model_config(monkeypatch, t
 
 
 def test_export_batch_rejects_model_config_for_unsupported_model(tmp_path):
-    from rs_embed.api import export_batch
 
-    with pytest.raises(ModelError, match="does not support model_config"):
+    with pytest.raises(ModelError, match="does not accept model-specific keyword arguments"):
         export_batch(
             spatials=[_SPATIAL],
             temporal=_TEMPORAL,
@@ -949,7 +905,6 @@ def test_export_batch_rejects_model_config_for_unsupported_model(tmp_path):
 
 def test_normalize_embedding_output_idempotent_for_pooled():
     """Pooled embeddings are passed through unchanged; calling twice is safe."""
-    from rs_embed.tools.output import normalize_embedding_output
 
     data = np.arange(8, dtype=np.float32)
     emb = Embedding(data=data, meta={"y_axis_direction": "south_to_north"})
@@ -969,7 +924,6 @@ def test_normalize_embedding_output_grid_south_to_north_applied_once():
     a second time on an already-normalised embedding would set
     grid_orientation_applied=False, incorrectly claiming no flip occurred.
     """
-    from rs_embed.tools.output import normalize_embedding_output
 
     data = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # 2×2 grid
     emb = Embedding(data=data, meta={"y_axis_direction": "south_to_north"})
@@ -997,9 +951,6 @@ def test_run_embedding_request_prefetched_path_normalizes_once(monkeypatch):
     exactly once, so grid_orientation_applied reflects truth for south-to-north
     models.
     """
-    import rs_embed.api as api
-    import rs_embed.tools.runtime as rt
-    from rs_embed.core.embedding import Embedding
 
     class _SouthNorthGridEmbedder:
         model_name = "s2n_grid_mock"
@@ -1022,7 +973,6 @@ def test_run_embedding_request_prefetched_path_normalizes_once(monkeypatch):
             data = np.zeros((2, 2), dtype=np.float32)
             return Embedding(data=data, meta={"y_axis_direction": "south_to_north"})
 
-    from rs_embed.core import registry
 
     registry.register("s2n_grid_mock")(_SouthNorthGridEmbedder)
 
@@ -1084,9 +1034,6 @@ class _BackendOnlyGEEExportEmbedder:
 
 def test_export_batch_assert_supported_rejects_incompatible_backend(tmp_path):
     """export_batch should raise ModelError when a model doesn't support the backend."""
-    from rs_embed.api import export_batch
-    from rs_embed.core import registry
-    from rs_embed.core.errors import ModelError
 
     registry.register("gee_only_export_mock")(_BackendOnlyGEEExportEmbedder)
 
@@ -1105,9 +1052,6 @@ def test_export_batch_assert_supported_rejects_incompatible_backend(tmp_path):
 
 def test_export_batch_assert_supported_rejects_incompatible_output_mode(tmp_path):
     """export_batch should raise ModelError when a model doesn't support the output mode."""
-    from rs_embed.api import export_batch
-    from rs_embed.core import registry
-    from rs_embed.core.errors import ModelError
 
     registry.register("gee_only_export_mock")(_BackendOnlyGEEExportEmbedder)
 
@@ -1127,7 +1071,6 @@ def test_export_batch_assert_supported_rejects_incompatible_output_mode(tmp_path
 
 def test_export_batch_assert_supported_passes_for_compatible_model(tmp_path):
     """export_batch should proceed normally when all model capabilities match."""
-    from rs_embed.api import export_batch
 
     # _MockEmbedder (registered by autouse fixture) has no backend/output constraints
     results = export_batch(
@@ -1147,6 +1090,53 @@ def test_export_batch_assert_supported_passes_for_compatible_model(tmp_path):
     assert results[0]["status"] == "ok"
 
 
+# ══════════════════════════════════════════════════════════════════════
+# ExportModelRequest.configure — simplified model kwargs interface
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_export_model_request_configure_builds_model_config():
+    req = ExportModelRequest.configure("dofa", variant="large")
+    assert req.name == "dofa"
+    assert req.model_config == {"variant": "large"}
+    assert req.sensor is None
+    assert req.fetch is None
+    assert req.modality is None
+
+
+def test_export_model_request_configure_no_model_kwargs_gives_none():
+    req = ExportModelRequest.configure("prithvi")
+    assert req.name == "prithvi"
+    assert req.model_config is None
+
+
+def test_export_model_request_configure_multiple_kwargs():
+    req = ExportModelRequest.configure("dofa", variant="base", image_size=224)
+    assert req.model_config == {"variant": "base", "image_size": 224}
+
+
+def test_export_model_request_configure_passes_through_to_export_batch(monkeypatch, tmp_path):
+    """ExportModelRequest.configure() model_config is forwarded into the BatchExporter."""
+    registry.register("mock_variant")(_MockVariantEmbedder)
+    captured = {}
+
+    def _fake_run(self):
+        captured["model_config"] = self.models[0].model_config
+        return [{"status": "ok"}]
+
+    monkeypatch.setattr("rs_embed.pipelines.exporter.BatchExporter.run", _fake_run)
+
+    export_batch(
+        spatials=[_SPATIAL],
+        temporal=_TEMPORAL,
+        models=[ExportModelRequest.configure("mock_variant", variant="large")],
+        target=ExportTarget.per_item(str(tmp_path)),
+        config=ExportConfig(show_progress=False),
+    )
+
+    assert captured["model_config"] == {"variant": "large"}
+
+
 def test_export_batch_backend_resolution_before_assert_supported(tmp_path, monkeypatch):
     """Backend is resolved per model BEFORE capability validation.
 
@@ -1155,8 +1145,6 @@ def test_export_batch_backend_resolution_before_assert_supported(tmp_path, monke
     to "auto" for precomputed models.  Without the per-model resolution fix
     (Finding 11), _assert_supported would see raw "gee" ∉ ["auto"] and raise.
     """
-    import rs_embed.api as api
-    from rs_embed.api import export_batch
 
     registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
 

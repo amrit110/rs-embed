@@ -46,10 +46,15 @@ from .tools.tiling import (
 class Model:
     """A ready-to-use embedding model.
 
+    Model-specific settings (e.g. variant selection) are passed as keyword
+    arguments directly.  For example, ``Model("dofa", variant="large")``
+    selects the large DOFA variant.  Call :func:`rs_embed.describe_model` to
+    see which keyword arguments a model accepts.
+
     Parameters
     ----------
     name : str
-        Model identifier (e.g. ``"satclip-vit16-l40"``).
+        Model identifier (e.g. ``"dofa"``, ``"prithvi"``).
     backend : str
         Provider/inference backend (``"auto"`` / ``"gee"`` / …).
     device : str
@@ -59,8 +64,6 @@ class Model:
     fetch : FetchSpec or None
         Lightweight fetch-policy override applied to the model default sensor.
         Cannot be combined with ``sensor``.
-    model_config : dict[str, Any] or None
-        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -68,6 +71,14 @@ class Model:
         Embedding output spec (default: pooled).
     input_prep : str or InputPrepSpec or None
         Input preparation mode.
+    **model_kwargs
+        Model-specific settings (e.g. ``variant="large"``).  The accepted
+        keys depend on the model; see :func:`rs_embed.describe_model`.
+
+    Examples
+    --------
+    >>> model = Model("dofa", variant="large")
+    >>> emb = model.get_embedding(spatial)
     """
 
     def __init__(
@@ -78,11 +89,12 @@ class Model:
         device: str = "auto",
         sensor: SensorSpec | None = None,
         fetch: FetchSpec | None = None,
-        model_config: dict[str, Any] | None = None,
         modality: str | None = None,
         output: OutputSpec = OutputSpec.pooled(),
         input_prep: InputPrepSpec | str | None = "resize",
+        **model_kwargs: Any,
     ) -> None:
+        model_config = model_kwargs or None
         self._model_n = normalize_model_name(name)
         self._backend_n = _resolve_embedding_api_backend(
             self._model_n, normalize_backend_name(backend)
