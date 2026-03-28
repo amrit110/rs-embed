@@ -34,12 +34,11 @@ Most users only need these public functions:
 
 Model-specific configuration:
 
-- `get_embedding(...)` and `get_embeddings_batch(...)` accept `model_config`
-- `export_batch(...)` supports per-model `model_config` via `ExportModelRequest(...)`
-- currently documented model-level `model_config` usage includes `dofa`, `anysat`, `thor`, and `satmaepp_s2_10b`
-- for the currently documented variant-aware models, use a unified field: `model_config={"variant": "..."}`
-- valid `variant` values still depend on the selected model and currently exposed published checkpoints, so check the corresponding model detail page
-- unsupported `model_config` usage raises `ModelError` instead of being ignored silently
+- `get_embedding(...)` and `get_embeddings_batch(...)` accept model-specific settings as direct keyword arguments (e.g. `variant="large"`)
+- `export_batch(...)` supports per-model settings via `ExportModelRequest.configure("model", variant="large")`
+- currently documented variant-aware models: `dofa`, `anysat`, `thor`, `prithvi`, and `satmaepp_s2_10b`
+- valid `variant` values depend on the model — check the corresponding model detail page or call `describe_model(model_id)`
+- passing unsupported keyword arguments raises `ModelError`
 
 Sampling / fetch configuration:
 

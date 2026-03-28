@@ -42,12 +42,12 @@ get_embedding(
     temporal: Optional[TemporalSpec] = None,
     sensor: Optional[SensorSpec] = None,
     fetch: Optional[FetchSpec] = None,
-    model_config: Optional[dict[str, Any]] = None,
     modality: Optional[str] = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
     device: str = "auto",
     input_prep: InputPrepSpec | str = "resize",
+    **model_kwargs,
 ) -> Embedding
 ```
 
@@ -60,7 +60,7 @@ Computes the embedding for a single ROI.
 - `temporal`: `TemporalSpec` or `None`
 - `sensor`: input descriptor for on-the-fly models; for most precomputed models this can be `None`
 - `fetch`: lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`
-- `model_config`: optional model-specific runtime settings; for the currently documented variant-aware models, use it mainly as `{"variant": ...}`
+- `**model_kwargs`: model-specific settings passed as direct keyword arguments (e.g. `variant="large"`); the accepted keys depend on the model — call `describe_model(model_id)` to see the schema
 - `modality`: optional model-facing modality selector (for example `s1`, `s2`, `s2_l2a`) for models that expose multiple input branches
 - `output`: `OutputSpec.pooled()` or `OutputSpec.grid(...)`
 - `backend`: access backend. `backend="auto"` is the public default and the recommended choice. For provider-backed on-the-fly models it resolves to a compatible provider backend; for precomputed models it lets rs-embed choose the model-compatible access path.
@@ -79,17 +79,18 @@ Modality contract:
 - Only models that explicitly expose a given modality can use it.
 - Unsupported modality selections raise a `ModelError`.
 
-`model_config` contract:
+Model-specific settings contract:
 
-- `model_config` is optional and model-specific
-- for the currently documented variant-aware models, the public field is unified as `variant`
-- examples currently documented in model pages include:
-  - `dofa`: `{"variant": "base" | "large"}`
-  - `anysat`: `{"variant": "base"}`
-  - `thor`: `{"variant": "tiny" | "small" | "base" | "large"}`
-  - `satmaepp_s2_10b`: `{"variant": "large"}`
-- if a model does not document `model_config`, leave it unset; unsupported usage raises `ModelError`
-- when available, `describe()["model_config"]` is the machine-readable schema for supported keys and values
+- model settings are optional and vary per model
+- pass them as direct keyword arguments rather than a dict (e.g. `variant="large"`)
+- variant-aware models currently documented:
+  - `dofa`: `variant="base"` or `variant="large"`
+  - `anysat`: `variant="base"`
+  - `thor`: `variant="tiny"`, `"small"`, `"base"`, or `"large"`
+  - `satmaepp_s2_10b`: `variant="large"`
+  - `prithvi`: `variant="prithvi_eo_v2_100_tl"`, `"prithvi_eo_v2_300_tl"`, or `"prithvi_eo_v2_600_tl"`
+- if a model does not accept any keyword arguments, passing unknown keys raises `ModelError`
+- `describe_model(model_id)["model_config"]` is the machine-readable schema for supported keys and values
 
 **Returns**
 
@@ -113,7 +114,7 @@ emb = get_embedding(
 vec = emb.data  # (D,)
 ```
 
-**Example with `model_config`**
+**Example with variant selection**
 
 ```python
 from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
@@ -124,7 +125,7 @@ emb = get_embedding(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
     backend="gee",
-    model_config={"variant": "large"},
+    variant="large",
 )
 ```
 
@@ -140,12 +141,12 @@ get_embeddings_batch(
     temporal: Optional[TemporalSpec] = None,
     sensor: Optional[SensorSpec] = None,
     fetch: Optional[FetchSpec] = None,
-    model_config: Optional[dict[str, Any]] = None,
     modality: Optional[str] = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
     device: str = "auto",
     input_prep: InputPrepSpec | str = "resize",
+    **model_kwargs,
 ) -> List[Embedding]
 ```
 
@@ -182,7 +183,7 @@ embs = get_embeddings_batch(
 )
 ```
 
-**Batch example with `model_config`**
+**Batch example with variant selection**
 
 ```python
 from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embeddings_batch
@@ -198,7 +199,7 @@ embs = get_embeddings_batch(
     temporal=TemporalSpec.range("2022-01-01", "2023-01-01"),
     output=OutputSpec.pooled(),
     backend="gee",
-    model_config={"variant": "base"},
+    variant="base",
 )
 ```
 

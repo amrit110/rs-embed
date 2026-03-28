@@ -14,7 +14,7 @@
 | Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | provider path requires `TemporalSpec.range(...)` |
 | Output modes | `pooled`, `grid` |
-| Model config keys | `model_config["variant"]` (default: `base`; choices: `base`, `large`) |
+| Model config keys | `variant` (default: `base`; choices: `base`, `large`) |
 | Extra side inputs | **required** wavelength vector (`wavelengths_um`) |
 | Training alignment (adapter path) | Medium-High (when wavelengths and band semantics are correct) |
 
@@ -110,19 +110,16 @@ Fixed adapter behavior:
 
 Non-env model selection knobs:
 
-- `model_config["variant"]`: `base` / `large` (default: `base`)
+- `variant`: `base` / `large` (default: `base`)
 - `sensor.bands`: channel semantics for provider fetch and wavelength inference
 - `sensor.wavelengths`: explicit wavelength vector (µm)
 
-If `model_config["variant"]` is omitted, rs-embed uses the `base` DOFA checkpoint by default. Set `model_config={"variant": "large"}` to switch to the larger model.
+If `variant` is omitted, rs-embed uses the `base` DOFA checkpoint by default. Pass `variant="large"` to switch to the larger model.
 
 Quick reminder:
 
-- DOFA supports `variant` directly through `model_config`
-- current public usage is:
-  - `model_config={"variant": "base"}`
-  - `model_config={"variant": "large"}`
-- for export jobs, pass the same setting via `ExportModelRequest("dofa", model_config={"variant": ...})`
+- pass `variant` as a keyword argument directly: `get_embedding("dofa", ..., variant="base")`
+- for export jobs, use `ExportModelRequest.configure("dofa", variant="large")`
 
 ---
 
@@ -152,7 +149,6 @@ emb = get_embedding(
     "dofa",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    model_config={"variant": "base"},
     output=OutputSpec.pooled(),
     backend="gee",
 )
@@ -167,9 +163,9 @@ emb = get_embedding(
     "dofa",
     spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    model_config={"variant": "large"},
     output=OutputSpec.pooled(),
     backend="gee",
+    variant="large",
 )
 ```
 

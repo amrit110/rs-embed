@@ -14,7 +14,7 @@
 | Default resolution | 10m default provider fetch (`sensor.scale_m`) | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | range window + single composite | range window + single composite |
 | Output modes | `pooled`, `grid` | `pooled`, `grid` |
-| Model config keys | none | `model_config["variant"]` (default: `large`; choices: `large`) |
+| Model config keys | none | `variant` (default: `large`; choices: `large`) |
 | Core extraction | `forward_encoder(mask_ratio=0.0)` | `forward_encoder(mask_ratio=0.0)` |
 
 ---
@@ -185,7 +185,7 @@ emb_s2 = get_embedding(
 # export RS_EMBED_SATMAEPP_S2_GRID_REDUCE=mean
 ```
 
-### Example with `model_config`
+### Example with variant selection
 
 ```python
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
@@ -199,12 +199,12 @@ emb_s2 = get_embedding(
     temporal=temporal,
     output=OutputSpec.grid(),
     backend="gee",
-    model_config={"variant": "large"},
+    variant="large",
 )
 ```
 
 For export jobs, the same setting goes through
-`ExportModelRequest("satmaepp_s2_10b", model_config={"variant": "large"})`.
+`ExportModelRequest.configure("satmaepp_s2_10b", variant="large")`.
 
 ---
 

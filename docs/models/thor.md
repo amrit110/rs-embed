@@ -15,7 +15,7 @@
 | Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (composite window) |
 | Output modes | `pooled`, `grid` |
-| Model config keys | `model_config["variant"]` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |
+| Model config keys | `variant` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |
 | Extra side inputs | none required in current adapter |
 | Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved |
 
@@ -99,10 +99,10 @@ Notes:
 - `RS_EMBED_THOR_PATCH_SIZE` and `RS_EMBED_THOR_IMG` jointly affect token layout and `ground_cover_m`.
 - Changing `group_merge` changes grid channel semantics and dimensionality (especially `concat`).
 
-## `model_config`
+## Model-specific Settings
 
-- `model_config["variant"]`: `tiny` / `small` / `base` / `large`
-- for export jobs, pass it via `ExportModelRequest("thor", model_config={"variant": ...})`
+- `variant`: `tiny` / `small` / `base` / `large`
+- for export jobs, pass it via `ExportModelRequest.configure("thor", variant=...)`
 
 Example:
 
@@ -115,7 +115,7 @@ emb = get_embedding(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
     backend="gee",
-    model_config={"variant": "large"},
+    variant="large",
 )
 ```
 
@@ -163,7 +163,7 @@ emb = get_embedding(
 # export RS_EMBED_THOR_PATCH_SIZE=16
 ```
 
-### Example with `model_config`
+### Example with variant selection
 
 ```python
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
@@ -174,7 +174,7 @@ emb = get_embedding(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.grid(pooling="mean"),
     backend="gee",
-    model_config={"variant": "small"},
+    variant="small",
 )
 ```
 
