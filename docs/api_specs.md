@@ -355,12 +355,12 @@ ExportConfig(
 
 ExportModelRequest("remoteclip")
 ExportModelRequest("terrafm", modality="s1", sensor=my_s1_sensor)
-ExportModelRequest("thor", model_config={"variant": "large"})
+ExportModelRequest.configure("thor", variant="large")
 ```
 
 - `ExportTarget`: where outputs should be written
 - `ExportConfig`: how the export should run
-- `ExportModelRequest`: optional per-model overrides when one export job mixes different model-specific settings such as sensor, modality, or `model_config`
+- `ExportModelRequest`: optional per-model overrides when one export job mixes different model-specific settings such as sensor, modality, or variant; use `ExportModelRequest.configure(...)` to pass model settings as keyword arguments
 
 Legacy `out + layout`, `out_dir` / `out_path`, and per-model dict overrides are still accepted for backward compatibility.
 

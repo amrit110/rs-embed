@@ -197,14 +197,14 @@ models=[
 ]
 ```
 
-`ExportModelRequest(...)` also carries per-model `model_config`, for example:
+`ExportModelRequest.configure(...)` also accepts model-specific settings as keyword arguments, for example:
 
 ```python
 from rs_embed import ExportModelRequest
 
 models=[
     "remoteclip",
-    ExportModelRequest("thor", model_config={"variant": "large"}),
+    ExportModelRequest.configure("thor", variant="large"),
 ]
 ```
 
@@ -213,7 +213,7 @@ Typical use cases:
 - one model needs a different `FetchSpec`
 - one model needs `modality="s1"`
 - one model needs a different `SensorSpec`
-- one model needs a different `model_config` such as `{"variant": "large"}`
+- one model needs a different variant (e.g. `variant="large"`)
 - one model should override the shared export settings
 
 This also matches the implementation path: string model IDs are first converted into `ExportModelRequest(name=...)`, then resolved.
@@ -224,11 +224,11 @@ Modality rules:
 - one model can override it via `ExportModelRequest(...)`
 - unsupported modality choices raise `ModelError`
 
-`model_config` rules:
+Per-model settings rules:
 
-- `export_batch(...)` does not have one global `model_config` shared across all models
-- pass per-model runtime settings through `ExportModelRequest(..., model_config=...)`
-- unsupported `model_config` usage raises `ModelError`
+- `export_batch(...)` does not have a global model settings parameter shared across all models
+- pass per-model settings through `ExportModelRequest.configure("model", variant=...)`
+- unsupported keyword arguments raise `ModelError`
 
 ---
 
@@ -328,7 +328,7 @@ from rs_embed import (
 export_batch(
     spatials=[PointBuffer(121.5, 31.2, 2048)],
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
-    models=[ExportModelRequest("thor", model_config={"variant": "large"})],
+    models=[ExportModelRequest.configure("thor", variant="large")],
     target=ExportTarget.combined("exports/thor_large_run"),
     backend="gee",
 )
@@ -356,6 +356,6 @@ If provider-backed export is used and both `save_inputs=True` and `save_embeddin
 
 !!! tip "Simple rule"
     Start with `ExportTarget.combined(...)` + `ExportConfig()`.
-    Add `ExportModelRequest(...)` only for the few models that need per-model sensor, modality, or `model_config` overrides.
+    Add `ExportModelRequest.configure(...)` only for the few models that need per-model sensor, modality, or variant overrides.
 
 ---

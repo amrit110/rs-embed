@@ -1,6 +1,6 @@
 # Prithvi-EO v2 (`prithvi`)
 
-> Vendored Prithvi runtime for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed and `model_config["variant"]` support for TL checkpoints.
+> Vendored Prithvi runtime for Sentinel-2 6-band inputs, with required temporal/location coordinate side inputs derived by rs-embed and `variant` keyword support for TL checkpoints.
 
 ## Quick Facts
 
@@ -15,7 +15,7 @@
 | Default resolution | 30m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` preferred; adapter normalizes `year`/`None` to a range |
 | Output modes | `pooled`, `grid` |
-| Model config keys | `model_config["variant"]` (default: `prithvi_eo_v2_100_tl`) |
+| Model config keys | `variant` (default: `prithvi_eo_v2_100_tl`) |
 | Extra side inputs | **required** temporal coords + location coords (derived by adapter) |
 | Training alignment (adapter path) | Medium (depends on preprocessing mode and resize/pad choices) |
 
@@ -95,7 +95,7 @@ Default `SensorSpec` if omitted:
 
 ---
 
-## `model_config`
+## Model-specific Settings
 
 | Key | Type | Default | Choices |
 |---|---|---|---|
@@ -103,7 +103,7 @@ Default `SensorSpec` if omitted:
 
 Notes:
 
-- `model_config["variant"]` overrides `RS_EMBED_PRITHVI_KEY`.
+- `variant` overrides `RS_EMBED_PRITHVI_KEY`.
 - Short aliases `100_tl`, `300_tl`, and `600_tl` are also accepted in code.
 
 ---
@@ -148,7 +148,7 @@ emb = get_embedding(
 # export RS_EMBED_PRITHVI_PRETRAINED=1
 ```
 
-### With `model_config["variant"]`
+### With variant selection
 
 ```python
 from rs_embed import get_embedding, PointBuffer, TemporalSpec, OutputSpec
@@ -159,7 +159,7 @@ emb = get_embedding(
     temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
     output=OutputSpec.pooled(),
     backend="gee",
-    model_config={"variant": "prithvi_eo_v2_300_tl"},
+    variant="prithvi_eo_v2_300_tl",
 )
 ```
 

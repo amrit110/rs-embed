@@ -147,8 +147,8 @@ def require_model_config_support(
         return
     keys = sorted(str(k) for k in model_config.keys())
     raise ModelError(
-        f"Model {_display_model_name(embedder)} does not support model_config"
-        f" for {method_name}(); got keys {keys}."
+        f"Model {_display_model_name(embedder)} does not accept model-specific"
+        f" keyword arguments for {method_name}(); got keys {keys}."
     )
 
 

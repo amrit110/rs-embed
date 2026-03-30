@@ -347,3 +347,62 @@ def test_model_precomputed_auto_resolves_to_auto():
     m = Model("mock_precomputed", backend="auto")
     emb = m.get_embedding(_SPATIAL)
     assert emb.meta["backend_used"] == "auto"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Model kwargs — simplified model config interface
+# ══════════════════════════════════════════════════════════════════════
+
+
+class _MockVariantEmbedder(EmbedderBase):
+    def describe(self):
+        return {
+            "type": "mock",
+            "backend": ["auto"],
+            "output": ["pooled"],
+            "model_config": {
+                "variant": {"type": "string", "default": "base", "choices": ["base", "large"]}
+            },
+        }
+
+    def get_embedding(
+        self,
+        *,
+        spatial,
+        temporal,
+        sensor,
+        output,
+        backend,
+        device="auto",
+        input_chw=None,
+        model_config=None,
+    ):
+        variant = (model_config or {}).get("variant", "base")
+        return Embedding(
+            data=np.arange(3, dtype=np.float32),
+            meta={"model": self.model_name, "variant": variant},
+        )
+
+
+def test_model_accepts_model_kwargs_as_model_config():
+    """Model(name, variant='large') passes variant through to the embedder."""
+    registry.register("mock_variant")(_MockVariantEmbedder)
+    get_embedder_bundle_cached.cache_clear()
+    m = Model("mock_variant", variant="large")
+    emb = m.get_embedding(_SPATIAL, temporal=_TEMPORAL)
+    assert emb.meta["variant"] == "large"
+
+
+def test_model_default_variant_when_no_kwargs():
+    """Model without model_kwargs uses the embedder's default variant."""
+    registry.register("mock_variant")(_MockVariantEmbedder)
+    get_embedder_bundle_cached.cache_clear()
+    m = Model("mock_variant")
+    emb = m.get_embedding(_SPATIAL, temporal=_TEMPORAL)
+    assert emb.meta["variant"] == "base"
+
+
+def test_model_rejects_model_kwargs_for_unsupported_model():
+    """Model raises ModelError when kwargs are passed to a model that doesn't accept them."""
+    with pytest.raises(ModelError, match="does not accept model-specific keyword arguments"):
+        Model("mock_model", variant="large")

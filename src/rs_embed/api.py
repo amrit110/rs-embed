@@ -163,12 +163,12 @@ def get_embedding(
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
     fetch: FetchSpec | None = None,
-    model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
     device: str = "auto",
     input_prep: InputPrepSpec | str | None = "resize",
+    **model_kwargs: Any,
 ) -> Embedding:
     """Compute a single embedding.
 
@@ -185,8 +185,6 @@ def get_embedding(
     fetch : FetchSpec or None
         Lightweight fetch-policy override applied to the model default sensor.
         Cannot be combined with ``sensor``.
-    model_config : dict[str, Any] or None
-        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -198,6 +196,11 @@ def get_embedding(
         Target inference device.
     input_prep : InputPrepSpec or str or None
         Optional API-side input preprocessing policy.
+    **model_kwargs
+        Model-specific settings passed directly as keyword arguments.
+        For example, ``variant="large"`` selects the large DOFA variant.
+        The accepted keys depend on the model; call :func:`describe_model`
+        to see the ``"model_config"`` schema for a given model.
 
     Returns
     -------
@@ -216,7 +219,12 @@ def get_embedding(
     -----
     This function reuses a cached embedder instance when possible to avoid
     repeatedly loading model weights / initializing providers.
+
+    Examples
+    --------
+    >>> emb = get_embedding("dofa", spatial=point, temporal=t, variant="large")
     """
+    model_config = model_kwargs or None
     _validate_specs(spatial=spatial, temporal=temporal, output=output)
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
@@ -251,12 +259,12 @@ def get_embeddings_batch(
     temporal: TemporalSpec | None = None,
     sensor: SensorSpec | None = None,
     fetch: FetchSpec | None = None,
-    model_config: dict[str, Any] | None = None,
     modality: str | None = None,
     output: OutputSpec = OutputSpec.pooled(),
     backend: str = "auto",
     device: str = "auto",
     input_prep: InputPrepSpec | str | None = "resize",
+    **model_kwargs: Any,
 ) -> list[Embedding]:
     """Compute embeddings for multiple spatials using a shared embedder instance.
 
@@ -273,8 +281,6 @@ def get_embeddings_batch(
     fetch : FetchSpec or None
         Lightweight fetch-policy override applied to the model default sensor.
         Cannot be combined with ``sensor``.
-    model_config : dict[str, Any] or None
-        Optional model-specific settings such as variant selection.
     modality : str or None
         Optional modality selector for models that expose multiple input
         branches.
@@ -286,6 +292,11 @@ def get_embeddings_batch(
         Target inference device.
     input_prep : InputPrepSpec or str or None
         Optional API-side input preprocessing policy.
+    **model_kwargs
+        Model-specific settings passed directly as keyword arguments.
+        For example, ``variant="large"`` selects the large DOFA variant.
+        The accepted keys depend on the model; call :func:`describe_model`
+        to see the ``"model_config"`` schema for a given model.
 
     Returns
     -------
@@ -299,7 +310,12 @@ def get_embeddings_batch(
         unsupported.
     SpecError
         If spatial or temporal specifications fail validation.
+
+    Examples
+    --------
+    >>> embs = get_embeddings_batch("dofa", spatials=points, temporal=t, variant="large")
     """
+    model_config = model_kwargs or None
     _validate_spatial_list(spatials=spatials, temporal=temporal, output=output)
     sensor_eff = _resolve_sensor_for_model(
         _normalize_model_name(model),
@@ -361,7 +377,11 @@ def export_batch(
     temporal : TemporalSpec or None
         Optional temporal filter applied to all spatial requests.
     models : list[str | ExportModelRequest]
-        Model identifiers or per-model request objects.
+        Model identifiers or per-model request objects.  To pass model-specific
+        settings (e.g. variant selection), use
+        :meth:`ExportModelRequest.configure` instead of raw strings::
+
+            models=[ExportModelRequest.configure("dofa", variant="large")]
     target : ExportTarget
         Output destination: use :meth:`ExportTarget.per_item` for per-item
         directory exports or :meth:`ExportTarget.combined` for a single file.

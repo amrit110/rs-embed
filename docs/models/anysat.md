@@ -14,7 +14,7 @@
 | Default resolution | 10m default provider fetch (`sensor.scale_m`) |
 | Temporal mode | `range` in practice (adapter normalizes `year`/`None` to range) |
 | Output modes | `pooled`, `grid` |
-| Model config keys | `model_config["variant"]` (default: `base`; choices: `base`) |
+| Model config keys | `variant` (default: `base`; choices: `base`) |
 | Extra side inputs | **required** `s2_dates` (per-frame DOY values) |
 | Training alignment (adapter path) | Medium (depends on frame count, normalization mode, and image size) |
 
