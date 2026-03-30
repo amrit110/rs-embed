@@ -57,9 +57,7 @@ def normalize_input_array(
             f"{name} must be CHW or TCHW with ndim=3/4, got shape={getattr(x, 'shape', None)}"
         )
     if expected_channels is not None and c != int(expected_channels):
-        raise ModelError(
-            f"{name} channel mismatch: got C={c}, expected C={int(expected_channels)}"
-        )
+        raise ModelError(f"{name} channel mismatch: got C={c}, expected C={int(expected_channels)}")
     return x
 
 

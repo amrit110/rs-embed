@@ -56,7 +56,6 @@ def normalize_export_target(
     raise ModelError(f"Unsupported ExportTarget layout: {target.layout!r}.")
 
 
-
 def resolve_export_model_configs(
     *,
     models: list[str | ExportModelRequest],

@@ -72,6 +72,7 @@ def apply_fetch_to_sensor(sensor: SensorSpec, fetch: FetchSpec | None) -> Sensor
         return sensor
     return replace(sensor, **updates)
 
+
 def _fetch_override_sensor_for_model(model_id: str) -> SensorSpec | None:
     model_key = str(model_id).strip().lower()
     if model_key == "gse":
