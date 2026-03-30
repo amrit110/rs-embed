@@ -40,9 +40,7 @@ def select_prefetched_channels(x_chw: np.ndarray, idx: tuple[int, ...]) -> np.nd
         if len(idx) == x.shape[1] and all(i == j for j, i in enumerate(idx)):
             return x
         return x[:, list(idx), :, :]
-    raise ValueError(
-        f"Prefetched input must be CHW or TCHW, got shape={getattr(x, 'shape', None)}"
-    )
+    raise ValueError(f"Prefetched input must be CHW or TCHW, got shape={getattr(x, 'shape', None)}")
 
 
 def build_prefetch_plan(

@@ -392,7 +392,11 @@ class InferenceEngine:
             def _single(i: int, _ctx=ctx, _mc=mc) -> Embedding:
                 inp = _get_input(i) if _ctx.needs_provider_input else None
                 fmeta = None
-                if _ctx.needs_provider_input and _ctx.skey is not None and prefetch_meta is not None:
+                if (
+                    _ctx.needs_provider_input
+                    and _ctx.skey is not None
+                    and prefetch_meta is not None
+                ):
                     fmeta = prefetch_meta.get((i, _ctx.skey)) or None
                 return self.infer_single(
                     embedder=_ctx.embedder,
