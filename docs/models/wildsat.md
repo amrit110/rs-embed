@@ -21,17 +21,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+WildSAT is useful when you want to experiment with different checkpoints and feature targets in one adapter, compare backbone features against image-head features through `RS_EMBED_WILDSAT_FEATURE`, or keep RGB workflows unified across ViT, ResNet, and Swin-style backbones. It is especially relevant for ecological and environmental downstream tasks, because the original WildSAT training objective jointly used satellite images, species occurrence maps, and habitat text to encode biodiversity-related and habitat-level signals rather than only generic visual similarity.
 
-- experimenting with WildSAT checkpoints and different feature extraction targets
-- comparing backbone features vs image-head features (`RS_EMBED_WILDSAT_FEATURE`)
-- RGB workflows where you want a single adapter covering ViT/ResNet/Swin variants
-
-### Be careful when
-
-- checkpoint architecture is inferred incorrectly (set `RS_EMBED_WILDSAT_ARCH` explicitly if needed)
-- comparing runs with different normalization modes (`minmax` vs `unit_scale`)
-- assuming `grid` is always a ViT patch grid (non-ViT or token-disabled paths can return `1x1` vector grid)
+Its flexibility also makes configuration drift easier. If architecture inference is ambiguous, set `RS_EMBED_WILDSAT_ARCH` explicitly. Normalization mode changes such as `minmax` versus `unit_scale` should be logged, and `grid` should not be assumed to mean a ViT patch grid because some paths intentionally return a `1x1` vector grid instead.
 
 ---
 
@@ -39,22 +31,17 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` normalized via shared helper; use `TemporalSpec.range(...)` for reproducibility
+The current adapter path is provider-only, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized via the shared helper, and `TemporalSpec.range(...)` is still the safest path for reproducible runs.
 
 ### Sensor / channels
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("B4", "B3", "B2")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2")`, `scale_m=10`, `cloudy_pct=30`, and `composite="median"`.
 
 `input_chw` contract:
 
-- must be `CHW` with `C=3` in `(B4,B3,B2)` order
-- expected raw values in `0..10000`
-- adapter clips NaN/Inf and converts to `uint8` RGB after normalization
+`input_chw` must be `CHW` with `C=3` in `(B4,B3,B2)` order. The adapter expects raw values in `0..10000`, clips NaN and Inf values, and converts the normalized result to `uint8` RGB.
 
 ---
 
@@ -74,7 +61,7 @@ Default `SensorSpec` if omitted:
 
 Important behavior:
 
-- If `grid` is requested but ViT tokens are unavailable (e.g., non-ViT arch or token extraction disabled), adapter returns a `1x1` grid (`grid_kind="vector_as_1x1"`) instead of failing.
+If `grid` is requested but ViT tokens are unavailable, for example with a non-ViT architecture or when token extraction is disabled, the adapter returns a `1x1` grid with `grid_kind="vector_as_1x1"` instead of failing.
 
 ---
 
@@ -112,20 +99,11 @@ Important behavior:
 
 ### `OutputSpec.pooled()`
 
-- Default pooled output usually comes from selected feature source vector (`image_head` preferred by default)
-- If `RS_EMBED_WILDSAT_POOLED_FROM_TOKENS=1` and ViT tokens are available, pooled output uses token pooling (`mean` / `max`)
-- Metadata records:
-  - `feature_source`
-  - `tokens_available`
-  - `pooled_from_tokens`
+By default, `OutputSpec.pooled()` usually returns the selected feature-source vector, with `image_head` preferred unless configuration says otherwise. If `RS_EMBED_WILDSAT_POOLED_FROM_TOKENS=1` and ViT tokens are available, the adapter instead pools tokens with `mean` or `max`. Metadata records `feature_source`, `tokens_available`, and `pooled_from_tokens`.
 
 ### `OutputSpec.grid()`
 
-- If ViT tokens are available and token-grid extraction is enabled:
-  - returns ViT patch-token grid (`grid_kind="vit_patch_tokens"`)
-- Otherwise:
-  - returns `1x1` vector grid (`grid_kind="vector_as_1x1"`)
-- Grid is model feature layout, not georeferenced raster pixels
+If ViT tokens are available and token-grid extraction is enabled, `OutputSpec.grid()` returns a ViT patch-token grid with `grid_kind="vit_patch_tokens"`. Otherwise it returns a `1x1` vector grid with `grid_kind="vector_as_1x1"`. In either case, the result is model feature layout rather than georeferenced raster pixels.
 
 ---
 
@@ -168,26 +146,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata for `arch`, `feature_source`, `tokens_available`, `grid_kind`
-- set `RS_EMBED_WILDSAT_ARCH` explicitly if checkpoint inference is ambiguous
-- fix checkpoint source first, then tune feature branch / normalization
+Inspect metadata for `arch`, `feature_source`, `tokens_available`, and `grid_kind` first. If checkpoint inference is ambiguous, set `RS_EMBED_WILDSAT_ARCH` explicitly, and stabilize the checkpoint source before tuning feature branch or normalization details.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- checkpoint path/source and file hash if possible
-- `RS_EMBED_WILDSAT_ARCH`
-- normalization mode (`RS_EMBED_WILDSAT_NORM`)
-- feature source / image branch / token-grid toggles
-- temporal window and provider compositing settings
+For reproducibility, keep the checkpoint path or source fixed and record a file hash when possible. It is also worth fixing `RS_EMBED_WILDSAT_ARCH`, normalization mode, feature source, image branch, token-grid toggles, temporal window, and provider compositing settings.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_wildsat.py`
-- Shared token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The implementation details are in `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_wildsat.py`, and the shared helpers in `src/rs_embed/embedders/_vit_mae_utils.py`.

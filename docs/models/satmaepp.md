@@ -21,17 +21,9 @@
 
 ## When To Use This Family
 
-### Good fit for
+The SatMAE++ family is useful when you want MAE-style patch-token features with a familiar encoder path, side-by-side comparisons between RGB and multispectral Sentinel-2 setups, or a single family that supports both pooled vectors and token-grid outputs.
 
-- SatMAE-style patch-token features with a familiar MAE encoder path
-- comparisons between RGB and multispectral S2 setups within one model family
-- workflows that want both pooled vectors and token-grid outputs
-
-### Be careful when
-
-- comparing the two variants as if they differ only by channel count; their preprocessing and runtime loading paths are materially different
-- assuming `grid` is georeferenced pixel space; both variants return model token grids
-- changing checkpoint or preprocessing settings without recording them
+The two variants are not interchangeable apart from channel count. Their preprocessing paths, runtime loading logic, and representation details differ enough that checkpoint and preprocessing settings should be treated as part of the experiment definition. As elsewhere in this docs set, `grid` refers to model token layout rather than georeferenced pixel space.
 
 ---
 
@@ -39,15 +31,11 @@
 
 ### `OutputSpec.pooled()`
 
-- Both variants pool patch tokens with `mean` or `max`
-- `satmaepp` metadata typically records `patch_mean` / `patch_max`
-- `satmaepp_s2_10b` metadata typically records `group_tokens_mean` / `group_tokens_max`
+Both variants support token pooling with `mean` or `max`. The RGB path typically records `patch_mean` or `patch_max` in metadata, while `satmaepp_s2_10b` usually records `group_tokens_mean` or `group_tokens_max` to reflect its grouped-token runtime.
 
 ### `OutputSpec.grid()`
 
-- `satmaepp` returns a standard ViT patch-token grid `(D,H,W)`
-- `satmaepp_s2_10b` reduces grouped tokens across channel groups, then reshapes to `(D,H,W)`
-- Both outputs are model token layouts, not georeferenced raster grids
+`satmaepp` returns a standard ViT patch-token grid `(D,H,W)`. `satmaepp_s2_10b` first reduces grouped tokens across channel groups and then reshapes the result to `(D,H,W)`. In both cases, the output is model token layout rather than a georeferenced raster grid.
 
 ---
 
@@ -57,15 +45,11 @@
 
 Default `SensorSpec`:
 
-- `collection="COPERNICUS/S2_SR_HARMONIZED"`
-- `bands=("B4","B3","B2")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`
+The RGB variant defaults to `collection="COPERNICUS/S2_SR_HARMONIZED"`, `bands=("B4","B3","B2")`, `scale_m=10`, `cloudy_pct=30`, and `composite="median"`.
 
 `input_chw` contract:
 
-- must be 3-channel `CHW`
-- band order must be `(B4,B3,B2)`
-- raw S2 SR values are expected in `0..10000`
+`input_chw` must be 3-channel `CHW` in `(B4,B3,B2)` order, and the adapter expects raw Sentinel-2 SR values in `0..10000`.
 
 ### Preprocessing Pipeline
 
@@ -102,15 +86,11 @@ Default `SensorSpec`:
 
 Default `SensorSpec`:
 
-- `collection="COPERNICUS/S2_SR_HARMONIZED"`
-- `bands=("B2","B3","B4","B5","B6","B7","B8","B8A","B11","B12")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
+The 10-band variant defaults to `collection="COPERNICUS/S2_SR_HARMONIZED"`, `bands=("B2","B3","B4","B5","B6","B7","B8","B8A","B11","B12")`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
 Strict requirements:
 
-- `sensor.bands` must exactly match the 10-band order above
-- `input_chw` must be 10-channel `CHW`
-- raw S2 SR values are expected in `0..10000`
+This path is stricter than the RGB path: `sensor.bands` must exactly match the 10-band order above, `input_chw` must be 10-channel `CHW`, and the adapter expects raw Sentinel-2 SR values in `0..10000`.
 
 ### Preprocessing + Runtime Loading
 
@@ -210,18 +190,10 @@ For export jobs, the same setting goes through
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- which variant you used (`satmaepp` vs `satmaepp_s2_10b`)
-- checkpoint source
-- image size, patch size, and channel/group reduction settings
-- temporal window and provider compositing settings
-- output mode (`pooled` vs `grid`) and pooling choice
+For reproducibility, record which variant you used, the checkpoint source, image size, patch size, channel or group reduction settings, temporal window, provider compositing settings, output mode, and pooling choice.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- RGB adapter: `src/rs_embed/embedders/onthefly_satmaepp.py`
-- S2-10B adapter: `src/rs_embed/embedders/onthefly_satmaepp_s2.py`
+The relevant code paths are `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_satmaepp.py`, and `src/rs_embed/embedders/onthefly_satmaepp_s2.py`.

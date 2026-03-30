@@ -22,17 +22,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+SatMAE is a strong RGB-only Sentinel-2 baseline when you want MAE-style token features, `OutputSpec.grid()` inspection, or direct comparisons with other RGB ViT adapters such as `remoteclip`, `scalemae`, and `wildsat`.
 
-- strong RGB-only SatMAE baseline on Sentinel-2
-- MAE-style token-grid analysis (`OutputSpec.grid()`)
-- comparisons with other RGB ViT adapters (`remoteclip`, `scalemae`, `wildsat`)
-
-### Be careful when
-
-- you need multispectral semantics (this is RGB-only)
-- assuming `grid` is georeferenced pixels (it is a patch-token grid)
-- comparing runs across environments where `rshf` wrapper preprocessing behavior may differ
+It is a weaker fit when multispectral semantics matter, and its `grid` output should still be read as a patch-token grid rather than georeferenced pixels. For cross-environment comparisons, keep in mind that `rshf` wrapper preprocessing behavior can influence outputs.
 
 ---
 
@@ -40,23 +32,17 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` is normalized via shared helper; use `TemporalSpec.range(...)` for reproducibility
-- Temporal window is used for compositing/filtering, not single-scene identity selection
+The current adapter path is provider-only, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized with the shared helper, and `TemporalSpec.range(...)` remains the safest choice for reproducibility. The temporal window is used for compositing and filtering rather than locking the request to a single source scene.
 
 ### Sensor / channels
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("B4", "B3", "B2")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2")`, `scale_m=10`, `cloudy_pct=30`, and `composite="median"`.
 
 `input_chw` contract:
 
-- must be `CHW` with exactly 3 bands in `(B4,B3,B2)` order
-- expected raw S2 SR values in `0..10000`
-- adapter converts to `[0,1]`, then `uint8` RGB before model preprocessing
+`input_chw` must be `CHW` with exactly 3 bands in `(B4,B3,B2)` order. The adapter expects raw Sentinel-2 SR values in `0..10000`, converts them to `[0,1]`, and then converts them to `uint8` RGB before model preprocessing.
 
 ---
 
@@ -74,8 +60,7 @@ Default `SensorSpec` if omitted:
 
 Notes:
 
-- Current adapter path always targets token output (not pooled wrapper outputs).
-- CLS token is removed automatically when pooling / grid reshape helpers detect it.
+The current adapter path always targets token output rather than pre-pooled wrapper outputs. If a CLS token is present, the pooling and grid helpers remove it automatically.
 
 ---
 
@@ -92,15 +77,7 @@ Notes:
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools SatMAE patch tokens using `OutputSpec.pooling`
-- Metadata records `pooling="patch_mean"` or `patch_max`, plus `cls_removed`
-
-### `OutputSpec.grid()`
-
-- Reshapes SatMAE token sequence `[N,D]` to `xarray.DataArray` `(D,H,W)`
-- Grid is ViT patch-token layout, not georeferenced raster pixels
+SatMAE also follows the standard pooled and patch-token grid behavior. `pooled` uses token pooling according to `OutputSpec.pooling`, and `grid` reshapes the token sequence to `(D,H,W)` in ViT patch-token space rather than georeferenced raster pixels.
 
 ---
 
@@ -139,26 +116,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata `tokens_shape` and `grid_hw`
-- confirm `RS_EMBED_SATMAE_ID` and `RS_EMBED_SATMAE_IMG`
-- verify your custom `input_chw` is raw SR (not already 0..1 unless you intentionally converted it)
+Start by checking metadata such as `tokens_shape` and `grid_hw`, then confirm `RS_EMBED_SATMAE_ID` and `RS_EMBED_SATMAE_IMG`. If you pass a custom `input_chw`, verify that it is still raw SR rather than already scaled to `0..1`, unless that conversion was intentional.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `RS_EMBED_SATMAE_ID`
-- image size (`RS_EMBED_SATMAE_IMG`)
-- temporal window and compositing settings
-- output mode (`pooled` / `grid`) and pooling choice
-- `rshf` version (wrapper preprocessing behavior can matter)
+For reproducibility, keep `RS_EMBED_SATMAE_ID`, `RS_EMBED_SATMAE_IMG`, the temporal window, compositing settings, output mode, and pooling choice fixed. It is also worth recording the `rshf` version, because wrapper preprocessing behavior can matter.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_satmae.py`
-- Shared RGB/token helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The code paths to check are `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_satmae.py`, and the shared helpers in `src/rs_embed/embedders/_vit_mae_utils.py`.

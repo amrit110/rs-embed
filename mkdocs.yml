@@ -5,6 +5,13 @@ repo_name: cybergis/rs-embed
 
 theme:
   name: material
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+  palette:
+    - scheme: default
+      primary: white
+      accent: teal
   icon:
     annotation: material/arrow-right-circle
   features:
@@ -58,21 +65,21 @@ nav:
     - Advanced Reference: models_reference.md
     - Precomputed:
       - Tessera: models/tessera.md
-      - Google Satellite Embedding: models/gse.md
-      - Copernicus Embed: models/copernicus.md
+      - GSE: models/gse.md
+      - Copernicus: models/copernicus.md
     - On-the-fly:
       - RemoteCLIP: models/remoteclip.md
-      - SatMAE RGB: models/satmae.md
-      - SatMAE++ Family: models/satmaepp.md
-      - ScaleMAE RGB: models/scalemae.md
+      - SatMAE: models/satmae.md
+      - SatMAE++: models/satmaepp.md
+      - ScaleMAE: models/scalemae.md
       - WildSAT: models/wildsat.md
-      - Prithvi-EO v2: models/prithvi.md
-      - TerraFM-B: models/terrafm.md
+      - Prithvi: models/prithvi.md
+      - TerraFM: models/terrafm.md
       - TerraMind: models/terramind.md
       - DOFA: models/dofa.md
       - FoMo: models/fomo.md
-      - THOR 1.0 Base: models/thor.md
-      - SatVision-TOA: models/satvision.md
+      - THOR: models/thor.md
+      - SatVision: models/satvision.md
       - AnySat: models/anysat.md
       - Galileo: models/galileo.md
       - AgriFM: models/agrifm.md

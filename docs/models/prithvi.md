@@ -23,45 +23,28 @@
 
 ## When To Use This Model
 
-### Good fit for
+Prithvi is a good fit for multispectral Sentinel-2 experiments that need more than RGB, token or grid-level feature inspection with a ViT-style backbone, or comparisons where explicit time and location conditioning are part of the model path.
 
-- multispectral S2 experiments beyond RGB
-- token/grid feature inspection with a ViT-like backbone
-- comparisons that need explicit time + location conditioning in the forward path
-
-### Be careful when
-
-- comparing to models without side inputs (time/location signals can change behavior)
-- changing preprocessing mode (`resize` vs `pad`) without documenting it
-- assuming `grid` is georeferenced pixel space (it is token grid)
-
+Use extra care when comparing Prithvi against models without side inputs, because the derived time and location signals can materially affect behavior. It is also worth treating preprocessing mode (`resize` vs `pad`) as part of the experiment definition.
 ---
 
 ## Input Contract (Current Adapter Path)
 
 ### Spatial / temporal
 
-- `SpatialSpec`: `BBox` or `PointBuffer`
-- `TemporalSpec`:
-  - `range`: used directly
-  - `year`: normalized to full-year half-open range `[YYYY-01-01, (YYYY+1)-01-01)`
-  - `None`: normalized to adapter default range via shared helper (not recommended for reproducible experiments)
-- Adapter derives:
-  - temporal coordinates as `(year, day_of_year)` from the temporal midpoint date
-  - location coordinates from ROI center, encoded as `(lat, lon)` for the vendored runtime
+`SpatialSpec` may be either `BBox` or `PointBuffer`. `TemporalSpec.range(...)` is used directly, while `TemporalSpec.year(...)` is normalized to the half-open interval `[YYYY-01-01, (YYYY+1)-01-01)`. When temporal input is omitted, the adapter falls back to a shared default-range helper, which is usually a poor choice for reproducible experiments.
+
+The adapter also derives the required side inputs for the vendored runtime: temporal coordinates are encoded as `(year, day_of_year)` from the midpoint date of the effective window, and location coordinates are encoded as `(lat, lon)` from the ROI center.
 
 ### Sensor / channels
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("BLUE", "GREEN", "RED", "NIR_NARROW", "SWIR_1", "SWIR_2")`
-- `scale_m=30`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("BLUE", "GREEN", "RED", "NIR_NARROW", "SWIR_1", "SWIR_2")`, `scale_m=30`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
 `input_chw` contract:
 
-- must be `CHW` with 6 bands (raw S2 SR values expected, `0..10000`)
-- adapter normalizes to `[0,1]`, clips, and replaces non-finite values
+`input_chw` must be `CHW` with exactly 6 bands. The adapter expects raw Sentinel-2 SR values in `0..10000`, normalizes them to `[0,1]`, clips out-of-range values, and replaces non-finite entries.
 
 ---
 
@@ -103,23 +86,13 @@ Default `SensorSpec` if omitted:
 
 Notes:
 
-- `variant` overrides `RS_EMBED_PRITHVI_KEY`.
-- Short aliases `100_tl`, `300_tl`, and `600_tl` are also accepted in code.
+`variant` overrides `RS_EMBED_PRITHVI_KEY`, and the short aliases `100_tl`, `300_tl`, and `600_tl` are also accepted in code.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools patch tokens using `mean`/`max` according to `OutputSpec.pooling`
-- CLS token is removed if present (recorded in metadata)
-
-### `OutputSpec.grid()`
-
-- Returns patch-token grid `(D,H,W)` as `xarray.DataArray`
-- Grid metadata includes token grid shape and whether CLS was removed
-- Token grid is model-internal spatial structure, not guaranteed georeferenced raster pixels
+Prithvi follows the standard pooled and patch-token grid behavior once the required temporal and location side inputs have been prepared. `pooled` applies token pooling with optional CLS removal, and `grid` returns `(D,H,W)` in model token space rather than georeferenced raster pixels.
 
 ---
 
@@ -175,24 +148,16 @@ emb = get_embedding(
 
 Recommended first check:
 
-- Inspect raw fetched patch and verify 6-band order/value range before debugging model output quality.
+Inspect the raw fetched patch first and confirm the 6-band order plus value range before debugging embedding quality.
 
 ---
 
 ## Reproducibility Notes
 
-Document and keep fixed:
-
-- temporal specification (prefer explicit `TemporalSpec.range(...)`)
-- `sensor.scale_m` (default here is `30`, unlike many S2 adapters using `10`)
-- preprocessing mode (`resize` vs `pad`) and related env vars
-- output mode (`pooled` vs `grid`) and pooling method
-- model key / pretrained flag
+For reproducible runs, keep the temporal specification fixed, preferably with explicit `TemporalSpec.range(...)`, and record `sensor.scale_m`, which defaults to `30` here rather than the more common Sentinel-2 value of `10`. You should also keep the preprocessing mode (`resize` vs `pad`) and its related environment variables fixed, along with the output mode, pooling method, and selected model key or pretrained flag.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_prithvi.py`
-- Shared temporal normalization helper: `src/rs_embed/embedders/meta_utils.py`
+The implementation details live in `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_prithvi.py`, and the shared temporal helper `src/rs_embed/embedders/meta_utils.py`.

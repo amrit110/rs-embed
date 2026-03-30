@@ -22,17 +22,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- experiments comparing S2 and S1 representations under one backbone family
-- workflows needing both provider fetch and direct tensor backend
-- model-native feature-map outputs instead of token-only grids
-
-### Be careful when
-
-- mixing S1 and S2 runs without logging modality and preprocessing path
-- passing tensor backend inputs with wrong channel count (`C` must be `2` or `12`)
-- assuming `backend="auto"` selects a non-provider path; it resolves through the embedder's provider contract unless you use `tensor`
+TerraFM is most useful when you want to compare S2 and S1 representations within one backbone family, switch between provider fetch and direct tensor inputs, or work with model-native feature-map grids instead of token-only grids. The main things to watch are modality drift between S1 and S2 runs, wrong tensor channel counts, and the mistaken assumption that `backend="auto"` selects something other than the provider-backed path.
 
 ---
 
@@ -40,34 +30,21 @@
 
 ### Backend modes
 
-- `backend="tensor"`:
-  - requires `input_chw` as `CHW`
-  - batch tensor inputs should use `get_embeddings_batch_from_inputs(...)`
-  - adapter resizes to `224`
-- provider backend (`gee` / provider-compatible, including `auto` via provider resolution):
-  - requires `TemporalSpec.range(...)` in v0.1
-  - fetches S2 or S1 based on `modality` (or `sensor.modality` if passed through `SensorSpec`)
+`backend="tensor"` requires `input_chw` as `CHW`, batch tensor usage should go through `get_embeddings_batch_from_inputs(...)`, and the adapter resizes inputs to `224`. The provider-backed path, including `backend="auto"`, requires `TemporalSpec.range(...)` in v0.1 and fetches either S2 or S1 according to `modality` or `sensor.modality`.
 
 ### Modality selection (`modality` or `sensor.modality`)
 
-- `s2` (default):
-  - 12-band Sentinel-2 SR input (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`)
-  - provider fetch returns normalized `[0,1]`
-  - `input_chw` override expects raw SR `0..10000`, adapter scales to `[0,1]`
+For `s2`, which is the default, TerraFM expects 12-band Sentinel-2 SR input `B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`. Provider fetch normalizes that path to `[0,1]`, while an `input_chw` override should still carry raw SR values in `0..10000` so the adapter can apply the same scaling.
 
-- `s1`:
-  - 2-band Sentinel-1 VV/VH input (`VV`,`VH`)
-  - provider path fetches raw VV/VH then normalizes via shared S1 normalization helper
-  - `input_chw` override expects raw VV/VH and applies `log1p` + percentile scaling to `[0,1]`
+For `s1`, TerraFM expects two-band Sentinel-1 `VV` and `VH`. The provider path fetches raw VV/VH and normalizes it with the shared S1 helper. An `input_chw` override is expected to carry raw VV/VH so the adapter can apply the same `log1p` plus percentile scaling path.
 
 ### Sensor fields used by adapter (provider path)
 
-- common: `scale_m`, `cloudy_pct`, `composite`
-- S1-specific: `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`
+The common provider-side sensor fields are `scale_m`, `cloudy_pct`, and `composite`. On the S1 path, TerraFM also uses `use_float_linear`, `s1_require_iw`, and `s1_relax_iw_on_empty`.
 
 Channel sanity:
 
-- TerraFM path is strict: `C` must be `12` (S2) or `2` (S1)
+TerraFM is strict about channel count: `C` must be `12` for S2 or `2` for S1.
 
 ---
 
@@ -83,21 +60,11 @@ Earth Engine Sentinel-1 collections are heterogeneous: different instrument mode
 
 ### S1 fetch options in rs-embed
 
-- `s1_require_iw=True`:
-  - first try `instrumentMode == "IW"` together with dual-pol `VV/VH`
-- `s1_relax_iw_on_empty=True`:
-  - if the strict `IW` query returns no imagery, retry without the `IW` filter
-- `s1_require_iw=False`:
-  - query dual-pol `VV/VH` directly without enforcing `IW`
+With `s1_require_iw=True`, rs-embed first tries `instrumentMode == "IW"` together with dual-pol `VV/VH`. If `s1_relax_iw_on_empty=True`, a strict `IW` miss triggers one retry without the `IW` filter. With `s1_require_iw=False`, the adapter queries dual-pol `VV/VH` directly and does not enforce `IW`.
 
 Metadata behavior:
 
-- when provider-backed S1 fetch succeeds, metadata records:
-  - `s1_iw_requested`
-  - `s1_iw_applied`
-  - `s1_iw_relaxed_on_empty`
-  - `s1_relax_iw_on_empty`
-- this makes it explicit whether a sample came from strict `IW` filtering or from the relaxed fallback path
+When provider-backed S1 fetch succeeds, metadata records `s1_iw_requested`, `s1_iw_applied`, `s1_iw_relaxed_on_empty`, and `s1_relax_iw_on_empty`, so you can tell whether a sample came from strict `IW` filtering or from the relaxed fallback path.
 
 ### Provider path
 
@@ -116,13 +83,16 @@ Metadata behavior:
 ### Tensor backend path
 
 1. Read `input_chw` (`CHW`)
-2. Resize to `224x224`
-3. Validate channel count (`2` or `12`)
-4. Load TerraFM-B and run same forward/grid extraction path
+2. Validate channel count (`2` or `12`)
+3. Apply the same modality-specific normalization used by the provider path:
+   - S2: raw SR `0..10000` -> `/10000` -> clip `[0,1]`
+   - S1: shared `VV/VH` normalization helper (`log1p` + percentile scaling)
+4. Resize to `224x224`
+5. Load TerraFM-B and run same forward/grid extraction path
 
 Notes:
 
-- Tensor backend path does not apply provider-specific fetch normalization automatically; you are responsible for matching expected input scale/semantics.
+The tensor backend does apply the adapter's modality-specific normalization. In practice, `input_chw` should still be raw S2 SR values for `s2`, or raw Sentinel-1 `VV/VH` values for `s1`, so that the tensor path matches the provider path semantics.
 
 ---
 
@@ -135,14 +105,11 @@ Notes:
 
 Related cache envs (used by HF asset download path):
 
-- `HUGGINGFACE_HUB_CACHE`, `HF_HOME`, `HUGGINGFACE_HOME`
+The related Hugging Face cache environment variables are `HUGGINGFACE_HUB_CACHE`, `HF_HOME`, and `HUGGINGFACE_HOME`.
 
 Adapter behavior notes:
 
-- image size is fixed to `224` in current implementation
-- runtime code is vendored inside `rs-embed`
-- weights are fetched from `MBZUAI/TerraFM` (`TerraFM-B.pth`)
-- although the vendored runtime also exposes a `large` factory, the current adapter only wires up the `TerraFM-B` weight path, so `model_config` variant switching is not exposed yet
+Image size is fixed at `224` in the current implementation, the runtime code is vendored inside `rs-embed`, and weights are fetched from `MBZUAI/TerraFM` as `TerraFM-B.pth`. Although the vendored runtime also exposes a `large` factory, the current adapter only wires up the TerraFM-B weight path, so variant switching is not exposed yet.
 
 ---
 
@@ -150,15 +117,11 @@ Adapter behavior notes:
 
 ### `OutputSpec.pooled()`
 
-- Returns TerraFM forward output (CLS embedding) `(D,)`
-- This is not token pooling; it is the model’s pooled embedding path
+`OutputSpec.pooled()` returns TerraFM's own pooled forward output `(D,)`. This is not token pooling; it is the model's pooled embedding path.
 
 ### `OutputSpec.grid()`
 
-- Returns last-layer TerraFM feature map via `extract_feature(...)`
-- `xarray.DataArray` shape `(D,H,W)`
-- Metadata includes `grid_type="feature_map"`
-- Grid is model feature-map layout, not georeferenced raster pixels
+`OutputSpec.grid()` returns the last-layer TerraFM feature map via `extract_feature(...)` as `xarray.DataArray` `(D,H,W)`. Metadata includes `grid_type="feature_map"`. This is model feature-map layout, not georeferenced raster pixels.
 
 ---
 
@@ -207,12 +170,7 @@ emb = get_embedding(
 
 Notes:
 
-- Prefer passing `modality="s1"` / `modality="s2"` directly at the public API layer.
-- Setting `modality="s1"` is what switches TerraFM onto the S1 path; changing only `collection` / `bands` is not enough.
-- `use_float_linear=True` matches `COPERNICUS/S1_GRD_FLOAT`; set it to `False` for `COPERNICUS/S1_GRD`.
-- `s1_require_iw=True` is the conservative default in rs-embed.
-- `s1_relax_iw_on_empty=True` keeps the default strict path but retries without `IW` if the strict query is empty.
-- if you need maximum reproducibility, keep `s1_require_iw=True` and set `s1_relax_iw_on_empty=False`.
+Prefer passing `modality="s1"` or `modality="s2"` directly at the public API layer. Setting `modality="s1"` is what actually switches TerraFM onto the S1 path; changing only `collection` or `bands` is not enough. `use_float_linear=True` matches `COPERNICUS/S1_GRD_FLOAT`, while `False` matches `COPERNICUS/S1_GRD`. The conservative default is `s1_require_iw=True`, and `s1_relax_iw_on_empty=True` keeps that strict path but retries without `IW` if the strict query is empty. For maximum reproducibility, keep `s1_require_iw=True` and set `s1_relax_iw_on_empty=False`.
 
 ---
 
@@ -228,26 +186,16 @@ Notes:
 
 Recommended first checks:
 
-- inspect metadata `modality`, `source`, `grid_type`, and weight file info
-- inspect S1 metadata flags `s1_iw_requested`, `s1_iw_applied`, `s1_iw_relaxed_on_empty`
-- verify tensor input scale/normalization if using `backend="tensor"`
-- start with S2 default path before enabling S1 overrides
+Inspect metadata such as `modality`, `source`, `grid_type`, and weight file info first. On the S1 path, also inspect `s1_iw_requested`, `s1_iw_applied`, and `s1_iw_relaxed_on_empty`. If you are using `backend="tensor"`, verify input scale and normalization before debugging anything else. For a clean baseline, start with the default S2 path before adding S1 overrides.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- backend mode (`provider` vs `tensor`)
-- modality (`s2` / `s1`) and S1-specific options (`use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`)
-- temporal window + compositing settings (provider path)
-- output mode (`pooled` / `grid`)
-- TerraFM HF asset source/cache snapshot if benchmarking
+Keep the backend mode, modality, S1-specific options, temporal window, compositing settings, output mode, and TerraFM asset snapshot fixed and recorded. Those settings change both the data path and the model path.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_terrafm.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/onthefly_terrafm.py` for the adapter implementation.

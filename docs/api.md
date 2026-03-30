@@ -7,12 +7,7 @@ If you want installation and first-run examples, start with [Quickstart](quickst
 
 ## Core Entry Points
 
-Most users only need these public functions:
-
-- `get_embedding(...)`
-- `get_embeddings_batch(...)`
-- `export_batch(...)`
-- `inspect_provider_patch(...)`
+Most users only need four public entry points: `get_embedding(...)`, `get_embeddings_batch(...)`, `export_batch(...)`, and `inspect_provider_patch(...)`.
 
 ---
 
@@ -28,24 +23,15 @@ Most users only need these public functions:
 ---
 ## Useful Extras
 
-- `export_npz(...)`: compatibility wrapper around `export_batch(...)` for single-ROI `.npz`
-- `inspect_gee_patch(...)`: compatibility wrapper around `inspect_provider_patch(...)`
-- `list_models()`: stable public model catalog helper
+`export_npz(...)` is a compatibility wrapper around `export_batch(...)` for single-ROI `.npz`, `inspect_gee_patch(...)` is the older GEE-focused name for `inspect_provider_patch(...)`, and `list_models()` is the stable public helper for inspecting the model catalog.
 
-Model-specific configuration:
+### Model-Specific Configuration
 
-- `get_embedding(...)` and `get_embeddings_batch(...)` accept model-specific settings as direct keyword arguments (e.g. `variant="large"`)
-- `export_batch(...)` supports per-model settings via `ExportModelRequest.configure("model", variant="large")`
-- currently documented variant-aware models: `dofa`, `anysat`, `thor`, `prithvi`, and `satmaepp_s2_10b`
-- valid `variant` values depend on the model — check the corresponding model detail page or call `describe_model(model_id)`
-- passing unsupported keyword arguments raises `ModelError`
+`get_embedding(...)` and `get_embeddings_batch(...)` accept model-specific settings as direct keyword arguments such as `variant="large"`. `export_batch(...)` handles the same kind of override per model through `ExportModelRequest.configure("model", variant="large")`. Variant-aware models are documented on their own detail pages, and unsupported keyword arguments raise `ModelError`.
 
-Sampling / fetch configuration:
+### Sampling And Fetch Configuration
 
-- public embedding and export APIs accept `fetch=FetchSpec(...)`
-- use `fetch` for common overrides such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`
-- reserve `sensor=SensorSpec(...)` for advanced source overrides (`collection`, `bands`, modality-specific contracts)
-- `fetch` and `sensor` cannot be passed together
+Public embedding and export APIs accept `fetch=FetchSpec(...)` for common overrides such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`. Reserve `sensor=SensorSpec(...)` for advanced source overrides like `collection`, `bands`, or modality-specific contracts. `fetch` and `sensor` are mutually exclusive.
 
 If you need a stable model list in code:
 
@@ -63,9 +49,7 @@ print(list_models())
 
 rs-embed raises several explicit exception types (all in `rs_embed.core.errors`):
 
-- `SpecError`: spec validation failure (invalid bbox, missing temporal fields, etc.)
-- `ProviderError`: provider/backend errors (e.g., GEE initialization or fetch failure)
-- `ModelError`: unknown model ID, unsupported parameters, unsupported export format, etc.
+`SpecError` covers spec validation failures such as invalid bounds or missing temporal fields, `ProviderError` covers backend and fetch failures such as GEE initialization problems, and `ModelError` covers unknown model IDs, unsupported parameters, and unsupported export formats.
 
 ---
 
@@ -73,6 +57,4 @@ rs-embed raises several explicit exception types (all in `rs_embed.core.errors`)
 
 The current version is still early stage (`0.1.x`):
 
-- `BBox/PointBuffer` currently require `crs="EPSG:4326"`
-- Precomputed models should use `backend="auto"`; on-the-fly models mainly use provider backends (typically `"gee"` or explicit provider names)
-- `ExportConfig(format=...)` is the recommended way to choose export format; supported values are currently `"npz"` and `"netcdf"` and may be extended to parquet/zarr/hdf5, etc.
+`BBox` and `PointBuffer` currently require `crs="EPSG:4326"`. Precomputed models should usually use `backend="auto"`, while on-the-fly models mainly use provider backends such as `"gee"` or other explicit provider names. `ExportConfig(format=...)` is the recommended way to choose export format; today that means `"npz"` or `"netcdf"`, with room for additional formats later.

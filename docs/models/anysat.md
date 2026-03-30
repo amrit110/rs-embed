@@ -22,17 +22,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- temporal S2 sequence modeling (not just single composites)
-- experiments where day-of-year context matters
-- comparing multi-frame adapters (`anysat`, `galileo`, `agrifm`)
-
-### Be careful when
-
-- comparing to single-composite models without matching temporal design assumptions
-- changing frame count / normalization mode without recording it
-- assuming `grid` is a georeferenced raster (it is patch output mapped to `(D,H,W)`)
+AnySat is a good fit when you want actual temporal S2 sequence modeling rather than a single composite, when day-of-year context matters, or when you are explicitly comparing multi-frame adapters such as `anysat`, `galileo`, and `agrifm`. It becomes easy to misuse if you compare it against single-composite models without matching temporal assumptions, if you change frame count or normalization without recording it, or if you read `grid` output as a georeferenced raster instead of model patch output.
 
 ---
 
@@ -40,25 +30,13 @@
 
 ### Spatial / temporal
 
-- `SpatialSpec`: `BBox` or `PointBuffer`
-- `TemporalSpec`: normalized to range via shared helper (`range` preferred for reproducibility)
-- Adapter splits the temporal window into `T` sub-windows and composites one frame per bin
-- Frame dates are converted to AnySat-style day-of-year values (`0..364`) and passed as `s2_dates`
+The adapter accepts `BBox` and `PointBuffer`, and normalizes `TemporalSpec` to a range internally; using `TemporalSpec.range(...)` directly is still the clearest and most reproducible choice. The requested window is split into `T` sub-windows, one composite is built per bin, and the midpoint of each bin is converted into AnySat-style day-of-year values in `s2_dates`.
 
 ### Sensor / channels
 
-Default `SensorSpec` if omitted:
+If `sensor` is omitted, AnySat uses `COPERNICUS/S2_SR_HARMONIZED` with bands `("B2","B3","B4","B5","B6","B7","B8","B8A","B11","B12")`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("B2","B3","B4","B5","B6","B7","B8","B8A","B11","B12")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
-
-`input_chw` contract:
-
-- accepts `CHW` (`C=10`) or `TCHW` (`C=10`)
-- `CHW` is repeated to `T` frames
-- `TCHW` is padded/truncated to exact `T`
-- values are clipped to raw-SR range `0..10000`
+For `input_chw`, the adapter accepts either `CHW` or `TCHW` with `C=10`. A `CHW` tensor is repeated to `T` frames, while `TCHW` is padded or truncated to the exact configured frame count. Values are clipped to the raw-SR range `0..10000`.
 
 ---
 
@@ -79,7 +57,7 @@ Default `SensorSpec` if omitted:
 
 Important constraint:
 
-- `sensor.scale_m` / `fetch.scale_m` must be a **positive multiple of 10 meters**
+`sensor.scale_m` or `fetch.scale_m` must be a positive multiple of 10 meters.
 
 ---
 
@@ -103,16 +81,7 @@ Important constraint:
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools patch grid over spatial dims `(H,W)`
-- Supports `mean` and `max` pooling (`patch_mean` / `patch_max` semantics)
-
-### `OutputSpec.grid()`
-
-- Returns patch features as `xarray.DataArray` `(D,H,W)`
-- Metadata includes `grid_hw`, `grid_shape`, patch output info, and temporal packaging details (`n_frames`, `doy0_values`)
-- This is model patch output structure, not guaranteed georeferenced raster pixels
+AnySat follows the standard patch-grid pattern for multi-frame adapters. `pooled` applies spatial pooling over the patch grid, and `grid` returns `(D,H,W)` in model patch space rather than georeferenced raster pixels. The more distinctive AnySat details, such as frame packaging and `doy0_values`, are recorded in metadata rather than requiring a long per-page output section.
 
 ---
 
@@ -155,25 +124,16 @@ emb = get_embedding(
 
 Recommended first check:
 
-- Inspect input patches and confirm temporal window/frame construction is what you intended.
+Inspect the input patches first and confirm that the temporal window and frame construction match the experiment you think you are running.
 
 ---
 
 ## Reproducibility Notes
 
-For fair comparisons and stable reruns, record:
-
-- temporal window (`TemporalSpec.range(...)`)
-- `RS_EMBED_ANYSAT_FRAMES`
-- `RS_EMBED_ANYSAT_NORM`
-- `RS_EMBED_ANYSAT_IMG`
-- `fetch.scale_m` / `sensor.scale_m` (provider resolution and patch size)
-- AnySat checkpoint source (local path vs HF repo/file, pretrained flag)
+For fair comparisons and stable reruns, record the temporal window, `RS_EMBED_ANYSAT_FRAMES`, `RS_EMBED_ANYSAT_NORM`, `RS_EMBED_ANYSAT_IMG`, the effective provider resolution from `fetch.scale_m` or `sensor.scale_m`, and the exact checkpoint source.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_anysat.py`
-- TCHW coercion helper: `src/rs_embed/embedders/runtime_utils.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration, `src/rs_embed/embedders/onthefly_anysat.py` for the adapter, and `src/rs_embed/embedders/runtime_utils.py` for TCHW coercion helpers.

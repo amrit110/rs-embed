@@ -22,17 +22,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+ScaleMAE is the right choice for RGB experiments where spatial scale conditioning matters, for comparisons against SatMAE or RemoteCLIP with an explicitly scale-aware backbone, and for robustness studies across resolution changes where `scale_m` is part of the logged setup.
 
-- RGB experiments where spatial scale conditioning matters
-- comparisons against SatMAE/RemoteCLIP with a scale-aware backbone
-- benchmarking robustness to resolution changes (while explicitly logging `scale_m`)
-
-### Be careful when
-
-- `sensor.scale_m` is missing/incorrect for your input patch
-- assuming `grid` is always available (some wrapper outputs may be pooled vectors only)
-- comparing results without recording model output type (`tokens_kind`)
+It becomes harder to interpret when `sensor.scale_m` is missing or semantically wrong for the input patch. You should also avoid assuming that `grid` is always available, because some wrapper outputs are pooled vectors only, and cross-run comparisons should record the output type through fields such as `tokens_kind`.
 
 ---
 
@@ -40,26 +32,21 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` normalized via shared helper; use `TemporalSpec.range(...)` for reproducibility
+The current adapter path is provider-only, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized through the shared helper, and `TemporalSpec.range(...)` remains the clearest option for reproducible runs.
 
 ### Sensor / channels + scale
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("B4", "B3", "B2")`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2")`, `scale_m=10`, `cloudy_pct=30`, and `composite="median"`.
 
 `input_chw` contract:
 
-- must be `CHW` with 3 channels in `(B4,B3,B2)` order
-- raw S2 SR values expected in `0..10000`
+`input_chw` must be `CHW` with 3 channels in `(B4,B3,B2)` order, and the adapter expects raw Sentinel-2 SR values in `0..10000`.
 
 Scale requirement:
 
-- adapter passes `float(sensor.scale_m)` to ScaleMAE as `input_res_m`
-- if `sensor.scale_m` does not reflect actual patch resolution semantics, embeddings are not comparable
+The adapter passes `float(sensor.scale_m)` to ScaleMAE as `input_res_m`. If `sensor.scale_m` does not match the actual resolution semantics of the patch, the resulting embeddings are not meaningfully comparable.
 
 ---
 
@@ -80,8 +67,7 @@ Scale requirement:
 
 Important:
 
-- `grid` output requires token sequence (`[N,D]` after adapter normalization).
-- If the model/wrapper returns pooled vectors only, `OutputSpec.grid()` raises a clear error.
+`grid` output requires a token sequence after adapter normalization. If the model or wrapper returns pooled vectors only, `OutputSpec.grid()` raises a clear error instead of silently fabricating a grid.
 
 ---
 
@@ -96,7 +82,7 @@ Important:
 
 Non-env but critical:
 
-- `sensor.scale_m` (used as `input_res_m`)
+Even though it is not an environment variable, `sensor.scale_m` is a critical runtime setting because it is passed directly as `input_res_m`.
 
 ---
 
@@ -104,15 +90,11 @@ Non-env but critical:
 
 ### `OutputSpec.pooled()`
 
-- If adapter gets token sequence `[N,D]`, it pools patch tokens (`mean` / `max`)
-- If adapter gets pooled vector `[D]`, it returns it directly (`pooling="model_pooled"`)
-- Metadata includes `tokens_kind`, `used_patch_size`, and `used_scale_m`
+If the adapter receives a token sequence `[N,D]`, `OutputSpec.pooled()` pools patch tokens with `mean` or `max`. If the model already returns a pooled vector `[D]`, that vector is returned directly and metadata marks the path as `model_pooled`. Metadata also records fields such as `tokens_kind`, `used_patch_size`, and `used_scale_m`.
 
 ### `OutputSpec.grid()`
 
-- Requires token sequence output after adapter normalization
-- Returns patch-token grid as `xarray.DataArray` `(D,H,W)`
-- Grid is model token layout, not georeferenced raster pixels
+`OutputSpec.grid()` requires a token sequence after adapter normalization and returns a patch-token grid as `xarray.DataArray` with shape `(D,H,W)`. As with the other ViT-like pages, this is model token layout rather than georeferenced raster pixels.
 
 ---
 
@@ -155,27 +137,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata `tokens_kind`, `used_patch_size`, `input_res_m` / `used_scale_m`
-- verify `sensor.scale_m` and `RS_EMBED_SCALEMAE_IMG`
-- start with `OutputSpec.pooled()` before debugging `grid`
+Start by inspecting metadata such as `tokens_kind`, `used_patch_size`, and `input_res_m` or `used_scale_m`. Then verify `sensor.scale_m` and `RS_EMBED_SCALEMAE_IMG`, and use `OutputSpec.pooled()` first if you are isolating a grid-layout issue.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `RS_EMBED_SCALEMAE_ID`
-- `RS_EMBED_SCALEMAE_IMG`
-- `sensor.scale_m` (critical)
-- temporal window + compositing settings
-- output mode and pooling choice
-- `rshf` version
+For reproducibility, keep `RS_EMBED_SCALEMAE_ID`, `RS_EMBED_SCALEMAE_IMG`, and especially `sensor.scale_m` fixed, along with the temporal window, compositing settings, output mode, pooling choice, and `rshf` version.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_scalemae.py`
-- Shared RGB/token helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The main implementation points are `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_scalemae.py`, and the shared helpers in `src/rs_embed/embedders/_vit_mae_utils.py`.

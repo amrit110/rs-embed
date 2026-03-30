@@ -18,25 +18,12 @@
 | Extra side inputs | none |
 | Training alignment (adapter path) | N/A (precomputed product) |
 
-Install requirement:
-
-- `pip install "rs-embed[copernicus]"`
 
 ---
 
 ## When To Use This Model
 
-### Good fit for
-
-- precomputed embedding workflows via local GeoTIFF access
-- quick spatial baseline features without provider requests
-- experiments where coarse precomputed coverage is acceptable
-
-### Be careful when
-
-- requesting years other than `2021` (unsupported in current adapter)
-- passing ROIs smaller than a single 0.25° pixel (adapter raises an error)
-- using non-auto backends (`copernicus` currently expects `backend="auto"`)
+Copernicus Embed is a good fit for precomputed embedding workflows via local GeoTIFF access, quick spatial baselines without provider requests, and experiments where coarse precomputed coverage is acceptable. It is easy to misuse if you request years other than `2021`, pass ROIs smaller than one 0.25° pixel, or use non-`auto` backends.
 
 ---
 
@@ -44,27 +31,15 @@ Install requirement:
 
 ### Spatial
 
-Accepted `SpatialSpec`:
-
-- `BBox`
-- `PointBuffer` (converted to EPSG:4326 bbox)
-
-The adapter internally slices the local GeoTIFF with bbox indexing:
-
-- `ds[minlon:maxlon, minlat:maxlat]`
+The adapter accepts `BBox` directly and `PointBuffer`, which it converts to an EPSG:4326 bbox. Internally it slices the local GeoTIFF with bbox indexing via `ds[minlon:maxlon, minlat:maxlat]`.
 
 ### Temporal
 
-- requires `TemporalSpec.year(...)`
-- current adapter supports only `2021`
-- adapter validates the year before dataset access
+Copernicus Embed requires `TemporalSpec.year(...)`, currently supports only `2021`, and validates the year before dataset access.
 
 ### Backend / data directory
 
-- backend should be `auto` (legacy `local` is accepted for compatibility)
-- data directory resolution:
-  - `RS_EMBED_COP_DIR` (default `data/copernicus_embed`)
-  - optional per-call override via `sensor.collection="dir:/path/to/copernicus_embed"`
+The backend should be `auto`, although legacy `local` is still accepted for compatibility. Data directory resolution comes from `RS_EMBED_COP_DIR` by default, or from a per-call override such as `sensor.collection="dir:/path/to/copernicus_embed"`.
 
 ---
 
@@ -80,7 +55,7 @@ The adapter internally slices the local GeoTIFF with bbox indexing:
 
 Notes:
 
-- `temporal` is validated but metadata in current adapter is built with `temporal=None`; record the requested year externally if strict provenance matters.
+`temporal` is validated, but metadata in the current adapter is built with `temporal=None`, so record the requested year externally if strict provenance matters.
 
 ---
 
@@ -93,26 +68,17 @@ Notes:
 
 Non-env override:
 
-- `sensor.collection="dir:/path/to/copernicus_embed"` overrides data directory per call
+`sensor.collection="dir:/path/to/copernicus_embed"` overrides the data directory per call.
 
 Current fixed adapter behavior (not env-configurable in v0.1):
 
-- `download=True`
+The current adapter keeps `download=True`, and that is not env-configurable in v0.1.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools `CHW` embedding grid over spatial dims:
-  - `mean` -> `mean_hw`
-  - `max` -> `max_hw`
-
-### `OutputSpec.grid()`
-
-- Returns local GeoTIFF sample embedding tensor as `xarray.DataArray` `(D,H,W)`
-- Grid is precomputed product space (dataset slice), not raw imagery pixels
+Copernicus follows the same precomputed-product pattern as the other local or provider-sampled embedding products. `pooled` applies spatial pooling over the sampled `CHW` embedding grid, and `grid` returns `(D,H,W)` in product space rather than raw imagery pixel space.
 
 ---
 
@@ -151,25 +117,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- confirm `TemporalSpec.year(2021)`
-- inspect metadata `data_dir`, `chw_shape`, `bbox_4326`
-- test a larger ROI if coverage seems empty
+Confirm `TemporalSpec.year(2021)` first, then inspect metadata such as `data_dir`, `chw_shape`, and `bbox_4326`. If coverage seems empty, test a larger ROI before assuming the dataset is broken.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- dataset path/version snapshot
-- requested year (must be `2021`)
-- ROI geometry
-- output mode / pooling choice
+Keep the dataset path or version snapshot, requested year, ROI geometry, and output mode fixed and recorded.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/precomputed_copernicus_embed.py`
-- Vendored GeoTIFF reader: `src/rs_embed/embedders/_vendor/copernicus_embed.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration, `src/rs_embed/embedders/precomputed_copernicus_embed.py` for the adapter, and `src/rs_embed/embedders/_vendor/copernicus_embed.py` for the vendored GeoTIFF reader.

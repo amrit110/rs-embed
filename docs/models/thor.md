@@ -23,17 +23,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+THOR is a strong Sentinel-2 SR baseline when you want pretrained THOR weights, both pooled and token-grid outputs, or experiments where group-wise token aggregation through `group_merge` is part of the analysis.
 
-- strong S2 SR baselines with THOR pretrained weights
-- experiments needing both pooled and token-grid outputs
-- studies where group-wise THOR token aggregation (`group_merge`) is relevant
-
-### Be careful when
-
-- changing normalization away from `thor_stats` for benchmark comparisons
-- changing `patch_size` / `image_size` without logging `ground_cover_m`
-- assuming `grid` is always available (some configs may fall back to pooled-only usability)
+As with the other model pages, the runtime knobs here affect representation semantics. Moving away from `thor_stats` normalization, changing `patch_size` or `image_size` without logging `ground_cover_m`, or assuming `grid` is always available can all make comparisons harder to interpret.
 
 ---
 
@@ -41,23 +33,17 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` is normalized to range via shared helper (`TemporalSpec.range(...)` recommended)
-- Temporal window is used for compositing, not scene identity locking
+The current adapter path is provider-only, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized to a range via the shared helper, with `TemporalSpec.range(...)` recommended for reproducibility. The temporal window controls compositing rather than locking the request to a single source scene.
 
 ### Sensor / channels
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands (adapter order): `B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with adapter band order `B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
 `input_chw` contract:
 
-- must be `CHW` with `C=10`
-- raw S2 SR values expected in `0..10000`
-- adapter clips NaN/Inf and clamps to `0..10000` before normalization
+`input_chw` must be `CHW` with `C=10`, and raw Sentinel-2 SR values are expected in `0..10000`. Before normalization, the adapter clips NaN and Inf values and clamps the range to `0..10000`.
 
 ---
 
@@ -96,13 +82,13 @@ Default `SensorSpec` if omitted:
 
 Notes:
 
-- `RS_EMBED_THOR_PATCH_SIZE` and `RS_EMBED_THOR_IMG` jointly affect token layout and `ground_cover_m`.
-- Changing `group_merge` changes grid channel semantics and dimensionality (especially `concat`).
+`RS_EMBED_THOR_PATCH_SIZE` and `RS_EMBED_THOR_IMG` jointly affect token layout and `ground_cover_m`. Changing `group_merge` also changes grid channel semantics and dimensionality, especially when `concat` is used.
 
 ## Model-specific Settings
 
-- `variant`: `tiny` / `small` / `base` / `large`
-- for export jobs, pass it via `ExportModelRequest.configure("thor", variant=...)`
+| Key | Type | Default | Choices | Notes |
+|---|---|---|---|---|
+| `variant` | `string` | `base` | `tiny`, `small`, `base`, `large` | Backbone size selector. For export jobs, pass it through `ExportModelRequest.configure("thor", variant=...)`. |
 
 Example:
 
@@ -125,15 +111,11 @@ emb = get_embedding(
 
 ### `OutputSpec.pooled()`
 
-- Pools token sequence using `_pool_thor_tokens(...)`
-- Uses expected THOR patch-token count when available to avoid pooling non-patch tokens incorrectly
-- Metadata records pooling mode and `cls_removed`
+`OutputSpec.pooled()` pools the token sequence through `_pool_thor_tokens(...)`. When the expected THOR patch-token count is available, the adapter uses it to avoid pooling non-patch tokens incorrectly. Metadata records the pooling mode and `cls_removed`.
 
 ### `OutputSpec.grid()`
 
-- Preferred path: THOR group-aware grid (`grid_kind="thor_group_grid"`) built from channel groups
-- Fallback path: generic ViT patch-token reshape (`grid_kind="patch_tokens"`)
-- Can fail for some model/config/token layouts; adapter raises a clear error suggesting pooled output
+`OutputSpec.grid()` first tries to build a THOR group-aware grid with `grid_kind="thor_group_grid"` from the channel groups. If that fails, it falls back to a generic ViT-style patch-token reshape with `grid_kind="patch_tokens"`. Some token layouts still cannot be reshaped into a grid, in which case the adapter raises a clear error and suggests using pooled output.
 
 ---
 
@@ -194,26 +176,16 @@ still use the existing environment-variable path.
 
 Recommended first checks:
 
-- verify metadata fields: `model_key`, `normalization`, `group_merge`, `patch_size`, `ground_cover_m`
-- try `OutputSpec.pooled()` to isolate grid-layout issues
-- revert to default `thor_stats` + `group_merge=mean` before benchmarking
+Start by verifying metadata such as `model_key`, `normalization`, `group_merge`, `patch_size`, and `ground_cover_m`. `OutputSpec.pooled()` is the faster way to isolate grid-layout issues, and the default `thor_stats` plus `group_merge=mean` combination is the best baseline before benchmarking alternatives.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `RS_EMBED_THOR_MODEL_KEY`, `RS_EMBED_THOR_PRETRAINED`, and local `CKPT` (if used)
-- normalization mode
-- `image_size` and `patch_size`
-- `group_merge` (affects grid representation)
-- temporal window and provider compositing settings
+For reproducibility, keep `RS_EMBED_THOR_MODEL_KEY`, `RS_EMBED_THOR_PRETRAINED`, and any local checkpoint path fixed, together with normalization mode, image size, patch size, `group_merge`, temporal window, and provider compositing settings.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_thor.py`
-- Token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The main implementation files are `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_thor.py`, and the shared token/grid helpers in `src/rs_embed/embedders/_vit_mae_utils.py`.

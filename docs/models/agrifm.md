@@ -21,17 +21,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- crop/agriculture-oriented temporal S2 experiments
-- comparisons against other multi-frame adapters (`anysat`, `galileo`)
-- workflows where a consistent fixed-length frame stack is useful
-
-### Be careful when
-
-- changing `RS_EMBED_AGRIFM_FRAMES` across experiments (changes temporal packaging)
-- feeding `CHW` inputs and forgetting they get repeated to `T` frames
-- comparing with single-window models without documenting temporal/frame construction
+AgriFM is a good fit for crop-oriented temporal S2 experiments, comparisons against other multi-frame adapters such as `anysat` and `galileo`, and workflows where a fixed-length frame stack is useful. The main pitfalls are changing `RS_EMBED_AGRIFM_FRAMES` between runs, forgetting that `CHW` inputs are repeated to `T` frames, and comparing it to single-window models without documenting the temporal packaging.
 
 ---
 
@@ -39,25 +29,13 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` normalized to range via shared helper (`TemporalSpec.range(...)` recommended)
-- Provider path fetches a multi-frame S2 sequence over the range and composes it into fixed `T` frames
+AgriFM is provider-backed, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized to a range through the shared helper, and `TemporalSpec.range(...)` is the clearest choice. The provider path fetches a multi-frame S2 sequence over that range and composes it into a fixed `T`-frame stack.
 
 ### Sensor / channels
 
-Default `SensorSpec` if omitted:
+If `sensor` is omitted, AgriFM uses `COPERNICUS/S2_SR_HARMONIZED` with bands `B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
-
-`input_chw` contract:
-
-- accepts `CHW` with `C=10`
-  - adapter repeats the same frame to `T = RS_EMBED_AGRIFM_FRAMES`
-- accepts `TCHW` with `C=10`
-  - adapter pads (repeat last frame) or truncates to exact `T`
-- values are clipped to raw S2 SR range `0..10000`
+For `input_chw`, the adapter accepts `CHW` with `C=10` and repeats that frame to `T = RS_EMBED_AGRIFM_FRAMES`, or `TCHW` with `C=10` and pads or truncates to the exact configured frame count. Values are clipped to the raw S2 SR range `0..10000`.
 
 ---
 
@@ -105,18 +83,7 @@ Default `SensorSpec` if omitted:
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Adapter pools the AgriFM grid spatially:
-  - `mean` -> spatial mean over `(H,W)`
-  - `max` -> spatial max over `(H,W)`
-- Metadata records `pooling="spatial_mean"` or `pooling="spatial_max"`
-
-### `OutputSpec.grid()`
-
-- Returns AgriFM feature grid as `xarray.DataArray` `(D,H,W)`
-- Grid is model feature map space (not georeferenced raster pixels)
-- Metadata includes `n_frames`, `grid_hw`, normalization mode, and input sizes
+AgriFM uses the standard feature-grid pattern for multi-frame encoders. `pooled` applies spatial pooling over the model feature grid, and `grid` returns `(D,H,W)` in model feature-map space rather than georeferenced raster pixels. The useful model-specific details are mostly carried in metadata, including frame count and normalization settings.
 
 ---
 
@@ -157,29 +124,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata for `n_frames`, `norm_mode`, `input_frames`, `grid_hw`
-- verify whether input came from provider fetch vs repeated `CHW`
-- pin checkpoint source/path before benchmarking
+Inspect metadata for `n_frames`, `norm_mode`, `input_frames`, and `grid_hw` first. Verify whether the input came from provider fetch or from repeated `CHW`, and pin the checkpoint source or path before benchmarking.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `RS_EMBED_AGRIFM_FRAMES`, `RS_EMBED_AGRIFM_IMG`, normalization mode
-- checkpoint source/path
-- temporal window and compositing settings
-- output mode / pooling choice
-
-Temporal note:
-
-- Multi-frame models are very sensitive to frame count and frame construction; changing `FRAMES` is a different experiment.
+Keep `RS_EMBED_AGRIFM_FRAMES`, `RS_EMBED_AGRIFM_IMG`, normalization mode, checkpoint source or path, temporal window, compositing settings, and output mode fixed and recorded. Multi-frame models are very sensitive to frame count and frame construction, so changing `FRAMES` is a different experiment rather than a small tuning tweak.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_agrifm.py`
-- Shared temporal fetch/coercion helpers: `src/rs_embed/embedders/runtime_utils.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration, `src/rs_embed/embedders/onthefly_agrifm.py` for the adapter, and `src/rs_embed/embedders/runtime_utils.py` for shared temporal fetch and coercion helpers.

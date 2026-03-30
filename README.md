@@ -56,7 +56,7 @@ earthengine authenticate
 
 ## Quick Example
 ```python
-from rs_embed import FetchSpec, PointBuffer, TemporalSpec, OutputSpec, get_embedding
+from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
 
 spatial = PointBuffer(lon=121.5, lat=31.2, buffer_m=2048)
 temporal = TemporalSpec.range(

@@ -22,17 +22,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- quick annual baselines from a maintained provider-hosted embedding product
-- low-friction comparisons using `OutputSpec.pooled()`
-- workflows that want provider-based sampling (no local tile cache management)
-
-### Be careful when
-
-- using `TemporalSpec.range(...)` (not supported in v0.1)
-- assuming native imagery semantics (this is an embedding product)
-- forgetting that `fetch.scale_m` affects provider sampling resolution
+GSE is a good fit for quick annual baselines, low-friction comparisons with `OutputSpec.pooled()`, and workflows that prefer provider-based sampling over local tile cache management. The main caveats are that `TemporalSpec.range(...)` is not supported in v0.1, the product is an embedding image rather than native imagery, and `fetch.scale_m` still affects provider sampling resolution.
 
 ---
 
@@ -40,21 +30,15 @@
 
 ### Backend / temporal
 
-- provider-backed path; public API should usually use `backend="auto"`
-- requires `TemporalSpec.year(year=...)`
-- adapter validates `temporal.mode == "year"`
+This is a provider-backed path, and the public API should usually use `backend="auto"`. It requires `TemporalSpec.year(year=...)`, and the adapter validates `temporal.mode == "year"`.
 
 ### Spatial / sampling
 
-- accepts normal `SpatialSpec` provider sampling path
-- fetches all embedding bands from annual collection using provider helper
-- `fetch.scale_m` / `sensor.scale_m` control sampling scale passed to provider
+The adapter accepts the normal `SpatialSpec` provider sampling path, fetches all embedding bands from the annual collection through the provider helper, and uses `fetch.scale_m` or `sensor.scale_m` as the provider sampling scale.
 
 Fixed provider fetch settings in current adapter:
 
-- collection: `GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`
-- `fill_value=-9999.0`
-- `composite="mosaic"`
+The provider fetch settings are fixed to collection `GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`, `fill_value=-9999.0`, and `composite="mosaic"`.
 
 ---
 
@@ -78,22 +62,13 @@ Fixed provider fetch settings in current adapter:
 
 Primary non-env sampling knob:
 
-- `fetch.scale_m` (or advanced `sensor.scale_m`)
+The main non-env sampling knob is `fetch.scale_m`, or the more explicit `sensor.scale_m`.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools precomputed embedding grid over spatial dims using `OutputSpec.pooling`
-- Metadata records pooling mode (`mean` / `max`)
-
-### `OutputSpec.grid()`
-
-- Returns provider-sampled embedding grid as `xarray.DataArray` `(D,H,W)`
-- `d` coordinate uses product band names (not integer indices only)
-- Grid is provider-sampled embedding image in product space, not raw imagery pixels
+GSE also follows the standard precomputed-product pattern. `pooled` applies spatial pooling over the sampled embedding grid, and `grid` returns `(D,H,W)` in embedding-product space rather than raw imagery space. The main GSE-specific detail is that the `d` coordinate uses product band names.
 
 ---
 
@@ -133,24 +108,16 @@ fetch = FetchSpec(scale_m=30)
 
 Recommended first checks:
 
-- inspect metadata `year`, `scale_m`, `bands`
-- try `OutputSpec.pooled()` first to validate access
-- adjust `fetch.scale_m` if sampling is too coarse/fine
+Inspect metadata such as `year`, `scale_m`, and `bands` first. If access itself is in doubt, try `OutputSpec.pooled()` before debugging the grid path. If the result looks too coarse or too fine, adjust `fetch.scale_m`.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `TemporalSpec.year(...)`
-- provider backend config / auth context
-- `fetch.scale_m`
-- output mode and pooling choice
+Keep the requested year, provider auth context, `fetch.scale_m`, and output mode fixed and recorded.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/precomputed_gse_annual.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/precomputed_gse_annual.py` for the adapter implementation.

@@ -22,17 +22,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- fast RGB baselines on Sentinel-2
-- CLIP-style embedding experiments and retrieval setups
-- simple comparisons with `pooled` vectors across multiple models
-
-### Be careful when
-
-- you need strict multispectral semantics (RGB-only path)
-- you assume `grid` is georeferenced pixels (it is a ViT token grid)
-- your wrapper/model build only exposes pooled outputs (then `grid` can fail)
+RemoteCLIP is a good fit for fast Sentinel-2 RGB baselines, CLIP-style retrieval experiments, and simple cross-model comparisons where `OutputSpec.pooled()` is enough. Be more careful if you need strict multispectral semantics, if you plan to treat `grid` output as georeferenced pixels, or if your wrapper build only exposes pooled outputs and therefore cannot serve a token grid.
 
 ---
 
@@ -40,22 +30,11 @@
 
 ### Spatial / temporal
 
-- `SpatialSpec`: `BBox` or `PointBuffer`
-- `TemporalSpec`: **must** be `TemporalSpec.range(start, end)`
-- Temporal semantics: window filter + composite (default `median`), not single-scene selection
+The adapter accepts `BBox` and `PointBuffer`. `TemporalSpec` must be `TemporalSpec.range(start, end)`, and that range is treated as a filter-and-composite window, not as a guarantee of one exact acquisition.
 
 ### Sensor / channels
 
-Default path (if `sensor` is omitted):
-
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `("B4", "B3", "B2")` (RGB in that order)
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`
-
-Adapter notes:
-
-- `sensor.collection` can be used as a checkpoint override with `hf:<repo_or_path>` (for example `hf:MVRL/remote-clip-vit-base-patch32`)
-- `input_chw` (prefetched/raw path) must be `CHW` with exactly 3 bands in `(B4,B3,B2)` order
+If `sensor` is omitted, the default path uses `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2")`, `scale_m=10`, `cloudy_pct=30`, and `composite="median"`. `sensor.collection` can also be used as a checkpoint override in the form `hf:<repo_or_path>`, for example `hf:MVRL/remote-clip-vit-base-patch32`. If you bypass provider fetch with `input_chw`, it must be `CHW` with exactly three bands in `(B4,B3,B2)` order.
 
 ---
 
@@ -72,7 +51,7 @@ Adapter notes:
 
 Current adapter image size:
 
-- fixed `224` in this adapter path
+The image size is fixed at `224` in this adapter path.
 
 ---
 
@@ -86,24 +65,13 @@ Current adapter image size:
 
 Checkpoint override (not env-based in this adapter):
 
-- set `sensor.collection="hf:<repo_or_local_path>"`
+Set `sensor.collection="hf:<repo_or_local_path>"`.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Returns a vector `(D,)`
-- If token sequence is available, adapter mean-pools tokens (records `pooling="token_mean"` in metadata)
-- If wrapper only returns pooled vector, adapter returns it directly
-
-### `OutputSpec.grid()`
-
-- Requires token sequence output `[N,D]`
-- Returns ViT token grid as `xarray.DataArray` with shape `(D, Ht, Wt)`
-- This is a **patch-token grid**, not georeferenced raster pixels
-- Typical note from adapter: often `7x7` for ViT-B/32 at 224px (checkpoint-dependent)
+RemoteCLIP mostly follows the standard pooled and patch-token grid behavior. `pooled` returns a vector `(D,)`, usually via token mean pooling when tokens are available, while `grid` returns a ViT token grid `(D,H,W)` in model token space rather than georeferenced raster pixels.
 
 ---
 
@@ -156,24 +124,16 @@ emb = get_embedding(
 
 Recommended first check:
 
-- Use `inspect_provider_patch(...)` / `inspect_gee_patch(...)` to verify raw RGB inputs and temporal composite quality.
+Use `inspect_provider_patch(...)` or `inspect_gee_patch(...)` to verify raw RGB inputs and temporal composite quality before debugging the model path.
 
 ---
 
 ## Reproducibility Notes
 
-For fair comparisons, keep fixed:
-
-- same ROI and temporal window
-- same `SensorSpec.composite` (`median` / `mosaic`)
-- same `OutputSpec` mode (prefer `pooled` first)
-- same checkpoint (`sensor.collection="hf:..."` override if used)
-- same preprocessing path (be aware wrapper transform vs CLIP fallback can differ)
+For fair comparisons, keep the ROI, temporal window, `SensorSpec.composite`, `OutputSpec` mode, checkpoint choice, and preprocessing path fixed. In particular, log whether the run used the wrapper transform or the CLIP-style fallback, because those paths are not identical.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_remoteclip.py`
-- Token/grid utilities: `src/rs_embed/embedders/onthefly_remoteclip.py` (token reshape helpers)
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/onthefly_remoteclip.py` for the adapter itself, including the token reshape helpers.

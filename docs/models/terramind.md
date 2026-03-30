@@ -21,17 +21,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+TerraMind is a good fit for strict multispectral Sentinel-2 experiments with TerraMind checkpoints, for comparisons that need a strong 12-band S2 encoder, and for workflows that want both provider-backed and direct tensor input paths.
 
-- strict multispectral S2 experiments with TerraMind checkpoints
-- comparisons requiring a strong S2 12-band encoder
-- workflows that need both provider and direct tensor backend paths
-
-### Be careful when
-
-- changing normalization mode away from TerraMind stats (`zscore`)
-- assuming `grid` is georeferenced raster space (it is patch-token grid)
-- using tensor backend without matching expected channel order and preprocessing assumptions
+Treat normalization mode as part of the model definition. Moving away from TerraMind's default `zscore` path changes the semantics of the input, and `grid` should still be read as a patch-token grid rather than georeferenced raster space. The tensor backend is useful, but only if the supplied channel order and preprocessing assumptions match the adapter contract.
 
 ---
 
@@ -39,31 +31,23 @@
 
 ### Spatial / temporal
 
-- Provider path: `SpatialSpec` + temporal normalized to range via shared helper
-- Tensor path: no provider fetch; pass `input_chw` as `CHW`
+On the provider path, `SpatialSpec` is paired with temporal input normalized to a range via the shared helper. On the tensor path, there is no provider fetch, and the adapter reads `input_chw` directly as `CHW`.
 
 ### Sensor / channels (provider path)
 
 Default `SensorSpec` if omitted:
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: adapter fetch order `_S2_SR_12_BANDS` = `B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
+The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with adapter fetch order `_S2_SR_12_BANDS = B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
 TerraMind internal semantic mapping is also tracked in metadata (`bands_terramind`).
 
 `input_chw` contract (provider override path):
 
-- must be `CHW` with 12 bands in adapter fetch order
-- raw SR values expected in `0..10000`
+For provider overrides, `input_chw` must be `CHW` with 12 bands in the adapter fetch order, and raw SR values are expected in `0..10000`.
 
 ### Tensor backend contract
 
-- `backend="tensor"` requires `input_chw`
-- accepted shape: `CHW`
-- batch tensor inputs should use `get_embeddings_batch_from_inputs(...)`
-- `C` must be `12`
-- adapter resizes to `224` and applies TerraMind normalization before forward
+`backend="tensor"` requires `input_chw` in `CHW` format, with `C=12`. Batch tensor inputs should go through `get_embeddings_batch_from_inputs(...)`. Before the forward pass, the adapter resizes to `224` and applies the same TerraMind normalization used on the provider path.
 
 ---
 
@@ -82,7 +66,7 @@ TerraMind internal semantic mapping is also tracked in metadata (`bands_terramin
 
 ### Tensor path
 
-- Reads `input_chw`, resizes to `224`, applies same normalization, then forwards model
+The tensor path reads `input_chw`, resizes it to `224`, applies the same normalization, and then forwards the model.
 
 ---
 
@@ -99,22 +83,13 @@ TerraMind internal semantic mapping is also tracked in metadata (`bands_terramin
 
 Fixed adapter behavior:
 
-- image size is fixed to `224` in current implementation
+In the current implementation, image size is fixed to `224`.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools TerraMind tokens with `mean` / `max` according to `OutputSpec.pooling`
-- Metadata records pooling mode and whether CLS removal happened
-
-### `OutputSpec.grid()`
-
-- Returns ViT patch-token grid `(D,H,W)` as `xarray.DataArray`
-- Metadata includes `grid_type="vit_patch_tokens"`, `grid_hw`, and `cls_removed`
-- Grid is model token layout, not georeferenced raster pixels
+TerraMind behaves like a standard token model at output time: `pooled` applies token pooling according to `OutputSpec.pooling`, and `grid` returns a ViT-style token grid `(D,H,W)` in model space rather than georeferenced raster pixels. Metadata still records the key details such as pooling mode, `grid_hw`, and CLS removal.
 
 ---
 
@@ -154,25 +129,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- verify provider raw input channel order and range before normalization
-- inspect metadata for model key, modality, normalization mode, and layer index
+Verify provider raw input channel order and value range before normalization, then inspect metadata for the model key, modality, normalization mode, and selected layer index.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed across runs:
-
-- model key (`v1` vs `v01` changes which z-score stats are used)
-- normalization mode (`zscore` strongly recommended)
-- modality (`S2L2A` default)
-- output mode/pooling choice
-- temporal window and compositing settings (provider path)
+For reproducibility, keep the model key fixed, because `v1` versus `v01` changes which z-score statistics are used. It is also worth keeping normalization mode, modality, output mode, pooling choice, and provider-side temporal and compositing settings fixed across runs.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_terramind.py`
-- Token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The implementation details are in `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_terramind.py`, and `src/rs_embed/embedders/_vit_mae_utils.py`.

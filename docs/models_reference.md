@@ -2,33 +2,15 @@
 
 This page is for **cross-model comparison after you already have a shortlist**.
 
-If you are choosing a model for the first time, start with:
-
-- [Supported Models (Overview)](models.md)
+If you are choosing a model for the first time, start with [Supported Models (Overview)](models.md).
 
 If you need the exact contract for one specific model, use the per-model detail pages in **Reference -> Model Details**.
 
-If you are authoring a new per-model doc page, use:
-
-- [Model Detail Template](model_detail_template.md)
+If you are authoring a new per-model doc page, use [Model Detail Template](model_detail_template.md).
 
 ---
 
-Use this page to compare:
-
-1. preprocessing assumptions
-2. temporal packaging
-3. side-input requirements
-4. environment-variable tuning knobs
-
-Jump to:
-
-- [Precomputed Embeddings](#precomputed-embeddings)
-- [Quick Comparison](#quick-comparison)
-- [Temporal Handling](#temporal-handling)
-- [Multi-frame Semantics](#multi-frame-semantics)
-- [Modality and Extra Inputs Matrix](#modality-and-extra-inputs-matrix)
-- [Preprocessing and Temporal Env Vars](#preprocessing-and-temporal-env-vars)
+Use this page to compare preprocessing assumptions, temporal packaging, side-input requirements, and the environment variables that materially change model behavior. The main sections are [Precomputed Embeddings](#precomputed-embeddings), [Quick Comparison](#quick-comparison), [Temporal Handling](#temporal-handling), [Multi-frame Semantics](#multi-frame-semantics), [Modality and Extra Inputs Matrix](#modality-and-extra-inputs-matrix), and [Preprocessing and Temporal Env Vars](#preprocessing-and-temporal-env-vars).
 
 ---
 
@@ -36,10 +18,7 @@ Jump to:
 
 ### Reading tips
 
-- Start with **Quick Comparison** if you are deciding between models
-- Read **Temporal Handling** and **Multi-frame Semantics** before comparing temporal models
-- Read **Modality and Extra Inputs Matrix** if you need fair cross-model benchmarking
-- Read **Environment Variables...** only when tuning preprocessing or reproducing training pipelines
+Start with **Quick Comparison** if you are deciding between models. Read **Temporal Handling** and **Multi-frame Semantics** before comparing temporal models, and use **Modality and Extra Inputs Matrix** when you need a fair benchmark across models with different side inputs. **Preprocessing and Temporal Env Vars** matters mainly when you are tuning preprocessing or reproducing training pipelines.
 
 Canonical model IDs in this page use the short public names from `MODEL_SPECS`, such as `remoteclip`, `prithvi`, `terrafm`, and `thor`.
 Some linked detail-page filenames still retain older names for compatibility.
@@ -56,12 +35,7 @@ Some linked detail-page filenames still retain older names for compatibility.
 
 ## On-the-fly Foundation Models
 
-Source of truth:
-
-- `src/rs_embed/embedders/catalog.py`
-- `src/rs_embed/embedders/onthefly_*.py`
-- `src/rs_embed/embedders/_vit_mae_utils.py`
-- `src/rs_embed/embedders/runtime_utils.py`
+The source of truth for this section is the adapter code in `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_*.py`, `src/rs_embed/embedders/_vit_mae_utils.py`, and `src/rs_embed/embedders/runtime_utils.py`.
 
 ### Quick Comparison
 
@@ -80,25 +54,21 @@ Use this table for a first-pass side-by-side comparison of input assumptions and
 | `prithvi` | Vendored `PrithviMAE` runtime with HF checkpoints | 30m | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) | raw SR -> `/10000` -> clamp `[0,1]`; prep mode from env | default mode `resize` to 224; optional `pad` to patch multiple (legacy) | token sequence -> pooled or patch-token grid | Medium |
 | `terrafm` | TerraFM-B from vendored runtime + HF weights | 10m | S2 12-band or S1 VV/VH | S2: `/10000` to `[0,1]`; S1: `log1p` + p99 scaling to `[0,1]` | resize to 224; no pad | pooled embedding, optional feature-map grid | Medium |
 | `terramind` | TerraTorch `BACKBONE_REGISTRY` TerraMind backbone | 10m | S2 SR 12-band | raw `0..10000`; resize 224; z-score with TerraMind v1/v01 pretrained mean/std | fixed 224; no pad | token sequence -> pooled or patch-token grid | High |
-| `dofa` | DOFA ViT (`base` / `large`, official checkpoints) | 10m | multi-band SR CHW + wavelengths | raw SR -> `/10000` to `[0,1]`; provide/infer wavelengths | bilinear resize to 224; explicitly no crop/pad | pooled vector or token grid (usually 14x14) | Medium-High |
+| `dofa` | DOFA ViT (`base` / `large`, official checkpoints) | 10m | multi-band SR CHW + wavelengths | raw SR `0..10000` -> `0..255`-like scale -> official per-band mean/std; provide/infer wavelengths | bilinear resize to 224; explicitly no crop/pad | pooled vector or token grid (usually 14x14) | Medium-High |
 | `fomo` | FoMo `MultiSpectralViT` (FoMo-Bench) | 10m | S2 SR 12-band | clip `0..10000`; default `unit_scale` (optional minmax/none) | default 64; bilinear resize; no pad | token sequence pooled; grid as spectral-mean patch-token map | Medium |
 | `thor` | Fully vendored THOR runtime (`tiny` / `small` / `base` / `large`) | 10m | S2 SR 10-band | clip `0..10000`; default `thor_stats` z-score after reflectance scaling | default 288; bilinear resize; no pad | pooled tokens and grouped token grid | Medium-High |
 | `agrifm` | AgriFM `PretrainingSwinTransformer3DEncoder` | 10m | S2 10-band time series `[T,C,H,W]` | clip `0..10000`; default `agrifm_stats` z-score using official config stats | default 224; TCHW resize; no pad | feature map grid `[D,H,W]`, pooled by spatial mean/max | High |
 | `satvision` | `timm` `SwinTransformerV2` (SatVision-TOA checkpoints) | 1000m | TOA 14 channels in strict order | channel-aware normalization to `[0,1]` (`auto/raw/unit`, reflectance + emissive calibration) | default 128; bilinear resize; no pad | model output as pooled or grid depending on tensor shape | High (if band order and calibration match checkpoint) |
 
-Note:
-
-- "Default Fetch Resolution" refers to the default source/provider-side resolution used when fetching raw inputs.
-- It does not mean the final spatial size of the tensor after model-specific resize/crop/pad.
+Here, "Default Fetch Resolution" refers to the default source-side resolution used when fetching raw inputs. It does not mean the final spatial size of the tensor after model-specific resize, crop, or pad.
 
 ### Temporal Handling 
 
 Read this section before comparing any model that accepts `TemporalSpec.range(...)`.
 
-- For most on-the-fly adapters, `TemporalSpec.range(start, end)` means: filter imagery in `[start, end)`, then build one composite patch for model input (`median` by default, or `mosaic` if configured via `SensorSpec.composite`).
-- In these adapters, `meta.input_time` is typically the midpoint of the temporal window and is mainly metadata (or an auxiliary time signal for models that require it), not a guaranteed single-scene acquisition date.
-- Multi-frame adapters: `agrifm`, `anysat`, and `galileo` fetch TCHW sequences by splitting the requested range into sub-windows and compositing each sub-window into one frame.
-- Current single-composite adapters include: `remoteclip`, `satmae`, `satmaepp`, `satmaepp_s2_10b`, `scalemae`, `wildsat`, `prithvi`, `terrafm`, `terramind`, `dofa`, `fomo`, `thor`, and `satvision`.
+For most on-the-fly adapters, `TemporalSpec.range(start, end)` means "filter imagery in `[start, end)` and build one composite patch for model input," usually with `median` and optionally `mosaic` through `SensorSpec.composite`. In those adapters, `meta.input_time` is usually the midpoint of the requested window and should be read as metadata, or occasionally as an auxiliary time signal, rather than proof of a single-scene acquisition date.
+
+The multi-frame adapters `agrifm`, `anysat`, and `galileo` instead split the requested range into sub-windows and composite one frame per bin. Current single-composite adapters include `remoteclip`, `satmae`, `satmaepp`, `satmaepp_s2_10b`, `scalemae`, `wildsat`, `prithvi`, `terrafm`, `terramind`, `dofa`, `fomo`, `thor`, and `satvision`.
 
 ### Multi-frame Semantics
 
@@ -106,11 +76,7 @@ This section only matters for adapters that construct multi-frame inputs from on
 
 Shared behavior for current multi-frame adapters (`agrifm`, `anysat`, `galileo`):
 
-- Frame construction: split `TemporalSpec.range(start, end)` into `T` equal sub-windows (end-exclusive), then composite each sub-window into one frame.
-- Missing-observation fallback: if a sub-window has no valid image, provider path reuses a fallback composite so frame count remains stable.
-- Fixed frame count: runtime always ensures exact `T` frames for model input.
-  For user-provided `input_chw`, `CHW` is repeated to `T`, and `TCHW` is padded/truncated to `T`.
-- Sensor compositing policy: frame composite mode follows `SensorSpec.composite` (`median` default, `mosaic` optional).
+All three split `TemporalSpec.range(start, end)` into `T` equal end-exclusive sub-windows and composite each sub-window into one frame. If a sub-window has no valid observation, the provider path reuses a fallback composite so frame count stays stable. The runtime always enforces exactly `T` frames; for user-provided inputs that means `CHW` is repeated to `T` and `TCHW` is padded or truncated to `T`. Frame compositing follows `SensorSpec.composite`, with `median` as the default and `mosaic` as the main alternative.
 
 Per-model temporal packaging:
 
@@ -126,9 +92,7 @@ Use this table to avoid unfair comparisons between plain image encoders and adap
 
 Interpretation:
 
-- "Backbone multimodal" means the upstream foundation model family supports multiple modalities.
-- "Current rs-embed path" means what this implementation currently feeds in practice.
-- "Requires extra metadata" means additional non-image inputs required by the forward path (hard requirement).
+"Backbone multimodal" means the upstream model family supports multiple modalities. "Current rs-embed path" means what this implementation actually feeds today. "Requires extra metadata" means the forward path needs non-image inputs as a hard requirement.
 
 | Model ID | Backbone multimodal? | Current rs-embed path uses multiple modalities? | Multi-input forward (beyond image tensor)? | Requires extra metadata? |
 |---|---|---|---|---|
@@ -149,13 +113,7 @@ Interpretation:
 | `agrifm` | No (this adapter path) | No | No extra side tensor, but temporal stack `[T,C,H,W]` required | Temporal coverage is important (no separate metadata tensor) |
 | `satvision` | No (this adapter path) | No | No separate side tensor | Yes: strict 14-channel order/calibration schema (band semantics) |
 
-Practically multi-input models:
-
-- `prithvi`: image + temporal coords + location coords
-- `anysat`: image/time-series + date tokens (`s2_dates`)
-- `galileo`: image-derived tensors + masks + per-frame month tokens (`months`)
-- `dofa`: image + wavelength vector
-- `scalemae`: image + `input_res_m`
+In practice, the most obviously multi-input models here are `prithvi` (image plus temporal and location coordinates), `anysat` (time series plus `s2_dates`), `galileo` (image-derived tensors plus masks and `months`), `dofa` (image plus wavelengths), and `scalemae` (image plus `input_res_m`).
 
 ### Preprocessing and Temporal Env Vars
 
@@ -182,6 +140,4 @@ This table only lists env vars that materially change model input construction o
 
 ### Practical Guidance
 
-- For highest reproducibility, keep each model's default normalization mode unless you can match the original training pipeline exactly.
-- For strict-schema models (`satvision`, `terramind`, `thor`, `agrifm`), do not change channel order unless checkpoint metadata explicitly allows it.
-- If comparing embeddings across models, standardize ROI and temporal compositing first; model preprocessing differences are substantial.
+For highest reproducibility, keep each model's default normalization mode unless you can match the original training pipeline exactly. For strict-schema models such as `satvision`, `terramind`, `thor`, and `agrifm`, do not change channel order unless checkpoint metadata explicitly allows it. If you are comparing embeddings across models, standardize ROI and temporal compositing first, because preprocessing differences are substantial.

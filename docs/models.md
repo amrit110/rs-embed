@@ -1,22 +1,15 @@
 # Supported Models (Overview)
 
 This page is the model selection entry point.
-Use it to answer one question quickly:
+Use it to answer one question quickly: which model IDs should I shortlist for this task?
 
-- Which model IDs should I shortlist for this task?
-
-After you have a shortlist:
-
-- use [Advanced Model Reference](models_reference.md) for side-by-side preprocessing and temporal details
-- open the linked detail page for the exact contract, caveats, and examples
+Once you have a shortlist, use [Advanced Model Reference](models_reference.md) for side-by-side preprocessing and temporal details, then open the linked detail page for the exact contract, caveats, and examples.
 
 ---
 
 ## How To Read This Page
 
-1. Pick a shortlist from the quick chooser
-2. Scan the catalog table for input and temporal fit
-3. Open the detail page before benchmarking or production use
+Start with the quick chooser, then scan the catalog table for input and temporal fit, and open the detail page before benchmarking or production use.
 
 Canonical model IDs use the short public names shown on this page, such as `remoteclip`, `prithvi`, `terrafm`, and `thor`.
 Some detail-page filenames still use older names for compatibility, but the canonical IDs above are the names users should copy into code.
@@ -68,11 +61,9 @@ Some detail-page filenames still use older names for compatibility, but the cano
 
 ## Temporal and Comparison Notes (What People Usually Miss)
 
-- `TemporalSpec.range(start, end)` is usually a **window for compositing**, not a single-scene acquisition selector.
-- `OutputSpec.grid()` may be a **token/patch grid**, not a georeferenced raster grid (especially for ViT-like backbones).
-- Cross-model comparisons are easiest with `OutputSpec.pooled()` and fixed ROI/temporal/compositing settings.
-- "Default Resolution" on this page means the default source/provider fetch resolution, not the final resized tensor shape fed into the backbone.
-- Multi-frame models (`agrifm`, `anysat`, `galileo`) need extra attention to frame count and temporal side inputs.
+`TemporalSpec.range(start, end)` is usually a compositing window rather than a single-scene selector, and `OutputSpec.grid()` may be a token or patch grid rather than a georeferenced raster, especially for ViT-like backbones. Cross-model comparisons are usually easiest with `OutputSpec.pooled()` plus fixed ROI, temporal, and compositing settings.
+
+On this page, "Default Resolution" means the default source-side fetch resolution, not the final resized tensor shape sent into the backbone. Multi-frame models such as `agrifm`, `anysat`, and `galileo` also need extra attention to frame count and temporal side inputs.
 
 Read the details in [Supported Models (Advanced Reference)](models_reference.md).
 
@@ -80,5 +71,4 @@ Read the details in [Supported Models (Advanced Reference)](models_reference.md)
 
 ## More Detail
 
-- [Advanced Model Reference](models_reference.md): cross-model tables for preprocessing, temporal packaging, and env knobs
-- [Extending](extending.md): add a new model adapter and document it consistently
+For cross-model preprocessing, temporal packaging, and environment knobs, continue to [Advanced Model Reference](models_reference.md). If you are adding a new adapter, use [Extending](extending.md) to keep the implementation and documentation consistent.

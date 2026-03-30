@@ -21,17 +21,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- fast precomputed baselines using existing GeoTessera cache tiles
-- large-area ROI embedding extraction without model inference runtime
-- workflows where adapter tile mosaic/crop behavior is preferable to provider fetches
-
-### Be careful when
-
-- expecting arbitrary backends (`tessera` currently expects `backend="auto"`)
-- using `TemporalSpec.range(...)` and assuming exact temporal semantics (adapter picks the start year)
-- ROI crosses tiles with inconsistent CRS/resolution (adapter requires strict mosaic compatibility)
+Tessera is a strong choice for fast precomputed baselines, large-area ROI extraction without model inference runtime, and workflows that benefit from local tile mosaic and crop behavior rather than provider fetches. It is easy to misuse if you expect arbitrary backends, treat `TemporalSpec.range(...)` as exact temporal semantics, or work across tiles with incompatible CRS or resolution.
 
 ---
 
@@ -39,27 +29,15 @@
 
 ### Spatial
 
-Accepted `SpatialSpec`:
-
-- `BBox` (validated)
-- `PointBuffer` (converted to `BBox` in EPSG:4326 using approximate meter-to-degree conversion)
-
-Unsupported spatial types raise `ModelError`.
+The adapter accepts `BBox` directly and `PointBuffer`, which it converts to `BBox` in EPSG:4326 using an approximate meter-to-degree conversion. Unsupported spatial types raise `ModelError`.
 
 ### Temporal
 
-- `temporal=None` -> defaults to year `2021`
-- `TemporalSpec.year(...)` -> uses `temporal.year`
-- `TemporalSpec.range(start, end)` -> uses the year parsed from `start`
-
-This is a year selector for tile product lookup, not scene-level temporal filtering.
+`temporal=None` defaults to year `2021`. `TemporalSpec.year(...)` uses `temporal.year`, and `TemporalSpec.range(start, end)` uses the year parsed from `start`. This is a year selector for tile-product lookup, not scene-level temporal filtering.
 
 ### Backend / cache
 
-- backend should be `auto` (legacy `local` is accepted for compatibility)
-- adapter reads GeoTessera cache from:
-  - `RS_EMBED_TESSERA_CACHE`, or
-  - `sensor.collection="cache:/path/to/cache"` override
+The backend should be `auto`, although legacy `local` is still accepted for compatibility. The adapter reads the GeoTessera cache from `RS_EMBED_TESSERA_CACHE` or from a per-call override such as `sensor.collection="cache:/path/to/cache"`.
 
 ---
 
@@ -88,23 +66,13 @@ This is a year selector for tile product lookup, not scene-level temporal filter
 
 Non-env override:
 
-- `sensor.collection="cache:/path/to/cache"` overrides cache directory for the call
+`sensor.collection="cache:/path/to/cache"` overrides the cache directory for one call.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Pools cropped precomputed `CHW` grid over spatial dims:
-  - `mean` -> `mean_hw`
-  - `max` -> `max_hw`
-
-### `OutputSpec.grid()`
-
-- Returns cropped precomputed embedding grid as `xarray.DataArray` `(D,H,W)`
-- Grid is product pixel/grid space from the precomputed tiles (after adapter mosaic+crop)
-- Metadata includes crop/mosaic info (CRS, crop window, transform)
+Tessera follows the standard precomputed-product behavior. `pooled` applies spatial pooling over the cropped embedding grid, and `grid` returns the cropped `(D,H,W)` embedding grid in product pixel space after mosaic and crop rather than raw imagery space.
 
 ---
 
@@ -143,24 +111,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata `preferred_year`, `bbox_4326`, `chw_shape`
-- inspect crop metadata (`tile_crs`, `mosaic_hw`, `crop_px_window`)
-- try a larger ROI if no tiles are found
+Inspect `preferred_year`, `bbox_4326`, and `chw_shape` first, then inspect crop metadata such as `tile_crs`, `mosaic_hw`, and `crop_px_window`. If no tiles are found, try a larger ROI before assuming the cache is broken.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- GeoTessera cache snapshot/path
-- year selection logic (`year` vs `range(start, ...)`)
-- ROI geometry and CRS
-- output mode / pooling choice
+Keep the GeoTessera cache snapshot or path, year-selection logic, ROI geometry, CRS, and output mode fixed and recorded.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/precomputed_tessera.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/precomputed_tessera.py` for the adapter implementation.

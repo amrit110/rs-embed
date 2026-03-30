@@ -1,42 +1,39 @@
+# Extending rs-embed
 
-## Overview
+This page documents the extension contract for adding a new embedder.
 
-To add a new model, you typically do five things:
+In most cases, adding a model means:
 
-1. **Create an embedder class** in `src/rs_embed/embedders/`
-2. Decorate it with **`@register("your_model_name")`**
-3. Add it to `src/rs_embed/embedders/catalog.py` (`MODEL_SPECS`)
-4. Implement: `describe()`, `get_embedding(...)`
-5. (Optional, recommended) Override:
-    - `get_embeddings_batch(...)` for true batched inference (no prefetched inputs)
-    - `get_embeddings_batch_from_inputs(...)` for true batched inference with prefetched `input_chw`
+1. Create an embedder class in `src/rs_embed/embedders/`.
+2. Register it with `@register("your_model_name")`.
+3. Add it to `src/rs_embed/embedders/catalog.py` (`MODEL_SPECS`).
+4. Implement `describe()` and `get_embedding(...)`.
+5. Override batch methods when the model supports true batched inference.
 
-If you are also documenting the new model, use [Model Detail Template](model_detail_template.md) and keep the model page focused on:
+For on-the-fly models, also choose one fetch path:
 
-- expected inputs and band order
-- temporal behavior
-- preprocessing and env knobs
-- output semantics
-- caveats for fair comparison or reproducibility
+- declarative fetch via `input_spec = ModelInputSpec(...)`
+- custom fetch via `fetch_input(...)`
 
-Source of truth in code:
+Useful source-of-truth locations:
 
-- model catalog: `src/rs_embed/embedders/catalog.py` (`MODEL_SPECS`)
-- on-the-fly implementations: `src/rs_embed/embedders/onthefly_*.py`
-- precomputed implementations: `src/rs_embed/embedders/precomputed_*.py`
+- catalog: `src/rs_embed/embedders/catalog.py`
+- base contract: `src/rs_embed/embedders/base.py`
+- on-the-fly examples: `src/rs_embed/embedders/onthefly_*.py`
+- precomputed examples: `src/rs_embed/embedders/precomputed_*.py`
 
 ---
 
-## The Registry
+## Registration
 
-Models are discovered through the registry in `rs_embed.core.registry`:
+Models are discovered through `rs_embed.core.registry`.
 
 - `@register("name")` registers an embedder class.
 - `get_embedder_cls("name")` resolves the class.
 - `list_models()` lists models that have already been loaded in the current process.
 - `rs_embed.list_models()` returns the stable public model catalog from `MODEL_SPECS`.
 
-Model loading is **lazy**:
+Model loading is lazy:
 
 - `get_embedder_cls("name")` looks up `name` in `MODEL_SPECS`.
 - Then it imports the mapped module and reads the mapped class.
@@ -48,7 +45,7 @@ Model loading is **lazy**:
 
 ---
 
-## Embedder Contract
+## Embedder Interface
 
 All models implement `EmbedderBase`:
 
@@ -57,6 +54,7 @@ from rs_embed.embedders.base import EmbedderBase
 
 class EmbedderBase:
     def describe(self) -> dict: ...
+    def fetch_input(self, provider, *, spatial, temporal, sensor): ...
     def get_embedding(
         self,
         *,
@@ -67,26 +65,44 @@ class EmbedderBase:
         backend,
         device="auto",
         input_chw=None,
+        model_config=None,
     ): ...
-    def get_embeddings_batch(...): ...
-    def get_embeddings_batch_from_inputs(...): ...
+    def get_embeddings_batch(..., model_config=None): ...
+    def get_embeddings_batch_from_inputs(..., model_config=None): ...
 ```
+
+The stable extension points are:
+
+- `describe()` for capability metadata
+- `fetch_input(...)` for model-specific provider fetch behavior
+- `get_embedding(...)` for single-item inference
+- `get_embeddings_batch(...)` and `get_embeddings_batch_from_inputs(...)` for true batched inference
 
 ### `describe()`
 
-`describe()` should return a JSON-serializable dictionary describing capabilities and requirements. A typical structure is:
+`describe()` should return a small JSON-serializable capability dictionary. A typical shape is:
 
 ```python
 {
   "type": "on_the_fly" | "precomputed",
   "backend": ["provider" | "gee" | "auto" | "tensor", ...],
   "inputs": {
-    "sensor_required": true/false,
-    "default_sensor": {...} | null,
-    "notes": "..."
+    "collection": "COPERNICUS/S2_SR_HARMONIZED",
+    "bands": ["B4", "B3", "B2"],
+    # or, for models with a more specific provider-facing default:
+    "provider_default": {
+      "collection": "...",
+      "bands": [...]
+    }
   },
   "temporal": {"mode": "year" | "range"} | null,
   "output": ["pooled", "grid"],
+  "defaults": {
+    "scale_m": 10,
+    "cloudy_pct": 30,
+    "composite": "median",
+    "image_size": 224
+  },
   "model_config": {
     "variant": {
       "type": "string",
@@ -98,19 +114,19 @@ class EmbedderBase:
 ```
 
 !!! note
-    `describe()` should be **fast** and should not trigger heavy downloads or model loading.
-    In current rs-embed, `describe()["backend"]`, `describe()["output"]`, and `describe()["temporal"]`
-    may be used for runtime validation and capability checks.
-    If your model exposes public `model_config` keys, document them in `describe()["model_config"]`
-    with a JSON-serializable schema.
-    For model detail docs, surface those public keys near the top as well, for example in the
-    `Quick Facts` table as `Model config keys | \`variant\` (default: \`base\`; choices: \`base\`, \`large\`)`.
+    `describe()` must stay fast. It should not trigger checkpoint downloads, provider setup, or heavy model loading.
+
+Important fields currently consumed by rs-embed:
+
+- `backend`, `output`, and `temporal` for capability checks
+- `inputs`, `defaults`, `modalities`, or `_default_sensor()` for default-sensor resolution
+- `model_config` for public model-specific keyword settings such as `variant`
 
 ---
 
-## Template: Minimal Model (Hello World)
+## Minimal Skeleton
 
-This is the smallest possible embedder you can add. It returns a deterministic random vector.
+This is the smallest useful embedder pattern. It returns a deterministic vector and supports the current public contract.
 
 Create `src/rs_embed/embedders/toy_model.py`:
 
@@ -124,6 +140,7 @@ import numpy as np
 
 from rs_embed.core.registry import register
 from rs_embed.core.embedding import Embedding
+from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import SpatialSpec, TemporalSpec, SensorSpec, OutputSpec
 from rs_embed.embedders.base import EmbedderBase
 
@@ -134,7 +151,6 @@ class ToyModelV1(EmbedderBase):
         return {
             "type": "precomputed",
             "backend": ["auto"],  # use "provider"/"gee" for on-the-fly fetchers
-            "inputs": {"sensor_required": False, "default_sensor": None},
             "output": ["pooled"],
         }
 
@@ -148,6 +164,7 @@ class ToyModelV1(EmbedderBase):
         backend: str = "auto",
         device: str = "auto",
         input_chw: Optional[np.ndarray] = None,
+        model_config: Optional[Dict[str, Any]] = None,
     ) -> Embedding:
         # Use a stable hash so results are reproducible across processes.
         seed_bytes = hashlib.blake2s(
@@ -158,13 +175,14 @@ class ToyModelV1(EmbedderBase):
         rng = np.random.default_rng(seed)
 
         if output.mode != "pooled":
-            raise ValueError("toy_model_v1 only supports pooled output")
+            raise ModelError("toy_model_v1 only supports pooled output")
 
         vec = rng.standard_normal(512).astype("float32")
         meta = {
             "model": self.model_name,
             "backend": backend,
             "device": device,
+            "model_config": model_config,
             "spatial": asdict(spatial),
             "temporal": asdict(temporal) if temporal else None,
         }
@@ -179,41 +197,66 @@ MODEL_SPECS["toy_model_v1"] = ("toy_model", "ToyModelV1")
 
 ---
 
-## On-the-fly Models (GEE patch → model → embedding)
+## On-the-fly Models
 
-Most vision models in rs-embed work like this:
+Most on-the-fly embedders follow this flow:
 
 1. Use a provider (e.g., Earth Engine) to fetch an **input patch** (CHW numpy).
 2. Preprocess it (normalize/resample).
 3. Run inference.
 4. Return `Embedding(data=..., meta=...)`.
 
-### Recommended pattern
+Recommended extension pattern:
 
-- Use `SensorSpec` to define:
-  - collection
-  - bands
-  - scale_m
-  - composite strategy
-- Use the provider to fetch inputs.
+- If generic provider fetching is enough, prefer declaring
+  `input_spec = ModelInputSpec(...)` on the embedder. That lets the base
+  `fetch_input()` implementation handle provider fetch + normalization.
+- If your model needs custom fetch logic, fallback chains, multi-sensor routing,
+  or fetch-time metadata, override `fetch_input(...)`.
+- Use `SensorSpec` and model defaults so API-level `fetch=...`, `sensor=...`,
+  and `modality=...` resolution can reuse your model cleanly.
 
 You can follow existing implementations in:
 - `rs_embed/embedders/onthefly_*.py`
 
 !!! tip
-    Keep network IO (fetching patches) separate from model inference whenever possible.
-    This makes batching and caching much easier.
+    Keep provider IO separate from model inference whenever possible. That makes batching, caching, and export reuse simpler.
 
 ---
 
-## Supporting `export_batch` Input Reuse (`input_chw`)
+## Vendored Runtime Code
+
+If a model depends on upstream runtime code that is easier to vendor than to wrap as an external package dependency, place that code under `src/rs_embed/embedders/_vendor/`.
+
+Typical patterns:
+
+- a single vendored module such as `_vendor/prithvi_mae.py`
+- a small vendored package such as `_vendor/anysat/` or `_vendor/thor/`
+
+Recommended layout:
+
+- keep the adapter itself in `onthefly_<model>.py` or `precomputed_<model>.py`
+- keep vendored upstream runtime code in `_vendor/`
+- keep vendored code minimally patched and document any rs-embed-specific changes in comments or a short local note
+
+License and dependency notes may live alongside the vendored runtime:
+
+- add the upstream license text under `_vendor/`, for example `LICENSE.<model>` or a package-local `LICENSE`
+- include `NOTICE` or attribution material when the upstream project requires it
+- if the vendored runtime still needs third-party Python packages at import or runtime, document those requirements close to the vendored code and surface the user-facing install error from the adapter with `ModelError`
+
+`_vendor/` is an implementation area, not a public API surface. Public behavior should remain defined by the adapter, `describe()`, and the stable rs-embed APIs.
+
+---
+
+## Input Reuse
 
 `export_batch` can prefetch the input patch once and reuse it for both:
 
 - saving `inputs`
 - computing `embeddings`
 
-To benefit from this optimization, your `get_embedding` should follow this rule:
+Contract:
 
 > If `input_chw` is provided, **do not fetch inputs again**. Use `input_chw` as the model input.
 
@@ -221,7 +264,7 @@ Example snippet:
 
 ```python
 if input_chw is None:
-    # fetch from backend/provider
+    # fetch from backend/provider, or via your custom fetch_input(...)
     input_chw = provider.fetch_array_chw(...)
 # now preprocess + infer using input_chw
 ```
@@ -231,13 +274,13 @@ if input_chw is None:
 
 ---
 
-## True Batch Inference (`get_embeddings_batch` / `get_embeddings_batch_from_inputs`)
+## Batch Methods
 
 `EmbedderBase.get_embeddings_batch` defaults to a Python loop calling `get_embedding`.  
 `EmbedderBase.get_embeddings_batch_from_inputs` defaults to a Python loop calling
 `get_embedding(..., input_chw=...)`.
 
-If your model supports vectorized/batched inference (common for torch models), override one or both:
+Override one or both when the model supports true vectorized inference:
 
 ```python
 def get_embeddings_batch(
@@ -246,6 +289,7 @@ def get_embeddings_batch(
     spatials,
     temporal=None,
     sensor=None,
+    model_config=None,
     output=OutputSpec.pooled(),
     backend="gee",
     device="auto",
@@ -256,7 +300,7 @@ def get_embeddings_batch(
     # 4) split outputs back into Embedding objects
 ```
 
-If your model supports `input_chw` reuse (recommended for on-the-fly models), also consider:
+If your model supports prefetched inputs, also consider:
 
 ```python
 def get_embeddings_batch_from_inputs(
@@ -266,6 +310,7 @@ def get_embeddings_batch_from_inputs(
     input_chws,
     temporal=None,
     sensor=None,
+    model_config=None,
     output=OutputSpec.pooled(),
     backend="auto",
     device="auto",
@@ -279,14 +324,15 @@ def get_embeddings_batch_from_inputs(
 provider inputs available, so overriding this method usually gives the biggest speedup for
 on-the-fly models.
 
-Best practice:
+General guidance:
+
 - Batch **inference** (GPU-friendly).
 - Parallelize **IO** (provider fetch) with threads if needed.
-- Keep memory stable by using chunking (see `export_batch(chunk_size=...)`).
+- Keep memory stable by using chunking (see `ExportConfig(chunk_size=...)` in `export_batch(...)`).
 
 ---
 
-## Handling `OutputSpec` (pooled vs grid)
+## Output Modes
 
 `OutputSpec` controls output shape:
 
@@ -297,15 +343,16 @@ If your model does not support a mode, raise a clear error:
 
 ```python
 if output.mode == "grid" and not supported:
-    raise ValueError("model_x does not support grid output")
+    raise ModelError("model_x does not support grid output")
 ```
 
 ---
 
-## Optional Dependencies (Packaging)
+## Optional Dependencies
 
 Many embedders rely on optional packages (e.g., `torch`, `ee`).  
-Follow this pattern:
+
+Recommended pattern:
 
 - Import heavy dependencies **inside** methods or within a `try/except` at module import.
 - If the dependency is missing, raise a **helpful** error (`ModelError`) explaining what to install.
@@ -328,11 +375,13 @@ def _require_torch():
 
 ---
 
-## Testing Your New Model
+## Testing
 
-### 1) Registry test (fast)
+Minimum test coverage:
 
-Add a test ensuring registration works:
+### Registry
+
+Add a small test ensuring registration works:
 
 ```python
 from rs_embed.core.registry import get_embedder_cls
@@ -342,7 +391,7 @@ def test_toy_model_registered():
     assert cls is not None
 ```
 
-### 2) API-level test (recommended)
+### API-level
 
 ```python
 from rs_embed import PointBuffer, TemporalSpec, OutputSpec, get_embedding
@@ -358,7 +407,7 @@ def test_toy_model_get_embedding():
     assert emb.data.shape == (512,)
 ```
 
-### 3) Export integration test (optional)
+### Export integration
 
 If your model supports input reuse and batch export, add a small `export_batch` test using `monkeypatch` to avoid real network calls.  
 See existing patterns in:
@@ -373,23 +422,28 @@ pytest -q
 
 ---
 
-## Documenting the Model
+## Documentation
 
-Update docs in one of these places:
+Update docs in these places as needed:
 
-- `docs/models.md` (add model name and usage)
+- `docs/models.md` for the overview table / entry point
+- `docs/models/<model>.md` for the detailed model page
+- `docs/models_reference.md` if the model adds important preprocessing or comparison caveats
+
+Use [Model Detail Template](model_detail_template.md) for the detailed page structure.
 
 
 ---
 
 ## Checklist
 
-Before opening a PR / shipping the model:
+Before opening a PR:
 
 - [ ] `@register("...")` added and entry added in `src/rs_embed/embedders/catalog.py`
 - [ ] `describe()` is fast and accurate
+- [ ] on-the-fly fetch path is defined through `input_spec` or `fetch_input(...)`
 - [ ] `get_embedding()` supports `input_chw` reuse (if on-the-fly)
 - [ ] override `get_embeddings_batch_from_inputs()` if your model can batch prefetched inputs
 - [ ] clear errors for missing optional dependencies
 - [ ] unit tests added (`pytest -q` passes)
-- [ ] minimal usage example in docs or notebook
+- [ ] docs updated (`models.md`, model detail page, and reference pages if needed)

@@ -23,10 +23,7 @@ emb = get_embedding(
 )
 ```
 
-- you are prototyping
-- you want to inspect metadata
-- you are debugging model behavior on one location
-- you may want a quick resolution override via `fetch=FetchSpec(...)`
+This is the right path when you are prototyping, inspecting metadata, debugging one location, or applying a quick sampling override through `fetch=FetchSpec(...)`.
 
 ---
 
@@ -51,9 +48,7 @@ embs = get_embeddings_batch(
 )
 ```
 
-- same model, many points
-- you want simpler code than manual loops
-- you may benefit from embedder-level batch inference
+This path is best when the model is fixed, the ROI list is larger than one point, and you want simpler code than a manual loop while still benefiting from any embedder-level batch inference.
 
 ---
 
@@ -81,12 +76,7 @@ export_batch(
 )
 ```
 
-- Stable ROI names make exports/manifests easier to track.
-- Apply one temporal policy consistently across all items for fair comparisons.
-- Mix multiple models in one export job when building benchmark datasets.
-- `per_item` keeps each ROI grouped together; useful for inspection and resume.
-- Move runtime knobs into `ExportConfig(...)` instead of adding more top-level keywords.
-- Use one shared `FetchSpec` when you want to normalize resolution/compositing across models.
+Stable ROI names make exports and manifests easier to track. Keep one temporal policy across all items for fair comparisons, and mix multiple models in one job when you are building benchmark datasets. `per_item` keeps each ROI grouped together, which helps with inspection and resume. Move runtime knobs into `ExportConfig(...)` rather than adding more top-level keywords, and use one shared `FetchSpec` when you want to normalize resolution or compositing across models.
 
 ---
 
@@ -113,7 +103,7 @@ report = inspect_provider_patch(
 
 ### Backward-compatible alias
 
-- `inspect_gee_patch(...)` calls the same underlying inspection flow for GEE paths.
+`inspect_gee_patch(...)` calls the same underlying inspection flow for GEE paths.
 
 ---
 
@@ -134,23 +124,13 @@ emb = get_embedding(
 )
 ```
 
-Use `input_prep="tile"` when:
-
-- `OutputSpec.grid()` matters
-- large ROI resize would lose too much detail
-- you accept extra runtime cost for better spatial structure preservation
+Use `input_prep="tile"` when `OutputSpec.grid()` matters, when a large-ROI resize would lose too much detail, and when you accept extra runtime cost in exchange for better spatial structure preservation.
 
 ---
 
 ## Fair Cross-Model Comparison
 
-When benchmarking models, prefer:
-
-- same ROI list
-- same temporal window
-- same compositing policy (`SensorSpec.composite`)
-- `OutputSpec.pooled()` first
-- default model normalization unless replicating original training setup
+When benchmarking models, keep the ROI list, temporal window, and compositing policy fixed, start with `OutputSpec.pooled()`, and prefer each model's default normalization unless you are deliberately replicating an original training setup.
 
 Then use [Supported Models](models.md) to review model-specific preprocessing and required side inputs.
 
@@ -158,7 +138,4 @@ Then use [Supported Models](models.md) to review model-specific preprocessing an
 
 ## See Also
 
-- [Quickstart](quickstart.md): first-run setup and the three core APIs
-- [Concepts](concepts.md): semantic meaning of temporal, output, backend, and sensor
-- [Models](models.md): model capability matrix and detail links
-- [API](api.md): exact signatures and parameter docs
+See [Quickstart](quickstart.md) for first-run setup, [Concepts](concepts.md) for the semantic meaning of temporal, output, backend, and sensor, [Models](models.md) for the capability matrix and detail links, and [API](api.md) for exact signatures and parameter docs.

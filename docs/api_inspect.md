@@ -2,11 +2,7 @@
 
 This page documents raw input inspection utilities (patch checks) used before model inference.
 
-Related pages:
-
-- [API: Specs and Data Structures](api_specs.md)
-- [API: Embedding](api_embedding.md)
-- [API: Export](api_export.md)
+Related reference pages: [API: Specs and Data Structures](api_specs.md), [API: Embedding](api_embedding.md), and [API: Export](api_export.md).
 
 ---
 
@@ -51,8 +47,7 @@ It performs the same input quality checks (**without running the model**).
 
 **Returns**
 
-- A JSON-serializable dict with `ok`, `report`, `sensor`, `temporal`, `backend`, and optional `artifacts` quicklook save paths.
-- If `return_array=True`, the result also includes `array_chw` (numpy array, not JSON-serializable).
+The function returns a JSON-serializable dict containing `ok`, `report`, `sensor`, `temporal`, `backend`, and optional quicklook save paths under `artifacts`. When `return_array=True`, the result also includes `array_chw`, which is a NumPy array and therefore not JSON-serializable.
 
 **Example**
 

@@ -1,17 +1,9 @@
 # Quickstart
 
 This page is the shortest path from installation to a first successful run.
-It focuses on the three core APIs most users need:
+It focuses on the three core APIs most users need: `get_embedding(...)`, `get_embeddings_batch(...)`, and `export_batch(...)`.
 
-- `get_embedding(...)`
-- `get_embeddings_batch(...)`
-- `export_batch(...)`
-
-Use this page top-to-bottom once. After that:
-
-- go to [Models](models.md) to choose model IDs
-- go to [API](api.md) for exact signatures and edge cases
-- go to [Extending](extending.md) if you want to add a model
+Use this page top-to-bottom once. After that, go to [Models](models.md) to choose model IDs, [API](api.md) for exact signatures and edge cases, and [Extending](extending.md) only if you want to add a model.
 
 Canonical model IDs use short names such as `tessera`, `remoteclip`, and `prithvi`.
 Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use the short names.
@@ -20,90 +12,27 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 
 ## Install
 
-
-
 For local development from the repository:
 
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
-pip install -e ".[dev]"
+pip install -e .
 ```
 
-Repository examples: `examples/playground.ipynb`, `examples/quickstart.py`
+For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`):
 
+```bash
+pip install -e ".[terratorch]"
+```
 
+Repository examples are available in `examples/playground.ipynb` and `examples/quickstart.py`.
 
 If this is your first time using Google Earth Engine, authenticate once:
 
 ```bash
 earthengine authenticate
 ```
-
----
-
-## Run the Example Script
-
-The repository example script is the fastest way to verify your environment after cloning this repo.
-
-```bash
-python examples/quickstart.py --help
-```
-
-### Precomputed path (`backend="auto"`)
-
-This path uses `tessera` and does not require GEE authentication.
-
-```bash
-python examples/quickstart.py --mode auto
-python examples/quickstart.py --mode auto --run-export
-```
-
-### On-the-fly path (`backend="gee"`)
-
-Authenticate Earth Engine first if this is your first time:
-
-```bash
-earthengine authenticate
-```
-
-Then run the GEE demo:
-
-```bash
-python examples/quickstart.py --mode gee --device auto
-python examples/quickstart.py --mode gee --run-export --out-dir examples/_outputs/quickstart
-```
-
-### Run both
-
-```bash
-python examples/quickstart.py --mode all
-python examples/quickstart.py --mode all --run-export
-```
-
-!!! tip
-    If you see `ModuleNotFoundError: No module named 'rs_embed'`, run `pip install -e .` from the repository root.
-
----
-
-## Minimal Mental Model
-
-Before looking at the APIs, keep these three ideas in mind:
-
-- `spatial`: where to extract from, usually `PointBuffer(...)` or `BBox(...)`
-- `temporal`: when to extract from, either `TemporalSpec.year(...)` or `TemporalSpec.range(...)`
-- `output`: what shape you want, usually `OutputSpec.pooled()` first
-
-For on-the-fly models, there is one more practical knob:
-
-- `fetch`: how imagery should be sampled, usually `FetchSpec(scale_m=..., cloudy_pct=...)`
-
-Two details matter a lot:
-
-- `TemporalSpec.range(start, end)` is usually a time window for filtering and compositing, not a guarantee of one exact acquisition date.
-- `OutputSpec.grid()` is often a model patch/token grid, not always a georeferenced raster grid.
-
-If you want the full semantics, read [API: Specs and Data Structures](api_specs.md).
 
 ---
 
@@ -189,6 +118,17 @@ For new code, `target=ExportTarget(...)` plus `config=ExportConfig(...)` is the 
 
 ---
 
+## Repository Examples
+
+The repository also includes optional runnable examples:
+
+- `examples/quickstart.py` for a small end-to-end script
+- `examples/playground.ipynb` for notebook-style exploration
+
+These are examples, not the primary usage path. For normal library use, start from the API snippets above.
+
+---
+
 ## When You Need GEE or Model Debugging
 
 Use GEE-backed on-the-fly models when you want to fetch imagery and run model inference directly.
@@ -196,14 +136,10 @@ Typical examples include `remoteclip`, `prithvi`, `terrafm`, and `terramind`.
 
 If the model output looks wrong, inspect the fetched patch before changing model settings:
 
-- [`inspect_provider_patch(...)`](api_inspect.md#inspect_provider_patch-recommended): recommended inspection API
-- [`inspect_gee_patch(...)`](api_inspect.md#inspect_gee_patch): compatibility alias
+[`inspect_provider_patch(...)`](api_inspect.md#inspect_provider_patch) is the recommended inspection API, while [`inspect_gee_patch(...)`](api_inspect.md#inspect_gee_patch) remains available as a compatibility alias.
 
 ---
 
 ## What To Read Next
 
-- [Models](models.md): choose the right model and check its input assumptions
-- [API](api.md): exact signatures for specs, embedding, export, and inspect
-- [Concepts](concepts.md): deeper explanation of temporal and output semantics
-- [Workflows](workflows.md): extra recipes for tiling, inspection, and fair comparison
+From here, use [Models](models.md) to choose the right model and verify its input assumptions, [API](api.md) for exact signatures and edge cases, [Concepts](concepts.md) for temporal and output semantics, and [Workflows](workflows.md) for extra recipes around tiling, inspection, and fair comparison.

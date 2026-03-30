@@ -1,6 +1,6 @@
 ![rs-embed banner](assets/banner.png)
 
-> One line of code to get embeddings from **any Remote Sensing Foundation Model (RSFM)** for **any location** and **any time**
+> One line of code to get embeddings from **any Remote Sensing Foundation Model (RSFM)** for **any place** and **any time**
 
 ---
 
@@ -9,12 +9,7 @@
 ![rs-embed background](assets/background.png)
 
 The remote sensing community has seen an explosion of foundation models in recent years.
-Yet, using them in practice remains surprisingly painful:
-
-- Inconsistent model interfaces: imagery models vs. precomputed embedding products
-- Ambiguous input semantics: patch vs. tile vs. grid vs. pooled output
-- Large differences in temporal, spectral, and spatial assumptions
-- No clean way to benchmark multiple models under one API
+Yet, using them in practice remains surprisingly painful. Model interfaces vary widely between imagery models and precomputed embedding products, input semantics are often ambiguous, and temporal, spectral, and spatial assumptions differ enough that cross-model comparison becomes tedious. In practice, even simple benchmarking can turn into glue-code work.
 
 RS-Embed aims to fix this.
 
@@ -25,36 +20,22 @@ RS-Embed aims to fix this.
 
 ## Start Here
 
-### Get something running
+Use the documentation the same way you would approach a mature library: start with one successful run, choose a model only after you understand the core API shape, and drop into the reference when you need exact contracts.
 
-- [Quickstart](quickstart.md): install the package, run a first example, and learn the three core APIs
-
-### Choose a model
-
-- [Models](models.md): shortlist model IDs by task, input type, and temporal behavior
-
-### Exact signatures
-
-- [API](api.md): exact signatures for specs, embedding, export, and inspection
-
-### Support for a new model
-
-- [Extending](extending.md): add a new model adapter or integrate with the registry/export flow
+| Start here if you want to... | Page |
+|---|---|
+| get something running quickly | [Quickstart](quickstart.md): install the package, run a first example, and learn the three core APIs |
+| choose a model | [Models](models.md): shortlist model IDs by task, input type, and temporal behavior |
+| check exact signatures | [API](api.md): exact signatures for specs, embedding, export, and inspection |
+| add support for a new model | [Extending](extending.md): add a new model adapter or integrate with the registry/export flow |
 
 ---
 
 ## Why rs-embed
-- Support embedding acquisition for any place and time, flexibly assist your downstream tasks
 
-- Supports simple usage, as well as highly customizable features
+rs-embed is designed to make embedding acquisition work the same way whether you are probing one location once or building a large benchmark dataset. The public surface stays small enough for quick use, but still exposes the controls you need for fetch policy, output shape, export configuration, and model-specific options.
 
-- **Scale from single regions to massive datasets** built around three functions:
-
-    - `get_embedding(...)`
-    - `get_embeddings_batch(...)`   
-    - `export_batch(...)`
-
-- Detailed documentation support
+Most workflows revolve around three functions: `get_embedding(...)` for one ROI, `get_embeddings_batch(...)` for repeated inference with one model, and `export_batch(...)` for dataset or benchmark generation. The rest of the documentation expands on those paths rather than introducing a second parallel abstraction layer.
 
 ---
 
@@ -72,7 +53,4 @@ RS-Embed aims to fix this.
 
 ## Advanced Reading
 
-- [Concepts](concepts.md): deeper semantics for `TemporalSpec`, `OutputSpec`, and backends
-- [Workflows](workflows.md): extra task-oriented recipes beyond the quickstart path
-- [Advanced Model Reference](models_reference.md): detailed preprocessing and temporal comparison tables
-- [Limitations](limitations.md): current constraints and edge cases
+Once the basic flow is familiar, read [Concepts](concepts.md) for the semantics behind `TemporalSpec`, `OutputSpec`, and backends, then use [Workflows](workflows.md) for task-oriented recipes. [Advanced Model Reference](models_reference.md) goes deeper on preprocessing and temporal assumptions, while [Limitations](limitations.md) collects current constraints and edge cases.

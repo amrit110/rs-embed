@@ -21,17 +21,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- temporal S2 sequence modeling with explicit month tokens
-- comparisons against other multi-frame adapters (`anysat`, `agrifm`)
-- feature-grid analysis over Galileo S2-related token groups
-
-### Be careful when
-
-- comparing to single-composite models without matching temporal assumptions
-- changing `image_size` / `patch_size` inconsistently (`image_size` must divide by `patch_size`)
-- changing month handling (`RS_EMBED_GALILEO_MONTH`) without documenting it
+Galileo is a good fit for temporal S2 sequence modeling with explicit month tokens, comparisons against other multi-frame adapters such as `anysat` and `agrifm`, and feature-grid analysis over Galileo's S2-related token groups. The main pitfalls are comparing it to single-composite models without matching temporal assumptions, changing `image_size` and `patch_size` inconsistently, or changing month handling without documenting it.
 
 ---
 
@@ -39,26 +29,13 @@
 
 ### Spatial / temporal
 
-- `SpatialSpec`: `BBox` or `PointBuffer`
-- `TemporalSpec`: normalized to range via shared helper (`range` recommended for reproducibility)
-- Adapter builds `T` frames by splitting the temporal window into equal sub-windows and compositing each frame
-- Month side input:
-  - default: derived from frame-bin midpoints
-  - optional override: `RS_EMBED_GALILEO_MONTH` (constant month for all frames)
+The adapter accepts `BBox` and `PointBuffer`, and normalizes `TemporalSpec` to a range through the shared helper; `TemporalSpec.range(...)` is still the clearest choice for reproducibility. Galileo builds `T` frames by splitting the requested window into equal sub-windows and compositing one frame per bin. The `months` side input is derived from frame-bin midpoints unless you force a constant month with `RS_EMBED_GALILEO_MONTH`.
 
 ### Sensor / channels
 
-Default `SensorSpec` if omitted:
+If `sensor` is omitted, Galileo uses `COPERNICUS/S2_SR_HARMONIZED` with bands `B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: 10-band S2 set used by adapter (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`)
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
-
-`input_chw` contract:
-
-- accepts `CHW` (`C=10`) or `TCHW` (`C=10`) through shared coercion helper
-- `CHW` repeats to `T`; `TCHW` pads/truncates to exact `T`
-- values are clipped to raw-SR range `0..10000`
+For `input_chw`, the adapter accepts `CHW` or `TCHW` with `C=10` through the shared coercion helper. `CHW` repeats to `T`, `TCHW` pads or truncates to exact `T`, and values are clipped to the raw-SR range `0..10000`.
 
 ---
 
@@ -80,7 +57,7 @@ Default `SensorSpec` if omitted:
 
 Constraint:
 
-- `image_size % patch_size == 0` is required
+`image_size % patch_size == 0` is required.
 
 ---
 
@@ -108,14 +85,11 @@ Constraint:
 
 ### `OutputSpec.pooled()`
 
-- Default pooled path uses Galileo pooled token output (`token_mean` semantics in metadata)
-- If `OutputSpec.pooling="max"`, adapter max-pools the produced grid instead (`grid_max`)
+The default pooled path uses Galileo's pooled token output, recorded with `token_mean` semantics in metadata. If `OutputSpec.pooling="max"`, the adapter max-pools the produced grid instead and records `grid_max`.
 
 ### `OutputSpec.grid()`
 
-- Returns S2-related Galileo space-time-group patch tokens as `xarray.DataArray` `(D,H,W)`
-- Grid is produced by selecting S2 groups and averaging over time + channel-group axes
-- This is model token structure, not georeferenced raster pixels
+`OutputSpec.grid()` returns S2-related Galileo space-time-group patch tokens as `xarray.DataArray` `(D,H,W)`. The grid is produced by selecting S2 groups and averaging over time and channel-group axes. This is model token structure rather than georeferenced raster space.
 
 ---
 
@@ -159,25 +133,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- verify temporal window/frame count and month sequence in metadata
-- inspect raw inputs before changing normalization or model settings
+Verify temporal window, frame count, and month sequence in metadata first. Inspect raw inputs before changing normalization or model settings.
 
 ---
 
 ## Reproducibility Notes
 
-Record and keep fixed:
-
-- temporal window and `RS_EMBED_GALILEO_FRAMES`
-- `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`
-- normalization mode / NDVI inclusion
-- month override (if any)
-- model source (local model path or HF repo/model size)
+Keep the temporal window, `RS_EMBED_GALILEO_FRAMES`, `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`, normalization mode, NDVI inclusion, month override, and model source fixed and recorded.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_galileo.py`
-- Shared TCHW coercion helper: `src/rs_embed/embedders/runtime_utils.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration, `src/rs_embed/embedders/onthefly_galileo.py` for the adapter, and `src/rs_embed/embedders/runtime_utils.py` for shared TCHW coercion.

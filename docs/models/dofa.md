@@ -22,17 +22,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- multispectral experiments where wavelength-aware modeling matters
-- custom sensor/band combinations (if you provide matching wavelengths)
-- comparing spectral models against S2-specific models
-
-### Be careful when
-
-- wavelengths are missing or mismatched with channels
-- assuming arbitrary bands can be inferred automatically (only known sets like S2 are inferable)
-- comparing results without logging `variant` and wavelengths used
+DOFA is the right choice when wavelength-aware multispectral modeling matters, when you need custom band combinations with matching wavelengths, or when you want to compare spectral models against more S2-specific adapters. The main failure mode is semantic mismatch: missing wavelengths, wrong wavelength-to-channel alignment, or unlogged changes to `variant` and wavelength configuration will all make results hard to trust.
 
 ---
 
@@ -40,36 +30,23 @@
 
 ### Spatial / temporal
 
-- Provider path requires `TemporalSpec.range(start, end)`
-- Tensor path does not use provider/temporal fetch semantics
+The provider path requires `TemporalSpec.range(start, end)`. The tensor path bypasses provider fetch entirely, so temporal semantics only matter insofar as they shaped the tensor you prepared.
 
 ### Sensor / channels (provider path)
 
-Default `SensorSpec` if omitted:
-
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: official DOFA S2 9-band order (`B4,B3,B2,B5,B6,B7,B8,B11,B12`)
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
+If `sensor` is omitted, the provider path uses `COPERNICUS/S2_SR_HARMONIZED` with the official DOFA S2 9-band order `B4,B3,B2,B5,B6,B7,B8,B11,B12`, plus `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`.
 
 Wavelengths:
 
-- Adapter requires one wavelength (µm) per channel
-- If `sensor.wavelengths` is not provided, adapter tries to infer from `sensor.bands`
-- `len(wavelengths_um)` must equal channel count `C`
-- official preprocessing currently only supports subsets/re-orderings of the default DOFA S2 9-band set
+The adapter requires one wavelength in micrometers per channel. If `sensor.wavelengths` is not provided, it tries to infer wavelengths from `sensor.bands`, but only known schemas such as the supported Sentinel-2 subsets are inferable. `len(wavelengths_um)` must always match the channel count `C`.
 
 `input_chw` contract (provider override path):
 
-- must be `CHW` with `C == len(bands)`
-- raw SR values expected (`0..10000`)
+If you override fetch with `input_chw`, it must be `CHW` with `C == len(bands)` and raw SR values in `0..10000`.
 
 ### Tensor backend contract
 
-- `backend="tensor"` requires `input_chw` as `CHW`
-- batch tensor inputs should use `get_embeddings_batch_from_inputs(...)`
-- `sensor.bands` is required so official preprocessing can be applied
-- `sensor.wavelengths` should be provided, or `sensor.bands` must allow wavelength inference
-- `input_chw` is expected to contain raw SR values (`0..10000`), not pre-normalized `[0,1]`
+For `backend="tensor"`, `input_chw` must be `CHW`, and batch tensor usage should go through `get_embeddings_batch_from_inputs(...)`. `sensor.bands` is required so the official preprocessing path can be applied, and `sensor.wavelengths` should either be provided directly or be inferable from the bands. The tensor is expected to hold raw SR values in `0..10000`, not pre-normalized `[0,1]`.
 
 ---
 
@@ -80,7 +57,7 @@ Wavelengths:
 1. Fetch raw multiband Sentinel-2 SR patch
 2. Optional input inspection on raw SR (`expected_channels=len(bands)`, value range `[0,10000]`)
 3. Convert raw SR `0..10000` to `0..255`-like scale
-4. Apply official DOFA S2 per-band mean/std normalization
+4. Apply official DOFA S2 per-band mean/std normalization on that `0..255`-like tensor
 5. Resize to fixed `224x224` (bilinear; no crop/pad)
 6. Load DOFA model variant (`base` / `large`)
 7. Forward with image tensor + wavelength vector
@@ -89,15 +66,18 @@ Wavelengths:
 ### Tensor path
 
 1. Read raw SR `input_chw` (`CHW`)
-2. Apply the same official DOFA S2 per-band normalization used by the provider path
-3. Resize to `224x224`
-4. Resolve wavelengths from `sensor.wavelengths` or infer from `sensor.bands`
-5. Forward DOFA with image + wavelengths
+2. Reject already-normalized `[0,1]`-like inputs
+3. Apply the same official DOFA S2 preprocessing used by the provider path:
+   - raw SR `0..10000` -> `[0,1]`
+   - rescale to `0..255`-like values
+   - apply official per-band mean/std normalization
+4. Resize to `224x224`
+5. Resolve wavelengths from `sensor.wavelengths` or infer from `sensor.bands`
+6. Forward DOFA with image + wavelengths
 
 Fixed adapter behavior:
 
-- image size fixed to `224` in current implementation
-- current official preprocessing path is defined for Sentinel-2 subsets of `B4,B3,B2,B5,B6,B7,B8,B11,B12`
+The current implementation fixes image size at `224`, and the official preprocessing path is defined for Sentinel-2 subsets of `B4,B3,B2,B5,B6,B7,B8,B11,B12`.
 
 ---
 
@@ -107,34 +87,27 @@ Fixed adapter behavior:
 |---|---|---|
 | `RS_EMBED_DOFA_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
 | `RS_EMBED_DOFA_BATCH_SIZE` | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs |
+| `RS_EMBED_DOFA_BASE_WEIGHTS` | unset | Local override for the base checkpoint file |
+| `RS_EMBED_DOFA_LARGE_WEIGHTS` | unset | Local override for the large checkpoint file |
+| `RS_EMBED_DOFA_WEIGHTS_DIR` | unset | Directory override containing DOFA checkpoint files |
+| `RS_EMBED_DOFA_HF_REPO_ID` | `earthflow/DOFA` | Hugging Face repo used for checkpoint download |
+| `RS_EMBED_DOFA_HF_REVISION` | `main` | Hugging Face revision used for checkpoint download |
 
 Non-env model selection knobs:
 
-- `variant`: `base` / `large` (default: `base`)
-- `sensor.bands`: channel semantics for provider fetch and wavelength inference
-- `sensor.wavelengths`: explicit wavelength vector (µm)
+The main non-env knobs are `variant` (`base` or `large`), `sensor.bands` for channel semantics and wavelength inference, and `sensor.wavelengths` for an explicit wavelength vector in micrometers.
 
 If `variant` is omitted, rs-embed uses the `base` DOFA checkpoint by default. Pass `variant="large"` to switch to the larger model.
 
 Quick reminder:
 
-- pass `variant` as a keyword argument directly: `get_embedding("dofa", ..., variant="base")`
-- for export jobs, use `ExportModelRequest.configure("dofa", variant="large")`
+Pass `variant` directly to `get_embedding("dofa", ..., variant="base")`. For export jobs, use `ExportModelRequest.configure("dofa", variant="large")`.
 
 ---
 
 ## Output Semantics
 
-### `OutputSpec.pooled()`
-
-- Returns DOFA pooled vector `(D,)`
-- Metadata includes wavelength vector, variant, preprocess strategy, token metadata
-
-### `OutputSpec.grid()`
-
-- Reshapes DOFA patch tokens to `xarray.DataArray` `(D,H,W)` (usually square token grid)
-- Requires token count to be a perfect square
-- Grid is ViT patch-token layout, not georeferenced raster pixels
+DOFA mostly follows the standard pooled and token-grid pattern. `pooled` returns a vector `(D,)`, while `grid` reshapes patch tokens to `(D,H,W)` in model token space rather than georeferenced raster space. The model-specific part is mainly in metadata, which records wavelengths, variant choice, and preprocessing details.
 
 ---
 
@@ -195,25 +168,16 @@ sensor = SensorSpec(
 
 Recommended first checks:
 
-- print/log `bands` and `wavelengths_um` used by the adapter
-- verify provider input is scaled/ordered as expected before forward pass
+Print or log the exact `bands` and `wavelengths_um` used by the adapter, then verify that the provider or tensor input is scaled and ordered the way you intended before blaming the model.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- `variant` (`base` vs `large`)
-- exact `bands` and `wavelengths_um`
-- temporal window and compositing (provider path)
-- output mode (`pooled` vs `grid`)
-- whether backend is `provider` or `tensor`
+Keep the `variant`, exact `bands`, exact `wavelengths_um`, temporal window and compositing policy, output mode, and backend choice fixed and recorded. Those settings materially change what DOFA sees.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_dofa.py`
-- Wavelength inference map: `src/rs_embed/embedders/onthefly_dofa.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/onthefly_dofa.py` for both adapter logic and wavelength inference.

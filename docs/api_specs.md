@@ -2,11 +2,7 @@
 
 This page documents the core spec/data types used across the public API.
 
-For task-oriented usage, see [Common Workflows](workflows.md). For exact embedding/export/inspect functions, see:
-
-- [API: Embedding](api_embedding.md)
-- [API: Export](api_export.md)
-- [API: Inspect](api_inspect.md)
+For task-oriented usage, see [Common Workflows](workflows.md). For exact embedding, export, and inspect functions, see [API: Embedding](api_embedding.md), [API: Export](api_export.md), and [API: Inspect](api_inspect.md).
 
 === ":material-shape-outline: Spatial"
 
@@ -34,8 +30,7 @@ For task-oriented usage, see [Common Workflows](workflows.md). For exact embeddi
 BBox(minlon: float, minlat: float, maxlon: float, maxlat: float, crs: str = "EPSG:4326")
 ```
 
-- An **EPSG:4326** lat/lon bounding box (the current version supports only EPSG:4326).
-- `validate()` checks that bounds are valid.
+This is an **EPSG:4326** latitude/longitude bounding box. The current public API supports only EPSG:4326, and `validate()` checks that the bounds are valid.
 
 #### `PointBuffer`
 
@@ -43,8 +38,7 @@ BBox(minlon: float, minlat: float, maxlon: float, maxlat: float, crs: str = "EPS
 PointBuffer(lon: float, lat: float, buffer_m: float, crs: str = "EPSG:4326")
 ```
 
-- A buffer centered at a point, measured in meters (a square ROI; internally projected into the coordinate system required by the provider).
-- Requires `buffer_m > 0`.
+This is a square ROI centered at a point, with size defined in meters and internally projected into the coordinate system required by the provider. `buffer_m` must be greater than zero.
 
 ---
 
@@ -66,17 +60,9 @@ TemporalSpec.range("2022-06-01", "2022-09-01")
 !!! warning "Temporal range is a window"
     `TemporalSpec.range(start, end)` is treated as a half-open interval `[start, end)`, so `end` is excluded.
 
-Temporal semantics in provider/on-the-fly paths:
+Temporal semantics in provider and on-the-fly paths: `TemporalSpec.range(start, end)` is interpreted as a half-open window `[start, end)`, so `end` is excluded. In GEE-backed fetch paths, that window is used to filter an image collection and then apply a compositing reducer such as `median` or `mosaic`. The fetched input is therefore usually a composite over the whole window rather than an automatically selected single-day scene. If you want to approximate a single-day query, use a one-day window such as `TemporalSpec.range("2022-06-01", "2022-06-02")`.
 
-- `TemporalSpec.range(start, end)` is interpreted as a half-open window `[start, end)`, where `end` is excluded.
-- In GEE-backed on-the-fly fetch, `range` is used to filter an image collection over the full window, then apply a compositing reducer (default `median`, optional `mosaic`).
-- So the fetched input is usually a composite over the whole time window, not an automatically selected single-day scene.
-- To approximate a single-day query, pass a one-day window such as `TemporalSpec.range("2022-06-01", "2022-06-02")`.
-
-About `input_time` in metadata:
-
-- Many embedders store `meta["input_time"]` as the midpoint date of the temporal window.
-- This midpoint is metadata (and for some models, an auxiliary time signal), not evidence that imagery was fetched from exactly that single date.
+About `input_time` in metadata: many embedders store `meta["input_time"]` as the midpoint date of the temporal window. That midpoint is metadata, and for some models an auxiliary time signal, rather than proof that imagery was fetched from exactly that single date.
 
 !!! note "Common gotcha"
     `input_time` often looks like a single date, but the actual provider fetch may still be a composite over the full temporal window.
@@ -98,22 +84,28 @@ SensorSpec(
     modality: Optional[str] = None,
     orbit: Optional[str] = None,
     use_float_linear: bool = True,
+    s1_require_iw: bool = True,
+    s1_relax_iw_on_empty: bool = True,
     check_input: bool = False,
     check_raise: bool = True,
     check_save_dir: Optional[str] = None,
 )
 ```
 
-- `collection`: GEE collection or image ID
-- `bands`: band names (tuple)
-- `scale_m`: sampling resolution (meters)
-- `cloudy_pct`: cloud filter (best-effort; depends on collection properties)
-- `fill_value`: no-data fill value
-- `composite`: image compositing method over the temporal window (median/mosaic)
-- `modality`: optional model-facing modality selector used by models with multiple input branches
-- `orbit`: optional orbit/pass filter for sensor families that support it
-- `use_float_linear`: selects linear-scale floating-point products when a sensor family offers both linear and dB variants
-- `check_*`: optional input checks and quicklook saving (see [`inspect_gee_patch`](api_inspect.md#inspect_gee_patch))
+| Field | Meaning |
+|---|---|
+| `collection` | GEE collection or image ID. |
+| `bands` | Band names as a tuple. |
+| `scale_m` | Sampling resolution in meters. |
+| `cloudy_pct` | Best-effort cloud filter, subject to collection properties. |
+| `fill_value` | No-data fill value. |
+| `composite` | Temporal compositing method, usually `median` or `mosaic`. |
+| `modality` | Optional model-facing modality selector for models with multiple branches. |
+| `orbit` | Optional orbit or pass filter for sensor families that support it. |
+| `use_float_linear` | Selects linear-scale floating-point products when a sensor family offers both linear and dB variants. |
+| `s1_require_iw` | Prefer Sentinel-1 `IW` scenes only on provider-backed S1 fetch paths. |
+| `s1_relax_iw_on_empty` | Retry without the `IW` filter when strict S1 `IW` fetch returns no imagery. |
+| `check_*` | Optional input checks and quicklook saving; see [API: Inspect](api_inspect.md#inspect_gee_patch). |
 
 !!! note
     For **precomputed** models (e.g., directly reading offline embedding products), `sensor` is usually ignored or set to `None`.
@@ -136,23 +128,16 @@ FetchSpec(
 )
 ```
 
-- `scale_m`: sampling resolution override
-- `cloudy_pct`: cloud filter override
-- `fill_value`: no-data fill override
-- `composite`: temporal compositing override
+| Field | Meaning |
+|---|---|
+| `scale_m` | Sampling resolution override. |
+| `cloudy_pct` | Cloud filter override. |
+| `fill_value` | No-data fill override. |
+| `composite` | Temporal compositing override. |
 
-Recommended rule:
+Recommended rule: use `fetch=FetchSpec(...)` for normal public API usage. Use `sensor=SensorSpec(...)` only when you need advanced control over `collection`, `bands`, `modality`, or similar source-level details.
 
-- use `fetch=FetchSpec(...)` for normal public API usage
-- use `sensor=SensorSpec(...)` only when you need advanced control over `collection`, `bands`, `modality`, or similar source-level details
-
-Important constraints:
-
-- `fetch` and `sensor` cannot be passed together in the same request
-- `fetch` is applied on top of the model's default sensor contract
-- some models use `scale_m` as more than fetch resolution
-  - for example, `scalemae` uses it as semantic scale conditioning
-  - `anysat` uses it as both fetch resolution and patch-size control
+Important constraints: `fetch` and `sensor` cannot be passed together in the same request, and `fetch` is always applied on top of the model's default sensor contract. Some models use `scale_m` as more than fetch resolution: for example, `scalemae` uses it as semantic scale conditioning, and `anysat` uses it as both fetch resolution and patch-size control.
 
 Example:
 
@@ -173,6 +158,7 @@ emb = get_embedding(
 
 `OutputSpec` controls the embedding output shape: a **pooled vector** or a **dense grid**.
 
+
 ```python
 OutputSpec(
     mode: Literal["grid", "pooled"],
@@ -181,7 +167,7 @@ OutputSpec(
 )
 ```
 
-Recommended constructors:
+#### Recommended Constructors
 
 === ":material-vector-line: Pooled (default)"
 
@@ -204,29 +190,19 @@ Use `fetch=FetchSpec(scale_m=...)` for resolution overrides.
 
 > ROI-level Vector Embedding
 
-**Semantic meaning**
 
 `pooled` represents one whole ROI (Region of Interest) using a single vector `(D,)`.
 
-Best suited for:
-
-- Classification / regression
-- Retrieval / similarity search
-- Clustering
-- Cross-model comparison (recommended)
-
-Unified output format:
+Best suited for classification, retrieval, clustering, and most cross-model comparison work. The out put shape is:
 
 ```python
 Embedding.data.shape == (D,)
 ```
 
-How it is produced:
+How `pooled` is produced:
 
-ViT / MAE-style models (e.g., RemoteCLIP / Prithvi / SatMAE / ScaleMAE):
-
-- Native output is patch tokens `(N, D)` (with optional CLS token)
-- Remove CLS token if present, then pool tokens across the token axis (`mean` by default, optional `max`)
+- **ViT / MAE-style models** (e.g., RemoteCLIP / Prithvi / SatMAE / ScaleMAE)
+  Start from patch tokens `(N, D)` with an optional CLS token. The adapter removes the CLS token if present, then pools across the token axis, usually with `mean` and optionally with `max`.
 
 Mean-pooling formula:
 
@@ -234,58 +210,36 @@ $$
 v_d = \frac{1}{N'} \sum_{i=1}^{N'} t_{i,d}
 $$
 
-Precomputed embeddings (e.g., Tessera / GSE / Copernicus):
-
-- Native output is an embedding grid `(D, H, W)`
-- Pool over spatial dimensions `(H, W)`
+- **Precomputed embeddings** (e.g., Tessera / GSE / Copernicus)
+  These already expose an embedding grid `(D, H, W)`, so pooling happens over the spatial dimensions `(H, W)`.
 
 $$
 v_d = \frac{1}{HW} \sum_{y,x} g_{d,y,x}
 $$
 
-Why prefer `pooled` for benchmarks:
-
-- Model-agnostic and stable
-- Less sensitive to spatial/token layout differences
-- Easiest output to compare across models
 
 #### `grid`
 > ROI-level Spatial Embedding Field
 
-**Semantic meaning**
 
 `grid` returns a spatial embedding field `(D, H, W)`, where each spatial location maps to a vector.
 
-Best suited for:
-
-- Spatial visualization (PCA / norm / similarity maps)
-- Pixel-wise / patch-wise tasks
-- Intra-ROI structure analysis
-
-Unified output format:
+Best suited for spatial visualization, pixel-wise or patch-wise tasks, and intra-ROI structure analysis. The output shape is:
 
 ```python
 Embedding.data.shape == (D, H, W)
 ```
 
-Notes:
+!!! note
+    `data` can be returned as `xarray.DataArray`, with metadata in `meta` or `attrs`. For precomputed geospatial products, that metadata may include CRS and crop context. For ViT token grids, it usually describes patch-grid structure rather than georeferenced pixel coordinates.
 
-- `data` can be returned as `xarray.DataArray` with metadata in `meta`/`attrs`
-- For precomputed geospatial products, metadata may include CRS/crop context
-- For ViT token grids, this is usually patch-grid metadata (not georeferenced pixel coordinates)
+How `grid` is produced:
 
-How it is produced:
+- **ViT / MAE-style models**
+  Start from tokens `(N, D)`. The adapter removes a CLS token if needed, reshapes the remaining tokens from `(N', D)` to `(H, W, D)`, and then reorders them to `(D, H, W)`. Here `(H, W)` comes from the patch layout, such as `8x8` or `14x14`.
 
-ViT / MAE-style models:
-
-- Native output: tokens `(N, D)`
-- Remove CLS token if present, reshape remaining tokens:
-- `(N', D) -> (H, W, D) -> (D, H, W)`
-- `(H, W)` comes from patch layout (for example, `8x8`, `14x14`)
-
-Precomputed embeddings:
-
-- Native output is already `(D, H, W)`
+- **Precomputed embeddings**
+  These already use `(D, H, W)` as the native output shape, so the API can return that structure directly.
 
 ---
 
@@ -305,7 +259,7 @@ InputPrepSpec(
 )
 ```
 
-Recommended constructors:
+#### Recommended Constructors
 
 ```python
 InputPrepSpec.resize()               # default behavior (fastest)
@@ -314,7 +268,7 @@ InputPrepSpec.auto(max_tiles=4)      # choose tile or resize automatically
 InputPrepSpec.tile(tile_size=224)    # explicit tile size override
 ```
 
-You can also pass a string to public APIs as a shorthand:
+#### String Shorthand
 
 ```python
 input_prep="resize"   # default
@@ -322,13 +276,9 @@ input_prep="tile"
 input_prep="auto"
 ```
 
-Current tiled design (API layer):
+#### Current Tiling Behavior
 
-- Tile size defaults to `embedder.describe()["defaults"]["image_size"]` when available (can be overridden).
-- Boundary tiles use a **cover-shift** layout (for example `300 -> [0,224]` and `[76,300]`) to avoid edge padding when possible.
-- Grid stitching uses **midpoint-cut** ownership in overlap regions (instead of hard overwrite).
-- `tile_stride` currently must equal `tile_size` (explicit overlap/gap configuration is not enabled yet), but boundary shifting can still create overlap on the last tile.
-- `auto` is conservative and currently prefers tiling mainly for `OutputSpec.grid()` when tile count is small enough (`max_tiles`).
+Tile size defaults to `embedder.describe()["defaults"]["image_size"]` when available, unless you override it. Boundary tiles use a cover-shift layout such as `300 -> [0,224]` and `[76,300]` to avoid edge padding when possible, and grid stitching uses midpoint-cut ownership in overlap regions rather than hard overwrite. `tile_stride` currently must equal `tile_size`, so explicit overlap or gap control is not enabled yet, although boundary shifting can still create overlap on the last tile. `auto` is conservative and currently prefers tiling mainly for `OutputSpec.grid()` when tile count is small enough.
 
 ![tiles](assets/tiles.png)
 
@@ -340,6 +290,8 @@ Current tiled design (API layer):
 ### ExportTarget / ExportConfig / ExportModelRequest
 
 `export_batch(...)` now uses small public request objects so large export jobs do not need dozens of top-level keywords.
+
+#### Examples
 
 ```python
 ExportTarget.combined("exports/run")
@@ -358,9 +310,7 @@ ExportModelRequest("terrafm", modality="s1", sensor=my_s1_sensor)
 ExportModelRequest.configure("thor", variant="large")
 ```
 
-- `ExportTarget`: where outputs should be written
-- `ExportConfig`: how the export should run
-- `ExportModelRequest`: optional per-model overrides when one export job mixes different model-specific settings such as sensor, modality, or variant; use `ExportModelRequest.configure(...)` to pass model settings as keyword arguments
+`ExportTarget` controls where outputs are written, `ExportConfig` controls how the export runs, and `ExportModelRequest` carries optional per-model overrides when one job mixes different settings such as sensor, modality, or variant. Use `ExportModelRequest.configure(...)` when you want to pass model settings as keyword arguments.
 
 Legacy `out + layout`, `out_dir` / `out_path`, and per-model dict overrides are still accepted for backward compatibility.
 
@@ -369,6 +319,7 @@ Legacy `out + layout`, `out_dir` / `out_path`, and per-model dict overrides are 
 ### Embedding
 
 `get_embedding` / `get_embeddings_batch` return an `Embedding`:
+
 
 ```python
 from rs_embed.core.embedding import Embedding
@@ -379,7 +330,6 @@ Embedding(
 )
 ```
 
-- `data`: the embedding data (float32, vector or grid)
-- `meta`: includes model info, input info (optional), and export/check reports, etc.
+`data` holds the embedding itself as a float32 vector or grid, and `meta` carries model information, optional input information, and export or check reports.
 
 ---

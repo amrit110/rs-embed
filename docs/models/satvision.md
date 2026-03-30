@@ -22,17 +22,9 @@
 
 ## When To Use This Model
 
-### Good fit for
+SatVision is a better fit for TOA-based experiments where you want SatVision checkpoints rather than Sentinel-2 SR-specific encoders, for MODIS-style provider workflows with explicit normalization and calibration control, and for cases where you want to compare pooled versus patch-token outputs from the same model path.
 
-- TOA-based experiments where you want SatVision checkpoints instead of S2 SR-specific encoders
-- MODIS-style provider workflows with explicit control over channel normalization/calibration
-- testing pooled vs patch-token grid outputs from the same model path
-
-### Be careful when
-
-- changing `SensorSpec.bands` order without updating `RS_EMBED_SATVISION_TOA_*` channel settings
-- mixing raw TOA and unit-scaled inputs without logging the effective normalization mode
-- assuming arbitrary 14-channel inputs will work if they do not match checkpoint training semantics
+Be careful when changing `SensorSpec.bands` order without updating the matching `RS_EMBED_SATVISION_TOA_*` channel settings. The page also assumes you will log whether the effective normalization path was raw, auto, or unit-scaled, because mixing those modes makes results hard to compare. Arbitrary 14-channel tensors are not enough on their own if they do not match the checkpoint's training semantics.
 
 ---
 
@@ -40,29 +32,21 @@
 
 ### Spatial / temporal
 
-- `SpatialSpec`: `BBox` or `PointBuffer`
-- `TemporalSpec`: normalized to a range via shared helper (`TemporalSpec.range(...)` recommended)
-- Provider backend only (`backend="gee"` / other provider-compatible backend)
+`SpatialSpec` may be either `BBox` or `PointBuffer`. `TemporalSpec` is normalized to a range through the shared helper, and `TemporalSpec.range(...)` is the recommended path for reproducible requests. The current adapter path is provider-only, so use `backend="gee"` or another provider-compatible backend.
 
 ### Sensor / channels
 
 Default `SensorSpec` if omitted:
 
-- Collection: `MODIS/061/MOD021KM`
-- Bands (strict default order): `1,2,3,26,6,20,7,27,28,29,31,32,33,34`
-- `scale_m=1000`, `cloudy_pct=100`, `composite="mosaic"`, `fill_value=0.0`
+The default sensor is `MODIS/061/MOD021KM` with the strict band order `1,2,3,26,6,20,7,27,28,29,31,32,33,34`, `scale_m=1000`, `cloudy_pct=100`, `composite="mosaic"`, and `fill_value=0.0`.
 
 `input_chw` contract:
 
-- must be `CHW`
-- `C` must equal `RS_EMBED_SATVISION_TOA_IN_CHANS` (default `14`)
-- adapter checks `len(sensor.bands) == in_chans`
-- values may be raw TOA-like or already unit-scaled depending on normalization mode
+`input_chw` must be `CHW`, and `C` must match `RS_EMBED_SATVISION_TOA_IN_CHANS`, which defaults to `14`. The adapter also checks that `len(sensor.bands) == in_chans`. Values may be raw TOA-like inputs or already unit-scaled data, depending on the active normalization mode.
 
 Important:
 
-- The adapter does not infer semantic channel order from values.
-- `sensor.bands` order must match what the checkpoint expects.
+The adapter does not infer semantic channel order from the values themselves, so `sensor.bands` must match the checkpoint's expected order exactly.
 
 ---
 
@@ -127,15 +111,11 @@ Important:
 
 ### `OutputSpec.pooled()`
 
-- If model output is token sequence `[N,D]`, adapter pools patch tokens (`mean` / `max`)
-- If model output is already `(D,)`, adapter returns it directly as `model_pooled`
-- Metadata records pooling behavior and whether CLS token was removed
+If the model output is a token sequence `[N,D]`, `OutputSpec.pooled()` pools patch tokens with `mean` or `max`. If the model already returns a vector `(D,)`, the adapter returns it directly as `model_pooled`. Metadata records the pooling behavior together with whether a CLS token was removed.
 
 ### `OutputSpec.grid()`
 
-- Requires token sequence output `[N,D]`
-- Reshapes patch tokens to `xarray.DataArray` `(D,H,W)`
-- Grid is model patch-token layout, not georeferenced raster pixels
+`OutputSpec.grid()` requires token-sequence output `[N,D]` and reshapes patch tokens into an `xarray.DataArray` with shape `(D,H,W)`. The result is model patch-token layout rather than georeferenced raster pixels.
 
 ---
 
@@ -178,26 +158,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata for `norm_mode` and `norm_mode_effective`
-- log `sensor.collection`, `sensor.bands`, and calibration env values used
-- test `OutputSpec.pooled()` first before `grid`
+Start by inspecting metadata for `norm_mode` and `norm_mode_effective`, then log the effective `sensor.collection`, `sensor.bands`, and calibration environment values. As with other token models, `OutputSpec.pooled()` is the simpler first check before debugging `grid`.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- checkpoint source (`RS_EMBED_SATVISION_TOA_ID` or local `CKPT`)
-- exact band order and `in_chans`
-- normalization mode plus calibration arrays/divisor
-- temporal window + compositing settings
-- output mode (`pooled` / `grid`) and pooling choice
+For reproducibility, keep the checkpoint source fixed, whether that is `RS_EMBED_SATVISION_TOA_ID` or a local checkpoint path, and record the exact band order, `in_chans`, normalization mode, calibration arrays, divisor, temporal window, compositing settings, output mode, and pooling choice.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_satvision_toa.py`
-- Token/grid helpers: `src/rs_embed/embedders/_vit_mae_utils.py`
+The implementation lives in `src/rs_embed/embedders/catalog.py`, `src/rs_embed/embedders/onthefly_satvision_toa.py`, and the shared token-grid helpers in `src/rs_embed/embedders/_vit_mae_utils.py`.

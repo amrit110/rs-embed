@@ -21,17 +21,7 @@
 
 ## When To Use This Model
 
-### Good fit for
-
-- strict multispectral S2 experiments with spectral-token modeling
-- testing modality-aware token layouts beyond plain ViT RGB pipelines
-- analyses where spectral-token averaging into a spatial grid is acceptable
-
-### Be careful when
-
-- changing `RS_EMBED_FOMO_S2_KEYS` without understanding FoMo modality indexing
-- comparing to raster-like models and treating FoMo grid as georeferenced pixels
-- modifying model architecture envs (`DIM/DEPTH/HEADS/...`) while using incompatible checkpoints
+FoMo is a good fit for strict multispectral S2 experiments with spectral-token modeling, for testing modality-aware token layouts beyond plain RGB ViT pipelines, and for analyses where averaging spectral tokens into one spatial grid is acceptable. The main pitfalls are changing `RS_EMBED_FOMO_S2_KEYS` without understanding FoMo modality indexing, treating the FoMo grid as georeferenced pixels, or modifying architecture envs while keeping an incompatible checkpoint.
 
 ---
 
@@ -39,27 +29,15 @@
 
 ### Spatial / temporal
 
-- Provider backend only (`backend="gee"` / provider-compatible backend)
-- `TemporalSpec` normalized via shared helper; use `TemporalSpec.range(...)`
+FoMo is provider-backed, so use `backend="gee"` or another provider-compatible backend. `TemporalSpec` is normalized through the shared helper, and `TemporalSpec.range(...)` is the clearest option.
 
 ### Sensor / channels
 
-Default `SensorSpec` if omitted:
-
-- Collection: `COPERNICUS/S2_SR_HARMONIZED`
-- Bands: `B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`
-- `scale_m=10`, `cloudy_pct=30`, `composite="median"`, `fill_value=0.0`
-
-`input_chw` contract:
-
-- must be `CHW` with `C=12` in the adapter S2 band order above
-- expected raw S2 SR values in `0..10000`
+If `sensor` is omitted, FoMo uses `COPERNICUS/S2_SR_HARMONIZED` with bands `B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`, `scale_m=10`, `cloudy_pct=30`, `composite="median"`, and `fill_value=0.0`. If you pass `input_chw`, it must be `CHW` with `C=12` in that adapter band order and raw S2 SR values in `0..10000`.
 
 ### Modality keys
 
-- FoMo forward path requires a list of modality keys for each channel
-- adapter default S2 mapping is encoded via `_DEFAULT_S2_MODALITY_KEYS`
-- override with `RS_EMBED_FOMO_S2_KEYS` (must provide exactly 12 comma-separated integers)
+The FoMo forward path requires one modality key per channel. The default S2 mapping is encoded in `_DEFAULT_S2_MODALITY_KEYS`, and you can override it with `RS_EMBED_FOMO_S2_KEYS`, which must provide exactly 12 comma-separated integers.
 
 ---
 
@@ -120,21 +98,11 @@ Default `SensorSpec` if omitted:
 
 ### `OutputSpec.pooled()`
 
-- Pools FoMo token sequence across tokens:
-  - `mean` -> `token_mean`
-  - `max` -> `token_max`
-- Metadata records `token_count`, `token_dim`, and pooling mode
+`OutputSpec.pooled()` pools the FoMo token sequence across tokens. `mean` becomes `token_mean`, `max` becomes `token_max`, and metadata records `token_count`, `token_dim`, and pooling mode.
 
 ### `OutputSpec.grid()`
 
-- Preferred path:
-  - interpret tokens as `[modalities, H, W, D]`
-  - average over modalities
-  - return `(D,H,W)` grid with `grid_kind="spectral_mean_patch_tokens"`
-- Fallback path:
-  - if token layout is incompatible with expected modality/grid layout, return `1x1` vector grid (`grid_kind="vector_as_1x1"`)
-
-Grid is model token-derived structure, not georeferenced raster pixels.
+The preferred path interprets tokens as `[modalities, H, W, D]`, averages over modalities, and returns `(D,H,W)` with `grid_kind="spectral_mean_patch_tokens"`. If token layout is incompatible with the expected modality or grid structure, the adapter falls back to a `1x1` vector grid with `grid_kind="vector_as_1x1"`. In either case, this remains model token structure rather than georeferenced raster space.
 
 ---
 
@@ -177,25 +145,16 @@ emb = get_embedding(
 
 Recommended first checks:
 
-- inspect metadata `spectral_keys`, `token_count`, `grid_kind`, `grid_expected_tokens`
-- revert architecture envs to defaults before benchmarking
-- verify normalization mode and image/patch sizes
+Inspect metadata such as `spectral_keys`, `token_count`, `grid_kind`, and `grid_expected_tokens` first. Revert architecture envs to defaults before benchmarking, and verify normalization mode together with image and patch sizes.
 
 ---
 
 ## Reproducibility Notes
 
-Keep fixed and record:
-
-- checkpoint source/path and vendored FoMo runtime version
-- `IMG`, `PATCH`, normalization mode
-- `S2_KEYS` mapping
-- model config envs (`DIM/DEPTH/HEADS/MLP_DIM/NUM_CLASSES`)
-- temporal window + compositing settings
+Keep the checkpoint source or path, vendored FoMo runtime version, `IMG`, `PATCH`, normalization mode, `S2_KEYS` mapping, model config envs, and temporal plus compositing settings fixed and recorded.
 
 ---
 
 ## Source of Truth (Code Pointers)
 
-- Registration/catalog: `src/rs_embed/embedders/catalog.py`
-- Adapter implementation: `src/rs_embed/embedders/onthefly_fomo.py`
+The main code paths are `src/rs_embed/embedders/catalog.py` for registration and `src/rs_embed/embedders/onthefly_fomo.py` for the adapter implementation.

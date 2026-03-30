@@ -11,12 +11,7 @@ It is a supplement to [Quickstart](quickstart.md) and [API: Specs and Data Struc
 
 `(model, spatial, temporal, sensor, output) -> Embedding`
 
-In practice, most users work with:
-
-- `spatial`: where (ROI)
-- `temporal`: when (year or time window)
-- `output`: what shape you want (`pooled` or `grid`)
-- `backend`: data access route (`auto` recommended; `gee` is a common explicit provider override)
+In practice, most users work with `spatial` for where, `temporal` for when, `output` for what shape they want back, and `backend` for the data-access route. In normal public usage, `backend="auto"` is the default, and `gee` is the most common explicit provider override.
 
 This page explains what those words mean in practice.
 
@@ -24,14 +19,9 @@ This page explains what those words mean in practice.
 
 ## Spatial Specs: What Area You Want
 
-Two common ways to define a region:
+Two common ways to define a region are `PointBuffer(lon, lat, buffer_m)` for a square ROI centered at one point and `BBox(minlon, minlat, maxlon, maxlat)` for explicit latitude and longitude bounds.
 
-- `PointBuffer(lon, lat, buffer_m)`: square ROI centered at a point
-- `BBox(minlon, minlat, maxlon, maxlat)`: explicit lat/lon bounds
-
-Current limitation:
-
-- API currently accepts only `crs="EPSG:4326"` for `BBox` / `PointBuffer`
+The public API currently accepts only `crs="EPSG:4326"` for `BBox` and `PointBuffer`.
 
 For exact constructors and validation rules, see [API: Specs and Data Structures](api_specs.md).
 
@@ -69,44 +59,26 @@ See detailed model-specific temporal behavior in [Supported Models](models.md).
 
 Returns one vector `(D,)` for the whole ROI.
 
-Use this for:
+Use `pooled` for classification, retrieval, clustering, and most cross-model benchmarking work.
 
-- classification / regression
-- similarity search / retrieval
-- clustering
-- cross-model benchmarking (recommended default)
-
-Interpretation:
-
-- one ROI in, one embedding vector out
-- easiest output to compare across different model families
+Conceptually, this is one ROI in and one embedding vector out. It is also the easiest format to compare across different model families.
 
 ### `OutputSpec.grid()`
 
 Returns a spatial feature grid `(D, H, W)`.
 
-Use this for:
-
-- visualization (PCA / norm maps)
-- patch-wise analysis
-- spatial structure inspection
+Use `grid` for visualization, patch-wise analysis, and spatial structure inspection.
 
 !!! note
     For ViT-like models, `grid` is often a token/patch grid, not guaranteed georeferenced raster pixels.
 
-Interpretation:
-
-- one ROI in, one spatial embedding field out
-- useful when spatial layout matters more than a single pooled descriptor
+Conceptually, this is one ROI in and one spatial embedding field out. It is useful when spatial layout matters more than a single pooled descriptor.
 
 ---
 
 ## Backends and Providers
 
-Think of backend as the input retrieval/runtime path.
-
-- `backend="auto"`: recommended default; lets rs-embed choose the model-compatible access path
-- `backend="gee"`: fetch imagery from Google Earth Engine (common for on-the-fly models)
+Think of backend as the input retrieval and runtime path. `backend="auto"` is the recommended default and lets rs-embed choose the model-compatible path. `backend="gee"` explicitly fetches imagery from Google Earth Engine and is common for on-the-fly models.
 
 You usually do not need to customize providers directly unless you are debugging inputs or extending the library.
 
@@ -114,13 +86,7 @@ You usually do not need to customize providers directly unless you are debugging
 
 ## `sensor`: Only Needed for Some Paths
 
-For on-the-fly models, `SensorSpec(...)` describes:
-
-- collection
-- bands
-- scale (meters)
-- cloud filtering
-- composite mode (`median` / `mosaic`)
+For on-the-fly models, `SensorSpec(...)` describes the collection, bands, sampling scale, cloud filtering, and compositing mode.
 
 For most precomputed models, `sensor` is often `None` or ignored.
 
@@ -128,16 +94,9 @@ For most precomputed models, `sensor` is often `None` or ignored.
 
 ## Input Prep (`resize` / `tile` / `auto`)
 
-`input_prep` is an API-level policy for large on-the-fly inputs:
+`input_prep` is an API-level policy for large on-the-fly inputs. `"resize"` is the fast default, `"tile"` enables API-side tiled inference for large ROIs, and `"auto"` is a conservative automatic choice that mainly matters for some `grid` outputs.
 
-- `"resize"`: fast default
-- `"tile"`: API-side tiled inference for large ROIs
-- `"auto"`: conservative automatic choice (mainly useful for some `grid` outputs)
-
-Use tiling when:
-
-- you care about preserving more spatial detail for large ROIs
-- model default resize would be too destructive
+Use tiling when you want to preserve more spatial detail for large ROIs and the model's default resize would be too destructive.
 
 This is a runtime policy choice, not a model identity choice.
 Use it when the same model needs different large-ROI handling in different workflows.
@@ -148,34 +107,14 @@ Use it when the same model needs different large-ROI handling in different workf
 
 ### Precomputed
 
-- Reads embeddings from existing embedding products
-- Faster and simpler runtime
-- Temporal coverage and resolution are fixed by the product
-
-Examples:
-
-- `tessera`
-- `gse`
-- `copernicus`
+Precomputed models read embeddings from existing embedding products. They are usually faster and simpler to run, but their temporal coverage and resolution are fixed by the product. Typical examples are `tessera`, `gse`, and `copernicus`.
 
 ### On-the-fly
 
-- Fetches imagery patch, preprocesses, then runs model inference
-- More flexible but heavier dependencies/runtime
-- Requires careful attention to bands, temporal windows, and normalization
-
-Examples:
-
-- `remoteclip`
-- `prithvi`
-- `anysat`
-- `terramind`
+On-the-fly models fetch an imagery patch, preprocess it, and then run inference. They are more flexible, but they come with heavier runtime dependencies and require more care around bands, temporal windows, and normalization. Typical examples are `remoteclip`, `prithvi`, `anysat`, and `terramind`.
 
 ---
 
 ## Where To Go Next
 
-- Need runnable examples: [Quickstart](quickstart.md)
-- Need task recipes: [Workflows](workflows.md)
-- Need model-specific assumptions: [Models](models.md)
-- Need exact type definitions: [API: Specs and Data Structures](api_specs.md)
+For runnable examples, go to [Quickstart](quickstart.md). For task recipes, use [Workflows](workflows.md). For model-specific assumptions, use [Models](models.md). For exact type definitions, use [API: Specs and Data Structures](api_specs.md).
