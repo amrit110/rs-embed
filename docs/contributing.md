@@ -1,6 +1,6 @@
 # Contributing Guide
 
-The `rs-embed` project welcomes bug reports, documentation fixes, model integrations, and API improvements. This guide explains the written context that helps issues and pull requests move smoothly. 
+The `rs-embed` project welcomes bug reports, documentation fixes, model integrations, and API improvements. This page keeps the contribution workflow lightweight and points to the places where more detail already lives.
 
 If you want to add a new model adapter or change the embedder contract, start with [Extending](extending.md).
 
@@ -22,90 +22,11 @@ When you open the issue or PR, please include direct links to the relevant docs 
 
 ## Issues
 
-If you are not sure how to write the report, this is usually enough:
-
-````md
-## Summary
-
-What were you trying to do? What happened instead?
-
-## Model
-
-`prithvi`
-
-## Backend
-
-`auto`
-
-## Minimal Reproduction
-
-```python
-from rs_embed import ...
-...
-```
-
-## Setup
-
-```python
-spatial = ...
-temporal = ...
-output = ...
-backend = ...
-```
-
-## Error
-
-Paste the traceback or describe the incorrect result.
-
-## Links
-
-- docs:
-- paper or model card:
-- upstream repo:
-
-## Environment
-
-- Python:
-- device:
-- relevant versions:
-````
-
-The GitHub issue forms ask for the same information, but this template is a useful fallback when you want to draft the report first.
+This repository includes GitHub issue forms for bug reports and feature requests. Please use them and include the links, code snippets, and environment details they ask for. That information usually answers the first round of clarifying questions before they need to be asked.
 
 ## Pull Requests
 
-If you are not sure how to structure the pull request, this is usually enough:
-
-````md
-## Summary
-
-What problem does this PR solve?
-
-## Links
-
-- issue:
-- docs:
-- upstream reference:
-
-## Changes
-
-What changed? What did you intentionally leave out?
-
-## Verification
-
-```bash
-python -m pytest -v tests/...
-```
-
-Or paste a small code snippet that demonstrates the new behavior.
-
-## Docs
-
-What docs were updated? 
-
-````
-
-If the change modifies model behavior, it is especially helpful to describe the input contract, the defaults you chose, and any behavior that remains intentionally unsupported. If the change affects user-facing semantics, updating the docs in the same pull request is usually the right move.
+The repository also includes a pull request template. Please use it to summarize the change, link the related issue or reference material, and show how you verified the result. If the PR changes model behavior, it is especially helpful to mention the input contract, defaults, and any behavior that remains intentionally unsupported.
 
 ## Tests
 
@@ -137,5 +58,3 @@ For doc changes, build the site locally before opening the pull request:
 pip install mkdocs-material pymdown-extensions
 mkdocs build --strict
 ```
-
-The repository also includes GitHub issue and pull request templates. They are there to make it easier to include the right context in the first message: links, code, assumptions, and verification. That shared written context is what keeps collaboration efficient and cuts down on unnecessary back-and-forth.
