@@ -25,7 +25,9 @@
 
 Prithvi is a good fit for multispectral Sentinel-2 experiments that need more than RGB, token or grid-level feature inspection with a ViT-style backbone, or comparisons where explicit time and location conditioning are part of the model path.
 
-Use extra care when comparing Prithvi against models without side inputs, because the derived time and location signals can materially affect behavior. It is also worth treating preprocessing mode (`resize` vs `pad`) as part of the experiment definition.
+Use carefully when comparing Prithvi against models without side inputs, because the derived time and location signals can affect behavior. It is also worth treating preprocessing mode (`resize` vs `pad`) as part of the experiment definition.
+
+
 ---
 
 ## Input Contract (Current Adapter Path)
