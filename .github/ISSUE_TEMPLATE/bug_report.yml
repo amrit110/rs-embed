@@ -97,7 +97,5 @@ body:
     attributes:
       label: Checks
       options:
-        - label: I searched existing issues and docs before opening this report.
-          required: true
         - label: I included direct links and a plain-text reproduction snippet.
           required: true
