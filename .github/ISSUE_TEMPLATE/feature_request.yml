@@ -1,0 +1,66 @@
+name: Feature request
+description: Propose a new capability, model integration, or API improvement with enough written context to evaluate scope.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user problem does this solve?
+      placeholder: Today it is difficult to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the proposed API, workflow, model integration, or behavior.
+      placeholder: I propose adding...
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Concrete example
+      description: Show a small code snippet or command sequence for how the feature would be used.
+      render: python
+      placeholder: |
+        from rs_embed import ...
+
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Relevant links
+      description: Link papers, model cards, upstream repos, docs pages, benchmarks, or related issues.
+      placeholder: |
+        Docs:
+        Paper or model card:
+        Upstream repo:
+        Related issue or PR:
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and tradeoffs
+      description: Note expected defaults, constraints, compatibility concerns, or reasons not to do this.
+      placeholder: |
+        Expected defaults:
+        Compatibility concerns:
+        Non-goals:
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues, pull requests, and docs before opening this request.
+          required: true
+        - label: I included direct links and at least one concrete usage example.
+          required: true

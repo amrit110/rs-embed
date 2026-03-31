@@ -1,0 +1,103 @@
+name: Bug report
+description: Report a reproducible bug with enough context to debug it without a long comment thread.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please include plain-text code and direct links. Avoid screenshots of code or stack traces.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What were you trying to do, and what happened instead?
+      placeholder: I expected..., but instead...
+    validations:
+      required: true
+  - type: input
+    id: model_id
+    attributes:
+      label: Model ID
+      description: Example: prithvi, tessera, remoteclip
+      placeholder: prithvi
+    validations:
+      required: true
+  - type: input
+    id: backend
+    attributes:
+      label: Backend
+      description: Example: auto, gee, provider
+      placeholder: auto
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal reproduction code
+      description: Paste the smallest snippet that still reproduces the problem.
+      render: python
+      placeholder: |
+        from rs_embed import ...
+
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Error or incorrect output
+      description: Paste the traceback, assertion failure, or exact incorrect result.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Spatial / temporal / output configuration
+      description: Include the exact ROI, temporal spec, output spec, and any fetch or sensor overrides that matter.
+      render: python
+      placeholder: |
+        spatial = ...
+        temporal = ...
+        output = ...
+        fetch = ...
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Relevant links
+      description: Link the docs page, model paper, upstream repo, prior issue, notebook, or script that defines the expected behavior.
+      placeholder: |
+        Docs:
+        Paper:
+        Upstream repo:
+        Related issue:
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Python version, install method, OS, device, and any optional dependency versions if relevant.
+      render: text
+      placeholder: |
+        Python:
+        OS:
+        Device:
+        rs-embed install:
+        torch:
+        earthengine-api:
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and docs before opening this report.
+          required: true
+        - label: I included direct links and a plain-text reproduction snippet.
+          required: true

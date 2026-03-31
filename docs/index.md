@@ -54,3 +54,20 @@ Most workflows revolve around three functions: `get_embedding(...)` for one ROI,
 ## Advanced Reading
 
 Once the basic flow is familiar, read [Concepts](concepts.md) for the semantics behind `TemporalSpec`, `OutputSpec`, and backends, then use [Workflows](workflows.md) for task-oriented recipes. [Advanced Model Reference](models_reference.md) goes deeper on preprocessing and temporal assumptions, while [Limitations](limitations.md) collects current constraints and edge cases.
+
+
+## Citation
+```
+@article{ye2026modelplacetimeremote,
+      title={Any Model, Any Place, Any Time: Get Remote Sensing Foundation Model Embeddings On Demand}, 
+      author={Dingqi Ye and Daniel Kiv and Wei Hu and Jimeng Shi and Shaowen Wang},
+      year={2026},
+      eprint={2602.23678},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2602.23678}, 
+}
+```
+
+## License
+This project is released under the [Apache-2.0](https://github.com/cybergis/rs-embed/blob/main/LICENSE)

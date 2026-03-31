@@ -136,12 +136,12 @@ Resolution here means the default provider/source fetch resolution used by the a
 
 🪀 [Use case: Maize yield mapping Illinois](https://github.com/cybergis/rs-embed/blob/main/examples/demo.ipynb)
 
-## Extending
 
-We welcome requests for new model integrations and extensions. If you have your own work, or a model/paper you care about and think is meaningful to include, please open an [Issue](https://github.com/cybergis/rs-embed/issues) and share it. We will prioritize helping extend `rs-embed` for those requests.
+## Extending & Contributing
 
-If you want to implement the extension yourself, you can also follow the guide in [`extending`](https://cybergis.github.io/rs-embed/extending/).
+We welcome issues for new model integrations, extension ideas, bugs, and documentation gaps. If you have your own work, or a model or paper that you think would be valuable to include in `rs-embed`, please open an [Issue](https://github.com/cybergis/rs-embed/issues) and share the relevant links, context, and examples.
 
+We also warmly welcome community contributions, including new model support, bug fixes, documentation improvements, and example notebooks. If you would like to contribute directly, please start with the [`extending`](https://cybergis.github.io/rs-embed/extending/) guide and the [contributing guide](https://cybergis.github.io/rs-embed/contributing/). 
 
 
 
@@ -163,5 +163,13 @@ This library also builds upon the incredible work of the Remote Sensing communit
 }
 ```
 
+
 ## License
 This project is released under the [Apache-2.0](https://github.com/cybergis/rs-embed/blob/main/LICENSE)
+
+
+## Contributors
+
+<a href="https://github.com/cybergis/rs-embed/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=cybergis/rs-embed" />
+</a>

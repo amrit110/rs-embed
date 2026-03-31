@@ -58,8 +58,9 @@ not_in_nav: |
   /model_detail_template.md
 
 nav:
-  - Home: index.md
-  - Quickstart: quickstart.md
+  - Home:
+    - Overview: index.md
+    - Quickstart: quickstart.md
   - Models:
     - Overview: models.md
     - Advanced Reference: models_reference.md
@@ -89,4 +90,6 @@ nav:
     - Embedding API: api_embedding.md
     - Export API: api_export.md
     - Inspect API: api_inspect.md
-  - Extending: extending.md
+  - Extending:
+    - Overview: extending.md
+    - Contributing Guide: contributing.md

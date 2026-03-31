@@ -2,6 +2,8 @@
 
 This page documents the extension contract for adding a new embedder.
 
+For repository workflow, issue expectations, and pull request requirements, see [Contributing Guide](contributing.md).
+
 In most cases, adding a model means:
 
 1. Create an embedder class in `src/rs_embed/embedders/`.
