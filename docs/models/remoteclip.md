@@ -40,14 +40,18 @@ If `sensor` is omitted, the default path uses `COPERNICUS/S2_SR_HARMONIZED` with
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 RGB patch from provider (or reuse `input_chw`)
-2. Normalize raw SR values to `[0,1]` (for `input_chw`, divide by `10000` and clip)
-3. Optional input checks / quicklook export via `SensorSpec.check_*`
-4. Convert `CHW [0,1]` -> `uint8 HWC`
-5. Model preprocess:
-   - preferred: `model.transform(rgb_u8, image_size)` if available
-   - fallback: `Resize(224) -> CenterCrop(224) -> ToTensor -> CLIP normalization`
-6. Forward pass to get tokens (preferred) or pooled vector (fallback path)
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 RGB patch
+  <span class="pipeline-arrow">-&gt;</span> normalize raw SR to [0,1]
+     <span class="pipeline-detail">input_chw path: /10000 -&gt; clip</span>
+  <span class="pipeline-arrow">-&gt;</span> optional checks + quicklook export
+  <span class="pipeline-arrow">-&gt;</span> CHW [0,1] -&gt; uint8 HWC
+  <span class="pipeline-arrow">-&gt;</span> model preprocess
+     <span class="pipeline-branch">preferred:</span> model.transform(rgb_u8, image_size)
+     <span class="pipeline-branch">fallback:</span>  Resize(224) -&gt; CenterCrop(224) -&gt; ToTensor -&gt; CLIP normalization
+  <span class="pipeline-arrow">-&gt;</span> forward pass
+     <span class="pipeline-branch">preferred:</span> token sequence
+     <span class="pipeline-branch">fallback:</span>  pooled vector</code></pre>
 
 Current adapter image size:
 

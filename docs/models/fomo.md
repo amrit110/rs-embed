@@ -43,20 +43,21 @@ The FoMo forward path requires one modality key per channel. The default S2 mapp
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 SR 12-band patch (provider path) or use `input_chw`
-2. Normalize with `RS_EMBED_FOMO_NORM`:
-   - `unit_scale` (default): divide by `10000`
-   - `per_tile_minmax`: per-channel tile min-max after unit scaling
-   - `none` / `raw`: keep raw `0..10000` (clipped)
-3. Resize to `RS_EMBED_FOMO_IMG` (default `64`)
-4. Build/load FoMo model from:
-   - vendored local FoMo runtime
-   - checkpoint (local / auto-download)
-5. Forward with `(x, spectral_keys)` and `pool=False` to get tokens `[N,D]`
-6. Compute outputs:
-   - pooled vector: mean/max over all tokens
-   - grid: average tokens across modalities and reshape patch grid when possible
-   - fallback: `1x1` vector grid if token layout is not grid-compatible
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 SR 12-band patch
+  <span class="pipeline-arrow">-&gt;</span> normalize with RS_EMBED_FOMO_NORM
+     <span class="pipeline-branch">unit_scale:</span> /10000
+     <span class="pipeline-branch">per_tile_minmax:</span> per-channel min-max after unit scaling
+     <span class="pipeline-branch">none / raw:</span> keep clipped raw values
+  <span class="pipeline-arrow">-&gt;</span> resize to RS_EMBED_FOMO_IMG=64
+  <span class="pipeline-arrow">-&gt;</span> load FoMo runtime + checkpoint
+     <span class="pipeline-detail">vendored local runtime with local / auto-downloaded weights</span>
+  <span class="pipeline-arrow">-&gt;</span> forward(x, spectral_keys, pool=False)
+  <span class="pipeline-arrow">-&gt;</span> token output [N,D]
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> mean / max over all tokens
+     <span class="pipeline-branch">grid:</span>   modality-averaged patch grid when available
+     <span class="pipeline-branch">fallback:</span> 1x1 vector grid</code></pre>
 
 ---
 

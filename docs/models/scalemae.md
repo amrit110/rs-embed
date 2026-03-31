@@ -52,18 +52,24 @@ The adapter passes `float(sensor.scale_m)` to ScaleMAE as `input_res_m`. If `sen
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 RGB patch (provider path) or convert `input_chw` raw SR -> `[0,1]` -> `uint8`
-2. Resize to `RS_EMBED_SCALEMAE_IMG` (default `224`)
-3. Convert to tensor with CLIP-style preprocessing (`rgb_u8_to_tensor_clipnorm`)
-4. Build `input_res` tensor from `sensor.scale_m`
-5. Call ScaleMAE `forward_features(...)` (preferred) or `forward(...)`
-   - adapter handles signature differences across `rshf` versions
-   - passes both `patch_size` and `input_res`
-6. Normalize output format:
-   - `[N,D]` tokens
-   - `[D]` pooled vector
-   - `[C,H,W]` feature map reshaped to tokens
-7. Return pooled vector or token grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 RGB patch
+     <span class="pipeline-detail">input_chw path: raw SR -&gt; [0,1] -&gt; uint8</span>
+  <span class="pipeline-arrow">-&gt;</span> resize to RS_EMBED_SCALEMAE_IMG=224
+  <span class="pipeline-arrow">-&gt;</span> CLIP-style tensor preprocess
+     <span class="pipeline-detail">rgb_u8_to_tensor_clipnorm</span>
+  <span class="pipeline-arrow">-&gt;</span> build input_res tensor from sensor.scale_m
+  <span class="pipeline-arrow">-&gt;</span> ScaleMAE forward
+     <span class="pipeline-branch">preferred:</span> forward_features(...)
+     <span class="pipeline-branch">fallback:</span>  forward(...)
+     <span class="pipeline-detail">adapter passes patch_size + input_res and handles rshf signature differences</span>
+  <span class="pipeline-arrow">-&gt;</span> normalize output format
+     <span class="pipeline-branch">tokens:</span> [N,D]
+     <span class="pipeline-branch">pooled:</span> [D]
+     <span class="pipeline-branch">feature map:</span> [C,H,W] -&gt; tokens
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   token grid</code></pre>
 
 Important:
 

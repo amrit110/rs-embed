@@ -68,27 +68,35 @@ When provider-backed S1 fetch succeeds, metadata records `s1_iw_requested`, `s1_
 
 ### Provider path
 
-1. Validate `TemporalSpec.range(...)`
-2. Select modality from `modality` (`s2` / `s1`)
-3. Fetch provider patch:
-   - S2: 12-band SR -> normalize to `[0,1]`
-   - S1: dual-pol `VV/VH` raw -> prefer `IW` by default, optionally relax `IW` on empty -> shared S1 normalization helper -> `[0,1]`
-4. Optional input inspection on normalized provider input
-5. Resize to fixed `224x224`
-6. Load TerraFM-B from vendored runtime + HF `.pth` weights
-7. Forward:
-   - `pooled`: TerraFM forward returns CLS embedding `(D,)`
-   - `grid`: adapter calls `extract_feature(...)` and uses last-layer feature map `(D,H,W)`
+<pre class="pipeline-flow"><code><span class="pipeline-root">PROVIDER</span>  validate TemporalSpec.range(...)
+  <span class="pipeline-arrow">-&gt;</span> select modality
+     <span class="pipeline-branch">s2:</span> 12-band Sentinel-2 SR
+     <span class="pipeline-branch">s1:</span> dual-pol Sentinel-1 VV/VH
+  <span class="pipeline-arrow">-&gt;</span> provider fetch + modality-specific normalization
+     <span class="pipeline-branch">s2:</span> raw SR -&gt; [0,1]
+     <span class="pipeline-branch">s1:</span> prefer IW -&gt; optional relaxed retry -&gt; shared S1 normalization -&gt; [0,1]
+  <span class="pipeline-arrow">-&gt;</span> optional inspection on normalized input
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+  <span class="pipeline-arrow">-&gt;</span> load TerraFM-B runtime + HF weights
+  <span class="pipeline-arrow">-&gt;</span> forward / feature extraction
+     <span class="pipeline-branch">pooled:</span> TerraFM CLS embedding (D,)
+     <span class="pipeline-branch">grid:</span>   extract_feature(...) last-layer map (D,H,W)</code></pre>
 
 ### Tensor backend path
 
-1. Read `input_chw` (`CHW`)
-2. Validate channel count (`2` or `12`)
-3. Apply the same modality-specific normalization used by the provider path:
-   - S2: raw SR `0..10000` -> `/10000` -> clip `[0,1]`
-   - S1: shared `VV/VH` normalization helper (`log1p` + percentile scaling)
-4. Resize to `224x224`
-5. Load TerraFM-B and run same forward/grid extraction path
+<pre class="pipeline-flow"><code><span class="pipeline-root">TENSOR</span>  read input_chw
+  <span class="pipeline-arrow">-&gt;</span> validate channel count
+     <span class="pipeline-branch">s2:</span> 12 channels
+     <span class="pipeline-branch">s1:</span> 2 channels
+  <span class="pipeline-arrow">-&gt;</span> apply provider-equivalent modality normalization
+     <span class="pipeline-branch">s2:</span> raw SR 0..10000 -&gt; /10000 -&gt; clip [0,1]
+     <span class="pipeline-branch">s1:</span> shared VV/VH normalization helper
+     <span class="pipeline-detail">log1p + percentile scaling</span>
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+  <span class="pipeline-arrow">-&gt;</span> load TerraFM-B
+  <span class="pipeline-arrow">-&gt;</span> run same forward / grid extraction path
+     <span class="pipeline-branch">pooled:</span> TerraFM CLS embedding
+     <span class="pipeline-branch">grid:</span>   extract_feature(...) last-layer map</code></pre>
 
 Notes:
 

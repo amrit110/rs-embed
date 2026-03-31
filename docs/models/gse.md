@@ -44,13 +44,14 @@ The provider fetch settings are fixed to collection `GOOGLE/SATELLITE_EMBEDDING/
 
 ## Retrieval Pipeline (Current rs-embed Path)
 
-1. Validate provider-compatible backend + `TemporalSpec.year(...)`
-2. Fetch all embedding bands as `CHW` from annual collection
-3. Replace fill value `-9999` with `NaN`
-4. Build metadata (year, scale, band names)
-5. Return:
-   - pooled vector via `pool_chw_to_vec(...)`
-   - grid as `xarray.DataArray` `(D,H,W)` with `d` coords set to band names
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider-compatible backend + TemporalSpec.year(...)
+  <span class="pipeline-arrow">-&gt;</span> fetch annual embedding product as CHW
+  <span class="pipeline-arrow">-&gt;</span> replace fill value -9999 with NaN
+  <span class="pipeline-arrow">-&gt;</span> build metadata
+     <span class="pipeline-detail">year + scale + band names</span>
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> pool_chw_to_vec(...)
+     <span class="pipeline-branch">grid:</span>   xarray.DataArray (D,H,W) with d coords = band names</code></pre>
 
 ---
 

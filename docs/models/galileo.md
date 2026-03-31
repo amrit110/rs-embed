@@ -41,19 +41,25 @@ For `input_chw`, the adapter accepts `CHW` or `TCHW` with `C=10` through the sha
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 10-band `raw_tchw` or coerce user `input_chw` to `TCHW`
-2. Resolve months sequence from frame bins (or `RS_EMBED_GALILEO_MONTH`)
-3. Resize frames to `RS_EMBED_GALILEO_IMG` (default `64`) if needed
-4. Normalize S2 series with `RS_EMBED_GALILEO_NORM` (default `unit_scale`)
-5. Build Galileo encoder tensors and masks:
-   - `s_t_x`, `sp_x`, `t_x`, `st_x`
-   - masks `s_t_m`, `sp_m`, `t_m`, `st_m`
-   - `months`
-6. Optional NDVI channel injection when `RS_EMBED_GALILEO_INCLUDE_NDVI=1` and model space supports NDVI
-7. Forward Galileo encoder (`patch_size=RS_EMBED_GALILEO_PATCH`, default `8`)
-8. Outputs:
-   - pooled vector from visible tokens (`encoder.average_tokens(...)`)
-   - grid from S2-related space-time groups, averaged over time/group dimensions
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 10-band raw_tchw
+     <span class="pipeline-detail">input_chw path: coerce to exact TCHW</span>
+  <span class="pipeline-arrow">-&gt;</span> resolve months sequence
+     <span class="pipeline-detail">frame-bin midpoints or RS_EMBED_GALILEO_MONTH override</span>
+  <span class="pipeline-arrow">-&gt;</span> resize frames to RS_EMBED_GALILEO_IMG=64 if needed
+  <span class="pipeline-arrow">-&gt;</span> normalize series with RS_EMBED_GALILEO_NORM
+     <span class="pipeline-branch">default:</span> unit_scale
+  <span class="pipeline-arrow">-&gt;</span> build encoder tensors + masks
+     <span class="pipeline-branch">inputs:</span> s_t_x, sp_x, t_x, st_x
+     <span class="pipeline-branch">masks:</span>  s_t_m, sp_m, t_m, st_m
+     <span class="pipeline-branch">side input:</span> months
+  <span class="pipeline-arrow">-&gt;</span> optional NDVI injection
+     <span class="pipeline-detail">when RS_EMBED_GALILEO_INCLUDE_NDVI=1 and model space supports NDVI</span>
+  <span class="pipeline-arrow">-&gt;</span> Galileo encoder forward
+     <span class="pipeline-detail">patch_size=RS_EMBED_GALILEO_PATCH=8</span>
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> visible-token average
+     <span class="pipeline-branch">grid:</span>   average S2 space-time groups to grid</code></pre>
 
 Constraint:
 

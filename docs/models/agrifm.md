@@ -41,21 +41,23 @@ For `input_chw`, the adapter accepts `CHW` with `C=10` and repeats that frame to
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Resolve runtime settings:
-   - `n_frames`, `image_size`, normalization mode
-   - checkpoint path (local or auto-download)
-2. Fetch provider multi-frame raw `TCHW` or coerce `input_chw` (`CHW`/`TCHW`) to exact `T`
-3. Optional input inspection on frame 0 (temporarily scaled to `[0,1]`)
-4. Normalize with `RS_EMBED_AGRIFM_NORM`:
-   - `agrifm_stats` (default): z-score with AgriFM S2 statistics
-   - `unit_scale`: divide by `10000` and clip `[0,1]`
-   - `none` / `raw`: keep raw `0..10000` (clipped)
-5. Resize all frames to `RS_EMBED_AGRIFM_IMG` (default `224`)
-6. Load AgriFM model (checkpoint + vendored runtime)
-7. Forward to produce embedding grid `(D,H,W)`
-8. Return:
-   - pooled vector = spatial mean/max over grid
-   - grid = `xarray.DataArray`
+<pre class="pipeline-flow"><code><span class="pipeline-root">SETUP</span>  runtime settings
+  <span class="pipeline-arrow">-&gt;</span> n_frames + image_size + normalization mode
+  <span class="pipeline-arrow">-&gt;</span> checkpoint path (local or auto-download)
+<span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> multi-frame raw TCHW
+     <span class="pipeline-detail">input_chw path: coerce CHW / TCHW to exact T</span>
+  <span class="pipeline-arrow">-&gt;</span> optional inspection on frame 0
+  <span class="pipeline-arrow">-&gt;</span> normalize with RS_EMBED_AGRIFM_NORM
+     <span class="pipeline-branch">agrifm_stats:</span> z-score with AgriFM S2 statistics
+     <span class="pipeline-branch">unit_scale:</span> /10000 -&gt; clip [0,1]
+     <span class="pipeline-branch">none / raw:</span> keep clipped raw values
+  <span class="pipeline-arrow">-&gt;</span> resize all frames to RS_EMBED_AGRIFM_IMG=224
+  <span class="pipeline-arrow">-&gt;</span> load checkpoint + vendored runtime
+  <span class="pipeline-arrow">-&gt;</span> forward to embedding grid (D,H,W)
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> spatial mean / max over grid
+     <span class="pipeline-branch">grid:</span>   xarray.DataArray</code></pre>
 
 ---
 

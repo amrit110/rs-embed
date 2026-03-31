@@ -53,12 +53,16 @@ The RGB variant defaults to `collection="COPERNICUS/S2_SR_HARMONIZED"`, `bands=(
 
 ### Preprocessing Pipeline
 
-1. Fetch RGB `uint8` from the provider, or convert `input_chw` from raw SR to `[0,1]` and then to `uint8`
-2. Apply SatMAE++ fMoW RGB eval preprocessing:
-   - channel order `rgb` or `bgr`
-   - `ToTensor -> Normalize(mean/std) -> Resize(short side) -> CenterCrop(image_size)`
-3. Run `forward_encoder(mask_ratio=0.0)` to extract tokens
-4. Pool tokens or reshape them into a patch grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> RGB uint8 patch
+     <span class="pipeline-detail">input_chw path: raw SR -&gt; [0,1] -&gt; uint8</span>
+  <span class="pipeline-arrow">-&gt;</span> SatMAE++ fMoW eval preprocess
+     <span class="pipeline-branch">channel_order:</span> rgb | bgr
+     <span class="pipeline-detail">ToTensor -&gt; Normalize(mean/std) -&gt; Resize(short side) -&gt; CenterCrop(image_size)</span>
+  <span class="pipeline-arrow">-&gt;</span> forward_encoder(mask_ratio=0.0)
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> token pooling
+     <span class="pipeline-branch">grid:</span>   patch-token reshape</code></pre>
 
 ### Key Environment Variables
 
@@ -94,14 +98,19 @@ This path is stricter than the RGB path: `sensor.bands` must exactly match the 1
 
 ### Preprocessing + Runtime Loading
 
-1. Fetch 10-band `CHW`, or reuse `input_chw`
-2. Apply source-style Sentinel statistics mapping (`mean ± 2*std`) to `uint8`
-3. Apply eval transforms: `ToTensor -> Resize(short side) -> CenterCrop(image_size)`
-4. Download or load runtime weights
-5. Import vendored grouped-channel runtime
-6. Construct the grouped-channel model with channel groups `((0,1,2,6),(3,4,5,7),(8,9))`
-7. Run `forward_encoder(mask_ratio=0.0)` to extract grouped tokens
-8. Reduce grouped tokens for pooled or grid output
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> 10-band CHW
+  <span class="pipeline-arrow">-&gt;</span> source-style Sentinel stats mapping to uint8
+     <span class="pipeline-detail">mean ± 2*std stretch</span>
+  <span class="pipeline-arrow">-&gt;</span> eval transforms
+     <span class="pipeline-detail">ToTensor -&gt; Resize(short side) -&gt; CenterCrop(image_size)</span>
+  <span class="pipeline-arrow">-&gt;</span> load runtime weights + vendored grouped-channel runtime
+  <span class="pipeline-arrow">-&gt;</span> construct grouped model
+     <span class="pipeline-detail">channel groups: ((0,1,2,6),(3,4,5,7),(8,9))</span>
+  <span class="pipeline-arrow">-&gt;</span> forward_encoder(mask_ratio=0.0)
+  <span class="pipeline-arrow">-&gt;</span> grouped-token reduction
+     <span class="pipeline-branch">pooled:</span> reduce grouped tokens to vector
+     <span class="pipeline-branch">grid:</span>   reduce + reshape patch grid</code></pre>
 
 ### Key Environment Variables
 

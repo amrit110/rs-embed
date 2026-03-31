@@ -54,26 +54,36 @@ For `backend="tensor"`, `input_chw` must be `CHW`, and batch tensor usage should
 
 ### Provider path
 
-1. Fetch raw multiband Sentinel-2 SR patch
-2. Optional input inspection on raw SR (`expected_channels=len(bands)`, value range `[0,10000]`)
-3. Convert raw SR `0..10000` to `0..255`-like scale
-4. Apply official DOFA S2 per-band mean/std normalization on that `0..255`-like tensor
-5. Resize to fixed `224x224` (bilinear; no crop/pad)
-6. Load DOFA model variant (`base` / `large`)
-7. Forward with image tensor + wavelength vector
-8. Return pooled embedding or reshape tokens to patch-token grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">PROVIDER</span>  fetch raw multiband Sentinel-2 SR patch
+  <span class="pipeline-arrow">-&gt;</span> optional raw-value inspection
+     <span class="pipeline-detail">expected_channels=len(bands), value range [0,10000]</span>
+  <span class="pipeline-arrow">-&gt;</span> raw SR 0..10000 -&gt; 0..255-like scale
+  <span class="pipeline-arrow">-&gt;</span> official DOFA S2 per-band mean/std normalization
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+     <span class="pipeline-detail">bilinear; no crop / pad</span>
+  <span class="pipeline-arrow">-&gt;</span> load DOFA model variant
+     <span class="pipeline-branch">variant:</span> base | large
+  <span class="pipeline-arrow">-&gt;</span> forward(image, wavelengths)
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> embedding vector
+     <span class="pipeline-branch">grid:</span>   patch-token grid</code></pre>
 
 ### Tensor path
 
-1. Read raw SR `input_chw` (`CHW`)
-2. Reject already-normalized `[0,1]`-like inputs
-3. Apply the same official DOFA S2 preprocessing used by the provider path:
-   - raw SR `0..10000` -> `[0,1]`
-   - rescale to `0..255`-like values
-   - apply official per-band mean/std normalization
-4. Resize to `224x224`
-5. Resolve wavelengths from `sensor.wavelengths` or infer from `sensor.bands`
-6. Forward DOFA with image + wavelengths
+<pre class="pipeline-flow"><code><span class="pipeline-root">TENSOR</span>  read raw SR input_chw
+  <span class="pipeline-arrow">-&gt;</span> reject already-normalized [0,1]-like inputs
+  <span class="pipeline-arrow">-&gt;</span> apply provider-equivalent DOFA preprocessing
+     <span class="pipeline-detail">raw SR 0..10000 -&gt; [0,1]</span>
+     <span class="pipeline-detail">rescale to 0..255-like values</span>
+     <span class="pipeline-detail">official per-band mean/std normalization</span>
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+  <span class="pipeline-arrow">-&gt;</span> resolve wavelengths
+     <span class="pipeline-branch">preferred:</span> sensor.wavelengths
+     <span class="pipeline-branch">fallback:</span>  infer from sensor.bands
+  <span class="pipeline-arrow">-&gt;</span> forward(image, wavelengths)
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> embedding vector
+     <span class="pipeline-branch">grid:</span>   patch-token grid</code></pre>
 
 Fixed adapter behavior:
 

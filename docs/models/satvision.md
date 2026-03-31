@@ -52,20 +52,24 @@ The adapter does not infer semantic channel order from the values themselves, so
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Resolve runtime settings (checkpoint/model ID, `in_chans`, normalization, calibration arrays)
-2. Fetch provider patch (`CHW`) or use `input_chw`
-3. If provider metadata says input is already unit-scaled, effective norm mode is forced to `unit`
-4. Normalize with `RS_EMBED_SATVISION_TOA_NORM`:
-   - `auto`: use `[0,1]` directly if values look unit-scaled, else fall back to raw scaling
-   - `raw`: channel-wise scaling
-     - reflectance channels: divide by `RS_EMBED_SATVISION_TOA_REF_DIV` (default `100`)
-     - emissive channels: min-max normalize using `RS_EMBED_SATVISION_TOA_EMISSIVE_MINS/MAXS`
-   - `unit`: clip to `[0,1]`
-5. Resize to `RS_EMBED_SATVISION_TOA_IMG` (default `128`)
-6. Forward model and decode output tensor
-7. Return:
-   - pooled vector (from token pooling or model-pooled output)
-   - grid via token reshape if output is token sequence `[N,D]`
+<pre class="pipeline-flow"><code><span class="pipeline-root">SETUP</span>  runtime settings
+  <span class="pipeline-arrow">-&gt;</span> checkpoint / model ID
+  <span class="pipeline-arrow">-&gt;</span> in_chans + normalization + calibration arrays
+<span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> CHW patch
+  <span class="pipeline-arrow">-&gt;</span> provider unit-scale override
+     <span class="pipeline-detail">if metadata says unit-scaled, effective norm mode becomes unit</span>
+  <span class="pipeline-arrow">-&gt;</span> normalize with RS_EMBED_SATVISION_TOA_NORM
+     <span class="pipeline-branch">auto:</span> use [0,1] if values look unit-scaled, else raw scaling
+     <span class="pipeline-branch">raw:</span>  channel-wise scaling
+     <span class="pipeline-detail">reflectance: divide by RS_EMBED_SATVISION_TOA_REF_DIV=100</span>
+     <span class="pipeline-detail">emissive: min-max with RS_EMBED_SATVISION_TOA_EMISSIVE_MINS/MAXS</span>
+     <span class="pipeline-branch">unit:</span> clip to [0,1]
+  <span class="pipeline-arrow">-&gt;</span> resize to RS_EMBED_SATVISION_TOA_IMG=128
+  <span class="pipeline-arrow">-&gt;</span> forward model + decode output tensor
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> token pooling or model-pooled vector
+     <span class="pipeline-branch">grid:</span>   token reshape when output is [N,D]</code></pre>
 
 ---
 

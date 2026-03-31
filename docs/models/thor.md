@@ -49,21 +49,23 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with adapter band order `B2,
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 SR 10-band composite patch (provider path) or accept `input_chw`
-2. Optional input inspection on raw values (`expected_channels=10`, range `0..10000`)
-3. Normalize with `RS_EMBED_THOR_NORMALIZE`:
-   - `thor_stats` (default): `/10000` then THOR z-score stats
-   - `unit_scale`: `/10000` and clip `[0,1]`
-   - `none` / `raw`: keep raw `0..10000` (clipped)
-4. Resize to `RS_EMBED_THOR_IMG` (default `288`)
-5. Build/load THOR backbone via vendored THOR runtime wrapper
-   - `ground_cover_m = sensor.scale_m * image_size`
-   - `patch_size` passed into THOR build params
-6. Forward model, extract token sequence `[N,D]`
-7. Try building `grid`:
-   - first via THOR group-aware token layout (`group_merge`)
-   - fallback to generic square patch-token reshape
-   - if both fail, `grid` is unavailable
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 SR 10-band composite patch
+  <span class="pipeline-arrow">-&gt;</span> optional raw-value inspection
+     <span class="pipeline-detail">expected_channels=10, value range 0..10000</span>
+  <span class="pipeline-arrow">-&gt;</span> normalize with RS_EMBED_THOR_NORMALIZE
+     <span class="pipeline-branch">thor_stats:</span> /10000 -&gt; THOR z-score stats
+     <span class="pipeline-branch">unit_scale:</span> /10000 -&gt; clip [0,1]
+     <span class="pipeline-branch">none / raw:</span> keep clipped raw values
+  <span class="pipeline-arrow">-&gt;</span> resize to RS_EMBED_THOR_IMG=288
+  <span class="pipeline-arrow">-&gt;</span> build/load THOR backbone
+     <span class="pipeline-detail">ground_cover_m = sensor.scale_m * image_size</span>
+     <span class="pipeline-detail">patch_size passed through THOR build params</span>
+  <span class="pipeline-arrow">-&gt;</span> forward model to token sequence [N,D]
+  <span class="pipeline-arrow">-&gt;</span> grid construction
+     <span class="pipeline-branch">preferred:</span> THOR group-aware token layout (group_merge)
+     <span class="pipeline-branch">fallback:</span>  generic square patch-token reshape
+     <span class="pipeline-branch">failure:</span>   grid unavailable</code></pre>
 
 ---
 

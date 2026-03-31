@@ -42,18 +42,22 @@ For `input_chw`, the adapter accepts either `CHW` or `TCHW` with `C=10`. A `CHW`
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 10-band time series `raw_tchw` in `[T,C,H,W]` (or coerce `input_chw` to `TCHW`)
-2. Optionally resize all frames to square `RS_EMBED_ANYSAT_IMG` (default `24`)
-3. Normalize series using `RS_EMBED_ANYSAT_NORM`:
-   - `per_tile_zscore` (default)
-   - `unit_scale` / `reflectance` (`/10000 -> [0,1]`)
-   - `raw` / `none`
-4. Build AnySat side input dict:
-   - `s2`: `[1,T,10,H,W]`
-   - `s2_dates`: `[1,T]` (DOY values from frame-bin midpoints)
-5. Forward with `output="patch"` and `patch_size=sensor.scale_m`
-6. Map AnySat patch output `[B,H,W,D]` -> rs-embed grid `[D,H,W]`
-7. Optionally spatial-pool grid to vector (`mean` or `max`)
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 10-band time series in TCHW
+     <span class="pipeline-detail">input_chw path: coerce CHW / TCHW to exact T</span>
+  <span class="pipeline-arrow">-&gt;</span> optional resize to RS_EMBED_ANYSAT_IMG=24
+  <span class="pipeline-arrow">-&gt;</span> normalize series with RS_EMBED_ANYSAT_NORM
+     <span class="pipeline-branch">per_tile_zscore:</span> default
+     <span class="pipeline-branch">unit_scale / reflectance:</span> /10000 -&gt; [0,1]
+     <span class="pipeline-branch">raw / none:</span> keep raw values
+  <span class="pipeline-arrow">-&gt;</span> build AnySat side inputs
+     <span class="pipeline-branch">s2:</span> [1,T,10,H,W]
+     <span class="pipeline-branch">s2_dates:</span> [1,T] from frame-bin DOY midpoints
+  <span class="pipeline-arrow">-&gt;</span> forward with output="patch" and patch_size=sensor.scale_m
+  <span class="pipeline-arrow">-&gt;</span> map [B,H,W,D] -&gt; rs-embed grid [D,H,W]
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> spatial mean / max over grid
+     <span class="pipeline-branch">grid:</span>   model patch grid</code></pre>
 
 Important constraint:
 

@@ -79,6 +79,29 @@ Goal: make every model page answer the same questions quickly, so users can comp
 
 Document the **actual adapter path**, not the idealized paper pipeline.
 
+Recommended display pattern in MkDocs Material:
+
+- Use a `<pre class="pipeline-flow"><code>...</code></pre>` block for the pipeline itself.
+- Keep it compact and linear, like a small execution trace.
+- Use `<span>` classes for hierarchy: `pipeline-root`, `pipeline-arrow`, `pipeline-branch`, `pipeline-detail`.
+- Put detailed caveats below the block in normal prose instead of expanding the block itself.
+
+Example:
+
+```html
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> normalize
+  <span class="pipeline-arrow">-&gt;</span> model-specific prep
+     <span class="pipeline-branch">resize:</span> ...
+     <span class="pipeline-branch">pad:</span>    ...
+  <span class="pipeline-arrow">-&gt;</span> encoder forward
+  <span class="pipeline-arrow">-&gt;</span> output
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   token grid</code></pre>
+```
+
+Suggested content checklist:
+
 1. Raw provider tensor format: `TODO` (for example `CHW`, `TCHW`)
 2. Value range assumptions: `TODO`
 3. Normalization steps: `TODO`

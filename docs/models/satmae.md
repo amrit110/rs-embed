@@ -48,15 +48,17 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch S2 RGB patch as `uint8` RGB (provider path) or convert `input_chw` raw SR -> `[0,1]` -> `uint8`
-2. Resize to `RS_EMBED_SATMAE_IMG` (default `224`)
-3. Model preprocessing inside adapter:
-   - preferred: `model.transform(rgb_u8, image_size)` if wrapper exposes it
-   - fallback: generic CLIP-style tensor preprocessing (`rgb_u8_to_tensor_clipnorm`)
-4. Run `forward_encoder(mask_ratio=0.0)` to get token sequence `[N,D]`
-5. Return:
-   - `pooled`: patch-token pooling (`mean` / `max`)
-   - `grid`: patch-token reshape to `xarray.DataArray`
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 RGB uint8 patch
+     <span class="pipeline-detail">input_chw path: raw SR -&gt; [0,1] -&gt; uint8</span>
+  <span class="pipeline-arrow">-&gt;</span> resize to RS_EMBED_SATMAE_IMG=224
+  <span class="pipeline-arrow">-&gt;</span> model preprocess
+     <span class="pipeline-branch">preferred:</span> model.transform(rgb_u8, image_size)
+     <span class="pipeline-branch">fallback:</span>  rgb_u8_to_tensor_clipnorm
+  <span class="pipeline-arrow">-&gt;</span> forward_encoder(mask_ratio=0.0)
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> patch-token mean / max
+     <span class="pipeline-branch">grid:</span>   patch-token reshape</code></pre>
 
 Notes:
 

@@ -45,13 +45,20 @@ The backend should be `auto`, although legacy `local` is still accepted for comp
 
 ## Retrieval Pipeline (Current rs-embed Path)
 
-1. Validate `TemporalSpec.year(...)` and supported year (`2021`)
-2. Resolve `data_dir` (env or `sensor.collection` override)
-3. Load/cache vendored `CopernicusEmbedGeoTiff` dataset (`download=True` in current adapter)
-4. Convert `SpatialSpec` to EPSG:4326 bbox
-5. Validate that the requested ROI covers at least one full Copernicus pixel
-6. Slice dataset with bbox indexing and get `sample["image"]` (`CHW`)
-7. Return pooled vector or grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  TemporalSpec.year(...) + SpatialSpec
+  <span class="pipeline-arrow">-&gt;</span> validate supported year
+     <span class="pipeline-detail">current adapter supports 2021</span>
+  <span class="pipeline-arrow">-&gt;</span> resolve data_dir
+     <span class="pipeline-branch">default:</span> RS_EMBED_COP_DIR
+     <span class="pipeline-branch">override:</span> sensor.collection
+  <span class="pipeline-arrow">-&gt;</span> load / cache CopernicusEmbedGeoTiff dataset
+     <span class="pipeline-detail">download=True in current adapter</span>
+  <span class="pipeline-arrow">-&gt;</span> convert SpatialSpec to EPSG:4326 bbox
+  <span class="pipeline-arrow">-&gt;</span> validate ROI covers at least one full Copernicus pixel
+  <span class="pipeline-arrow">-&gt;</span> bbox slice -&gt; sample["image"] as CHW
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   embedding grid</code></pre>
 
 Notes:
 

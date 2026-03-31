@@ -55,18 +55,31 @@ For provider overrides, `input_chw` must be `CHW` with 12 bands in the adapter f
 
 ### Provider path
 
-1. Fetch 12-band raw S2 SR patch (`0..10000`), composite over temporal window
-2. Optional input inspection checks on raw values (`value_range=(0,10000)`)
-3. Resize to fixed `224x224`
-4. Apply TerraMind normalization (`RS_EMBED_TERRAMIND_NORMALIZE`, default `zscore`)
-   - `zscore`: uses TerraMind v1 or v01 stats depending on model key prefix
-   - `raw/none`: no z-score stats, only `nan_to_num`
-5. Forward TerraMind backbone and extract token tensor
-6. Pool tokens or reshape to patch-token grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">PROVIDER</span>  fetch raw 12-band S2 SR patch
+  <span class="pipeline-arrow">-&gt;</span> composite over temporal window
+  <span class="pipeline-arrow">-&gt;</span> optional raw-value inspection
+     <span class="pipeline-detail">value_range=(0,10000)</span>
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+  <span class="pipeline-arrow">-&gt;</span> TerraMind normalization
+     <span class="pipeline-branch">zscore:</span> TerraMind v1 / v01 stats by model key prefix
+     <span class="pipeline-branch">raw / none:</span> nan_to_num only
+  <span class="pipeline-arrow">-&gt;</span> forward TerraMind backbone
+  <span class="pipeline-arrow">-&gt;</span> token tensor
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> token pooling
+     <span class="pipeline-branch">grid:</span>   patch-token grid</code></pre>
 
 ### Tensor path
 
-The tensor path reads `input_chw`, resizes it to `224`, applies the same normalization, and then forwards the model.
+<pre class="pipeline-flow"><code><span class="pipeline-root">TENSOR</span>  read input_chw
+  <span class="pipeline-arrow">-&gt;</span> resize to fixed 224x224
+  <span class="pipeline-arrow">-&gt;</span> apply the same TerraMind normalization
+     <span class="pipeline-branch">zscore:</span> TerraMind v1 / v01 stats by model key prefix
+     <span class="pipeline-branch">raw / none:</span> nan_to_num only
+  <span class="pipeline-arrow">-&gt;</span> forward TerraMind backbone
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> token pooling
+     <span class="pipeline-branch">grid:</span>   patch-token grid</code></pre>
 
 ---
 

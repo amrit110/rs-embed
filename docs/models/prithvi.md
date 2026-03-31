@@ -52,15 +52,21 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("BLUE", "GREEN"
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Fetch 6-band S2 patch from provider (or reuse `input_chw`)
-2. Normalize raw SR -> `[0,1]` (`/10000`, clip, `nan_to_num`)
-3. Optional input checks and quicklook RGB export (`bands=(2,1,0)`)
-4. Apply Prithvi input prep (`_prepare_prithvi_chw`):
-   - `resize` to `RS_EMBED_PRITHVI_IMG` (default `224`), or
-   - `pad` H/W to multiple of `RS_EMBED_PRITHVI_PATCH_MULT` (default `16`)
-5. Compute temporal/date and location side inputs
-6. Forward pass to token sequence
-7. Convert to pooled vector or patch-token grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> 6-band S2 patch
+  <span class="pipeline-arrow">-&gt;</span> normalize raw SR to [0,1]
+     <span class="pipeline-detail">/10000 -&gt; clip -&gt; nan_to_num</span>
+  <span class="pipeline-arrow">-&gt;</span> optional checks + quicklook RGB
+  <span class="pipeline-arrow">-&gt;</span> _prepare_prithvi_chw
+     <span class="pipeline-branch">resize:</span> RS_EMBED_PRITHVI_IMG=224
+     <span class="pipeline-branch">pad:</span>    H/W -&gt; multiple of RS_EMBED_PRITHVI_PATCH_MULT=16
+  <span class="pipeline-arrow">-&gt;</span> derive side inputs
+     <span class="pipeline-detail">temporal coords from window midpoint</span>
+     <span class="pipeline-detail">location coords from ROI center</span>
+  <span class="pipeline-arrow">-&gt;</span> encoder forward pass
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   patch-token grid</code></pre>
 
 ---
 

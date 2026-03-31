@@ -47,17 +47,21 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("B4", "B3", "B2
 
 ## Preprocessing Pipeline (Current rs-embed Path)
 
-1. Resolve checkpoint path (local or auto-download)
-2. Fetch S2 RGB patch (provider path) or use `input_chw`
-3. Normalize `raw_chw` (`0..10000` -> `[0,1]`) with `RS_EMBED_WILDSAT_NORM`:
-   - `minmax` (default): per-tile min-max stretch after unit scaling
-   - `unit_scale` / `none`: keep unit-scaled values (no extra per-tile stretch)
-4. Convert to `uint8 HWC` and resize to `RS_EMBED_WILDSAT_IMG` (default `224`)
-5. Load torchvision backbone + optional decoder image head from checkpoint
-6. Forward pass:
-   - choose feature source (`image_head`, `backbone`, or `auto`)
-   - optional token extraction for ViT backbones (used for token pooling / grid)
-7. Return pooled vector or grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">SETUP</span>  resolve checkpoint path
+  <span class="pipeline-arrow">-&gt;</span> local checkpoint or auto-download
+<span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+  <span class="pipeline-arrow">-&gt;</span> S2 RGB patch
+  <span class="pipeline-arrow">-&gt;</span> normalize raw_chw with RS_EMBED_WILDSAT_NORM
+     <span class="pipeline-branch">minmax:</span> per-tile min-max after unit scaling
+     <span class="pipeline-branch">unit_scale / none:</span> keep unit-scaled values
+  <span class="pipeline-arrow">-&gt;</span> uint8 HWC + resize to RS_EMBED_WILDSAT_IMG=224
+  <span class="pipeline-arrow">-&gt;</span> load backbone + optional decoder image head
+  <span class="pipeline-arrow">-&gt;</span> forward pass
+     <span class="pipeline-branch">feature source:</span> image_head | backbone | auto
+     <span class="pipeline-detail">optional ViT token extraction for token pooling / grid</span>
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   token grid or 1x1 fallback</code></pre>
 
 Important behavior:
 

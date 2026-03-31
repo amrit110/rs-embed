@@ -43,17 +43,21 @@ The backend should be `auto`, although legacy `local` is still accepted for comp
 
 ## Preprocessing / Retrieval Pipeline (Current rs-embed Path)
 
-1. Convert `SpatialSpec` to `BBox` in EPSG:4326
-2. Resolve year from `TemporalSpec` (with fallback behavior)
-3. Open/cache `geotessera.GeoTessera` instance by `cache_dir`
-4. Query tile blocks covering ROI/year
-5. Fetch tile embeddings and normalize array layout (`HWC` or `CHW` -> internal `HWC`)
-6. Strict mosaic + crop:
-   - requires north-up transforms (no rotation/shear)
-   - requires consistent tile CRS and resolution across fetched tiles
-   - reprojects ROI bbox into tile CRS if needed (requires `pyproj`)
-7. Convert cropped result to `CHW`
-8. Return pooled vector or grid
+<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  SpatialSpec + TemporalSpec
+  <span class="pipeline-arrow">-&gt;</span> convert SpatialSpec to EPSG:4326 BBox
+  <span class="pipeline-arrow">-&gt;</span> resolve year from TemporalSpec
+     <span class="pipeline-detail">with adapter fallback behavior</span>
+  <span class="pipeline-arrow">-&gt;</span> open / cache geotessera.GeoTessera by cache_dir
+  <span class="pipeline-arrow">-&gt;</span> query tile blocks covering ROI + year
+  <span class="pipeline-arrow">-&gt;</span> fetch tile embeddings and normalize layout
+     <span class="pipeline-detail">HWC or CHW -&gt; internal HWC</span>
+  <span class="pipeline-arrow">-&gt;</span> strict mosaic + crop
+     <span class="pipeline-detail">requires north-up transforms and consistent tile CRS / resolution</span>
+     <span class="pipeline-detail">reprojects ROI bbox into tile CRS if needed</span>
+  <span class="pipeline-arrow">-&gt;</span> cropped result -&gt; CHW
+  <span class="pipeline-arrow">-&gt;</span> output projection
+     <span class="pipeline-branch">pooled:</span> vector
+     <span class="pipeline-branch">grid:</span>   embedding grid</code></pre>
 
 ---
 
