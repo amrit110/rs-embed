@@ -145,6 +145,12 @@ _TERRAMIND_REGISTRATION_MODULES = (
     "terratorch.models.backbones.terramind.model.terramind_register",
 )
 
+_TERRAMIND_INSTALL_HINT = (
+    'TerraMind requires the optional terratorch dependency. Install it with: '
+    'pip install "rs-embed[terramind]" '
+    '(equivalent to: pip install "rs-embed[terratorch]").'
+)
+
 
 def _resize_chw(x_chw: np.ndarray, *, size: int = 224) -> np.ndarray:
     ensure_torch()
@@ -209,9 +215,7 @@ def _import_terramind_backbone_registry() -> Any:
         from terratorch.registry import BACKBONE_REGISTRY
     except ModuleNotFoundError as e:
         if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-            raise ModelError(
-                'TerraMind requires terratorch. Install: pip install -e ".[terratorch]"'
-            ) from e
+            raise ModelError(_TERRAMIND_INSTALL_HINT) from e
         raise ModelError(
             "Failed to import terratorch registry while loading TerraMind. "
             f"Missing dependency: {getattr(e, 'name', None) or e}. "
@@ -256,9 +260,7 @@ def _ensure_terramind_backbone_registered(backbone_registry: Any, *, model_key: 
             importlib.import_module(module_name)
         except ModuleNotFoundError as e:
             if str(getattr(e, "name", "")).split(".")[0] == "terratorch":
-                raise ModelError(
-                    'TerraMind requires terratorch. Install: pip install -e ".[terratorch]"'
-                ) from e
+                raise ModelError(_TERRAMIND_INSTALL_HINT) from e
             raise ModelError(
                 f"Failed to import TerraMind registration module '{module_name}': "
                 f"{type(e).__name__}: {e}"
