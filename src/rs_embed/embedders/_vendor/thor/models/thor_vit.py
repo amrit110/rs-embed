@@ -25,9 +25,6 @@ from rs_embed.embedders._vendor.thor.utils.pos_embed import (
     get_2d_sincos_pos_embed,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 
@@ -375,7 +372,7 @@ class ThorViTEncoder(nn.Module):
                 valid_groups[f"group{group_idx}"].append(product_band)
                 found_bands.append(product_band)
 
-        logger.info(f"Found bands: {found_bands}")
+        logger.debug(f"Found bands: {found_bands}")
         # Remove bands from channels that are not present in the groups
         keys = list(self.channels.keys())
         remove_bands = set(keys) - set(found_bands)

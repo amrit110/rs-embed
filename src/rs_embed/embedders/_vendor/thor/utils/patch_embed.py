@@ -19,9 +19,6 @@ from rs_embed.embedders._vendor.thor.utils.pos_embed import (
     get_2d_sincos_pos_embed_with_resolution,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 
@@ -228,7 +225,7 @@ class FlexiPosEmbed(nn.Module):
 
         self.grid_size = grid_size
         self.pos_embed_dim = pos_embed_dim
-        logger.info(f"flexible pos embed reference grid size: {grid_size}")
+        logger.debug(f"flexible pos embed reference grid size: {grid_size}")
         self.ref_pos_embed = torch.from_numpy(
             get_2d_sincos_pos_embed(self.pos_embed_dim, grid_size[0], cls_token=False)
         ).float()
@@ -268,7 +265,7 @@ class FlexiPosEmbed(nn.Module):
             return self.ref_pos_embed
 
         if str(grid_size) not in self.pos_embeds:
-            logger.info(f"interpolating new pos_embed for grid_size: {grid_size}, from {self.grid_size}")
+            logger.debug(f"interpolating new pos_embed for grid_size: {grid_size}, from {self.grid_size}")
             self.pos_embeds[str(grid_size)] = (
                 resize_abs_pos_embed(
                     self.ref_pos_embed[None, :, :],
@@ -711,7 +708,7 @@ class FlexiBase(nn.Module):
 
         # Calculate pseudo-inverse of resize matrix
         if patch_size not in self.pinvs or new_patch_size not in self.pinvs[patch_size]:
-            logger.info(f"getting and caching pinv for {patch_size} -> {new_patch_size}")
+            logger.debug(f"getting and caching pinv for {patch_size} -> {new_patch_size}")
             if patch_size not in self.pinvs:
                 self.pinvs[patch_size] = {}
             self.pinvs[patch_size][new_patch_size] = self._calculate_pinv(patch_size, new_patch_size)
@@ -776,7 +773,7 @@ class IndFlexiPatchEmbed(FlexiBase):
             if channel_rename_map and product_band in channel_rename_map:
                 product_band = channel_rename_map[product_band]
             if product_band in proj_dict:
-                logger.info(f"Product band {product_band} already added, skipping")
+                logger.debug(f"Product band {product_band} already added, skipping")
                 continue
             proj_dict[product_band] = nn.Conv2d(1, embed_dim, kernel_size=kernel_size, stride=kernel_size, bias=bias)
         self.patch_embed = nn.ModuleDict(proj_dict)
@@ -810,9 +807,9 @@ class IndFlexiPatchEmbed(FlexiBase):
                 missing_produc_bands.append(product_band)
                 continue
 
-            logger.info(f"product_band: {product_band}, _patch_size_seq: {_patch_size_seq}\n")
+            logger.debug(f"product_band: {product_band}, _patch_size_seq: {_patch_size_seq}")
             patch_size_seqs[product_band] = sorted(_patch_size_seq)
-        logger.info(f"Missing product bands due to no valid patch sizes: {missing_produc_bands}")
+        logger.debug(f"Missing product bands due to no valid patch sizes: {missing_produc_bands}")
 
         self.patch_size_seqs = patch_size_seqs
 
@@ -1073,7 +1070,7 @@ class FlexiLinDecoder(FlexiBase):
 
         # Pre-calculate pinvs
         if patch_size_seqs is not None:
-            logger.info("Caching lin decoder pinvs")
+            logger.debug("Caching lin decoder pinvs")
             self.pinvs = self._cache_pinvs()
         else:
             self.pinvs = {}
@@ -1089,7 +1086,7 @@ class FlexiLinDecoder(FlexiBase):
             for ps in self.patch_size_seqs[product_band]:
                 ps = to_2tuple(ps)
                 if ps not in pinvs[patch_size] and ps != patch_size:
-                    logger.info(f"Caching pinv for group: {group_name}, patch_size: {patch_size}, new_patch_size: {ps}")
+                    logger.debug(f"Caching pinv for group: {group_name}, patch_size: {patch_size}, new_patch_size: {ps}")
                     pinvs[patch_size][ps] = self._calculate_pinv(patch_size, ps)
         return pinvs
 
@@ -1100,7 +1097,7 @@ class FlexiLinDecoder(FlexiBase):
 
         # Calculate pseudo-inverse of resize matrix
         if patch_size not in self.pinvs or new_patch_size not in self.pinvs[patch_size]:
-            logger.info(f"getting and caching pinv for {patch_size} -> {new_patch_size}")
+            logger.debug(f"getting and caching pinv for {patch_size} -> {new_patch_size}")
             if patch_size not in self.pinvs:
                 self.pinvs[patch_size] = {}
             self.pinvs[patch_size][new_patch_size] = self._calculate_pinv(patch_size, new_patch_size)
@@ -1244,7 +1241,7 @@ class FlexiConvTransDecoder(FlexiBase):
                 ps = to_2tuple(ps)
 
                 if ps not in pinvs[patch_size] and ps != patch_size:
-                    logger.info(f"Caching pinv for patch_size: {patch_size}, new_patch_size: {ps}")
+                    logger.debug(f"Caching pinv for patch_size: {patch_size}, new_patch_size: {ps}")
                     pinvs[patch_size][ps] = self._calculate_pinv(patch_size, ps)
         return pinvs
 

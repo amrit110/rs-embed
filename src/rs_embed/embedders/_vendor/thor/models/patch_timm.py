@@ -10,9 +10,6 @@ import torch.nn.functional as F
 from timm.models.vision_transformer import Attention as TimmAttention
 from timm.models.vision_transformer import Block as TimmBlock
 
-logging.basicConfig(
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 
@@ -102,12 +99,12 @@ def _alibi_block_forward(self, x: torch.Tensor, attn_mask: torch.Tensor | None =
 def enable_alibi_for_timm():
     if getattr(enable_alibi_for_timm, "_done", False):
         return
-    logger.info("Patching timm Attention and Block to use Alibi...")
+    logger.debug("Patching timm Attention and Block to use Alibi...")
     if use_flex_attn():
-        logger.info("Using flex attention for timm Attention")
+        logger.debug("Using flex attention for timm Attention")
         TimmAttention.forward = _alibi_attn_flex_forward
     else:
-        logger.info("Using normal attention for timm Attention")
+        logger.debug("Using normal attention for timm Attention")
         TimmAttention.forward = _alibi_attn_forward
     TimmBlock.forward = _alibi_block_forward
     enable_alibi_for_timm._done = True

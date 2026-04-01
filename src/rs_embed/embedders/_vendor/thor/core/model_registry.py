@@ -11,9 +11,6 @@ from rs_embed.embedders._vendor.thor.utils.helper import extract_model_state_dic
 from rs_embed.embedders._vendor.thor.utils.patch_embed import pi_resize_patch_embed
 from rs_embed.embedders._vendor.thor.utils.pos_embed import interpolate_pos_embed_thor
 
-logging.basicConfig(
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +62,7 @@ class ModelRegistry:
             target_model = model_cfg.get("target_model", model_name)
 
             if ckpt is not None:
-                logger.info(f"Loading custom weight for {model_name} from {ckpt}")
+                logger.debug(f"Loading custom weight for {model_name} from {ckpt}")
                 ckpt = torch.load(ckpt, map_location="cpu")
                 model_state_dict = extract_model_state_dict_from_ckpt(ckpt)[target_model]
 
@@ -76,11 +73,11 @@ class ModelRegistry:
                 model_state_dict = {k: model_state_dict[k] for k in new_keys}
 
                 for copy_key in ckpt_copy:
-                    logger.info(f"Skipping model load for: {copy_key}")
+                    logger.debug(f"Skipping model load for: {copy_key}")
                     model_state_dict[copy_key] = model.state_dict()[copy_key]
 
                 for key, cfg_map in ckpt_remap.items():
-                    logger.info(f"Remapping key for custom load: {key}")
+                    logger.debug(f"Remapping key for custom load: {key}")
                     old_val = model_state_dict.pop(key)
                     new_val = old_val
                     new_name = cfg_map.get("name", key)
@@ -133,7 +130,7 @@ class ModelRegistry:
                         new_patch_size = _get_patch_size(ground_cover, **channels[channel_key])
 
                         if model_state_dict[patch_embed_key].shape[2:] != new_patch_size:
-                            logger.info(f"Resizing patch embed for {patch_embed_key}")
+                            logger.debug(f"Resizing patch embed for {patch_embed_key}")
                             model_state_dict[patch_embed_key] = pi_resize_patch_embed(
                                 model_state_dict[patch_embed_key], new_patch_size
                             )
@@ -147,7 +144,7 @@ class ModelRegistry:
                         and model.state_dict()[ref_pos_embed_key].shape
                         != model_state_dict[ref_pos_embed_key].shape
                     ):
-                        logger.info("interpolating pos_embed")
+                        logger.debug("interpolating pos_embed")
                         interpolate_pos_embed_thor(model, model_state_dict, ref_pos_embed_key)
                         for key in pos_embed_keys:
                             if key in model_state_dict:
@@ -155,7 +152,7 @@ class ModelRegistry:
                         pos_embeds_needs_reinit = True
 
                 model.load_state_dict(model_state_dict, strict=strict)
-                logger.info(f"Custom weight loaded for {model_name}")
+                logger.debug(f"Custom weight loaded for {model_name}")
 
                 if pos_embeds_needs_reinit:
                     model.init_embeds(pos_only=True)
