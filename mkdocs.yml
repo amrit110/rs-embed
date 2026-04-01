@@ -93,3 +93,5 @@ nav:
   - Extending:
     - Overview: extending.md
     - Contributing Guide: contributing.md
+  - Project:
+    - Releases and Versioning: releases.md

@@ -87,6 +87,8 @@ Homepage = "https://github.com/cybergis/rs-embed"
 Documentation = "https://cybergis.github.io/rs-embed/"
 Repository = "https://github.com/cybergis/rs-embed"
 Issues = "https://github.com/cybergis/rs-embed/issues"
+Changelog = "https://github.com/cybergis/rs-embed/blob/main/CHANGELOG.md"
+Releases = "https://github.com/cybergis/rs-embed/releases"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rs_embed"]
@@ -96,6 +98,7 @@ only-include = [
   "src/rs_embed",
   "LICENSE",
   "README.md",
+  "CHANGELOG.md",
   "pyproject.toml",
 ]
 

@@ -31,6 +31,8 @@ python -m pytest -v tests/...
 - [ ] I ran the relevant tests locally.
 - [ ] I ran lint or formatting checks for touched code.
 - [ ] I updated docs for user-facing behavior changes.
+- [ ] I updated `CHANGELOG.md` for user-facing API, model, semantic, or installation changes.
+- [ ] This PR does not need a changelog entry because it is docs/tests/CI/internal-only, or it is explicitly labeled `skip-changelog`.
 - [ ] I included links and plain-text snippets instead of screenshots.
 
 ## Reviewer Notes
