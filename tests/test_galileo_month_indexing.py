@@ -6,7 +6,6 @@ import numpy as np
 
 from rs_embed.core.specs import TemporalSpec
 
-
 sys.modules.setdefault("xarray", types.SimpleNamespace(DataArray=object))
 gal = importlib.import_module("rs_embed.embedders.onthefly_galileo")
 _frame_month_sequence = gal._frame_month_sequence

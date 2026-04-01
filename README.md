@@ -59,6 +59,7 @@ For editable development with the `terratorch` extra:
 pip install -e ".[terratorch]"
 ```
 
+
 If this is your first time using Google Earth Engine, authenticate once:
 
 ```bash
