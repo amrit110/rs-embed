@@ -28,6 +28,10 @@ This repository includes GitHub issue forms for bug reports and feature requests
 
 The repository also includes a pull request template. Please use it to summarize the change, link the related issue or reference material, and show how you verified the result. If the PR changes model behavior, it is especially helpful to mention the input contract, defaults, and any behavior that remains intentionally unsupported.
 
+If a pull request changes public API, model defaults, output semantics, or user-facing installation behavior, please update `CHANGELOG.md` as part of the same change so the release record stays current.
+
+Pull requests that touch user-facing or package-relevant files now get an automated changelog check in GitHub Actions. If a PR is intentionally docs-only, tests-only, CI-only, or otherwise internal, maintainers can apply the `skip-changelog` label to bypass that check.
+
 ## Tests
 
 `rs-embed` uses GitHub Actions for continuous integration, and it helps a lot if pull requests keep those checks green. If you change Python behavior, please add or update tests so the new behavior is explicit and easy to review. The repository already contains many focused tests, so the easiest starting point is usually to find a nearby test and mirror its style rather than inventing a new pattern.

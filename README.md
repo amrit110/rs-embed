@@ -15,7 +15,7 @@
 
 
 
-[Docs](https://cybergis.github.io/rs-embed/) · [Learn](https://cybergis.github.io/rs-embed/quickstart/) · [Guide](https://cybergis.github.io/rs-embed/workflows/) · [StartNow](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb) · [UseCase](https://github.com/cybergis/rs-embed/blob/main/examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
+[Docs](https://cybergis.github.io/rs-embed/) · [Releases](https://github.com/cybergis/rs-embed/releases) · [Changelog](https://github.com/cybergis/rs-embed/blob/main/CHANGELOG.md) · [StartNow](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb) · [UseCase](https://github.com/cybergis/rs-embed/blob/main/examples/demo.ipynb) · [Paper](https://arxiv.org/abs/2602.23678)
 
 </div>
 
@@ -131,6 +131,10 @@ Resolution here means the default provider/source fetch resolution used by the a
 ## Learn More
 
 📚 [Full documentation](https://cybergis.github.io/rs-embed/)
+
+🧾 [Release policy and versioning](https://cybergis.github.io/rs-embed/releases/)
+
+📌 [Project changelog](https://github.com/cybergis/rs-embed/blob/main/CHANGELOG.md)
 
 🪄 [Get Started: Try `rs-embed` Now](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb)
 

@@ -6,16 +6,28 @@ GEE, torch, or any real model weights.
 
 import numpy as np
 import pytest
+
 import rs_embed.api as api
 import rs_embed.tools.runtime as rt
-
 from rs_embed import list_models
-from rs_embed.api import _assert_supported, _validate_specs, export_batch, get_embedding, get_embeddings_batch
+from rs_embed.api import (
+    _assert_supported,
+    _validate_specs,
+    export_batch,
+    get_embedding,
+    get_embeddings_batch,
+)
 from rs_embed.core import registry
 from rs_embed.core.embedding import Embedding
 from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import FetchSpec, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
-from rs_embed.core.types import ExportConfig, ExportLayout, ExportModelRequest, ExportTarget, FetchResult
+from rs_embed.core.types import (
+    ExportConfig,
+    ExportLayout,
+    ExportModelRequest,
+    ExportTarget,
+    FetchResult,
+)
 from rs_embed.embedders.base import EmbedderBase
 from rs_embed.tools.output import normalize_embedding_output
 from rs_embed.tools.runtime import sensor_key
