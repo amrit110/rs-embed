@@ -18,6 +18,7 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 - The tag-triggered release flow now validates `src/rs_embed/_version.py`, publishes to PyPI, and only then creates the GitHub Release.
 - The tag-triggered release flow now validates the matching `CHANGELOG.md` entry before publishing to PyPI, so a missing release-notes section fails early instead of after package upload.
 - The base package installation now includes the Copernicus GeoTIFF runtime (`tifffile` and `imagecodecs`) instead of requiring a separate extra.
+- The public docs now default to `pip install rs-embed` for published releases while keeping editable installs documented for repository development.
 
 ### Deprecated
 

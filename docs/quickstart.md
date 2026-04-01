@@ -12,7 +12,18 @@ Legacy aliases such as `remoteclip_s2rgb` still work, but new code should use th
 
 ## Install
 
-For local development from the repository:
+
+```bash
+pip install rs-embed
+```
+
+For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`), install the extra:
+
+```bash
+pip install "rs-embed[terratorch]"
+```
+
+For local development from the repository, keep using editable mode:
 
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
@@ -20,9 +31,7 @@ cd rs-embed
 pip install -e .
 ```
 
-The base install already includes the GeoTIFF runtime used by `copernicus` (`tifffile` and `imagecodecs`).
-
-For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`):
+For editable development with the `terratorch` extra:
 
 ```bash
 pip install -e ".[terratorch]"
