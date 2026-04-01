@@ -8,6 +8,8 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-01
+
 ### Added
 - Automated pull request changelog enforcement with a `skip-changelog` escape hatch for docs, tests, CI, and other internal-only changes.
 - Tag-driven GitHub Release publishing that uses the matching `CHANGELOG.md` section as the release notes.
@@ -36,5 +38,6 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 - Support for on-the-fly model adapters including `satmae`, `satmaepp`, `satmaepp_s2_10b`, `prithvi`, `scalemae`, `remoteclip`, `dofa`, `satvision`, `anysat`, `galileo`, `wildsat`, `fomo`, `terramind`, `terrafm`, `thor`, and `agrifm`.
 - Documentation site covering quickstart, model behavior, API contracts, and extension guidance.
 
-[Unreleased]: https://github.com/cybergis/rs-embed/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/cybergis/rs-embed/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/cybergis/rs-embed/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cybergis/rs-embed/releases/tag/v0.1.0
