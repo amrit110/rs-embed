@@ -24,7 +24,7 @@ from ..core.specs import (
 from ..core.types import FetchResult
 from ..providers import ProviderBase
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str
+from .meta_utils import build_meta
 from .runtime_utils import (
     coerce_single_input_chw,
 )
@@ -711,7 +711,6 @@ class TerraFMBEmbedder(EmbedderBase):
             sensor=sensor_meta,
             temporal=temporal_used,
             image_size=image_size,
-            input_time=temporal_midpoint_str(temporal_used),
             extra={
                 "modality": modality,
                 "scale_m": scale_m if uses_provider else None,
@@ -982,7 +981,6 @@ class TerraFMBEmbedder(EmbedderBase):
                     sensor=sensor_meta,
                     temporal=temporal_used,
                     image_size=image_size,
-                    input_time=temporal_midpoint_str(temporal_used),
                     extra={
                         "modality": modality,
                         "scale_m": scale_m if uses_provider else None,

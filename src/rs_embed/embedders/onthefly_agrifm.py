@@ -29,7 +29,7 @@ from ..core.specs import (
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     fetch_s2_multiframe_raw_tchw as _fetch_s2_multiframe_raw_tchw,
 )
@@ -746,7 +746,6 @@ class AgriFMEmbedder(EmbedderBase):
             sensor=sensor,
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra={
                 "bands": tuple(_S2_10_BANDS),
                 "n_frames": int(raw_tchw.shape[0]),

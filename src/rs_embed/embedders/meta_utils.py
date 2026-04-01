@@ -74,6 +74,16 @@ def temporal_midpoint_str(temporal: TemporalSpec | None) -> str | None:
 # Meta builder
 # ---------------------------------------------------------------------------
 
+META_REQUIRED_KEYS: tuple[str, ...] = (
+    "model",
+    "type",
+    "backend",
+    "source",
+    "sensor",
+    "temporal",
+    "image_size",
+)
+
 
 def _sensor_to_dict(
     sensor: SensorSpec | dict[str, Any] | None,
@@ -99,16 +109,14 @@ def build_meta(
     sensor: SensorSpec | dict[str, Any] | None,
     temporal: TemporalSpec | None,
     image_size: int | None,
-    input_time: str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Construct a consistent meta dictionary across embedders.
     Standard keys:
-      model, type, backend, source, sensor, temporal, input_time, image_size
+      model, type, backend, source, sensor, temporal, image_size
     """
     t_dict = temporal_to_dict(temporal)
-    resolved_input_time = input_time or temporal_midpoint_str(temporal)
 
     meta: dict[str, Any] = {
         "model": model,
@@ -117,9 +125,11 @@ def build_meta(
         "source": source,
         "sensor": _sensor_to_dict(sensor),
         "temporal": t_dict,
-        "input_time": resolved_input_time,
         "image_size": int(image_size) if image_size is not None else None,
     }
+
+    for key in META_REQUIRED_KEYS:
+        meta.setdefault(key, None)
 
     if extra:
         meta.update(extra)

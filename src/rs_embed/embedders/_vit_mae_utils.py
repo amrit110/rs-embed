@@ -221,7 +221,6 @@ def base_meta(
     sensor: SensorSpec,
     temporal: TemporalSpec | None = None,
     source: str | None = None,
-    input_time: str | None = None,
     embed_type: str = "on_the_fly",
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -233,7 +232,6 @@ def base_meta(
         sensor=sensor,
         temporal=temporal,
         image_size=image_size,
-        input_time=input_time,
         extra=None,
     )
     extra_fields = {"hf_id": hf_id}

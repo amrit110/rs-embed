@@ -62,11 +62,6 @@ TemporalSpec.range("2022-06-01", "2022-09-01")
 
 Temporal semantics in provider and on-the-fly paths: `TemporalSpec.range(start, end)` is interpreted as a half-open window `[start, end)`, so `end` is excluded. In GEE-backed fetch paths, that window is used to filter an image collection and then apply a compositing reducer such as `median` or `mosaic`. The fetched input is therefore usually a composite over the whole window rather than an automatically selected single-day scene. If you want to approximate a single-day query, use a one-day window such as `TemporalSpec.range("2022-06-01", "2022-06-02")`.
 
-About `input_time` in metadata: many embedders store `meta["input_time"]` as the midpoint date of the temporal window. That midpoint is metadata, and for some models an auxiliary time signal, rather than proof that imagery was fetched from exactly that single date.
-
-!!! note "Common gotcha"
-    `input_time` often looks like a single date, but the actual provider fetch may still be a composite over the full temporal window.
-
 ---
 
 ### SensorSpec
@@ -318,8 +313,7 @@ Legacy `out + layout`, `out_dir` / `out_path`, and per-model dict overrides are 
 
 ### Embedding
 
-`get_embedding` / `get_embeddings_batch` return an `Embedding`:
-
+`get_embedding`, `get_embeddings_batch`, `Model.get_embedding`, and `Model.get_embeddings_batch` all return `Embedding`.
 
 ```python
 from rs_embed.core.embedding import Embedding
@@ -330,6 +324,104 @@ Embedding(
 )
 ```
 
-`data` holds the embedding itself as a float32 vector or grid, and `meta` carries model information, optional input information, and export or check reports.
+`data` holds the embedding itself as a float32 vector or grid. `meta` is the runtime metadata attached to that result.
+
+This is the main metadata users should inspect across the public embedding APIs. Export APIs do not redefine it; they only serialize the same embedding metadata into the manifest.
+
+#### What `Embedding.meta` is for
+
+`Embedding.meta` answers questions such as:
+
+- Which model produced this embedding
+- Which backend, sensor, and temporal request were actually used
+- Whether the output is pooled or grid-like, and how pooling or grid layout should be interpreted
+- Whether any API-side preprocessing such as tiling was applied
+- Which model-specific runtime details matter for interpreting the output
+
+#### Stable Contract Fields
+
+All built-in embedders now share the same minimum `Embedding.meta` contract. These fields should always be present, even when a specific model has little to say for one of them:
+
+| Field | Meaning |
+|---|---|
+| `model` | Model identifier that produced the embedding. |
+| `type` | Execution family such as `precomputed` or `on_the_fly`. |
+| `backend` | Backend used at runtime, such as `auto` or `gee`. |
+| `source` | Source dataset, collection, or checkpoint family used by the embedder. |
+| `sensor` | Effective sensor metadata attached to the returned embedding. |
+| `temporal` | Serialized temporal request as interpreted by the embedder. |
+| `image_size` | Model input image size when the embedder records it. |
+| `pooling` | Pooling semantics for pooled outputs, such as `token_mean`, `patch_mean`, or `mean_hw`. |
+| `grid_hw` | Grid height and width for grid outputs in model feature space. |
+| `cls_removed` | Whether a CLS token was removed before pooling or grid reshaping. |
+| `input_prep` | API-side input preprocessing metadata, for example whether the request resolved to `resize`, `tile`, or `auto -> tile`. |
+
+Model-specific adapters can still attach additional keys beyond this stable base, such as checkpoint IDs, normalization details, token counts, frame counts, CRS hints, crop provenance, or modality-specific runtime flags.
+
+#### Example
+
+```python
+from rs_embed import FetchSpec, PointBuffer, TemporalSpec, get_embedding
+
+emb = get_embedding(
+    "remoteclip",
+    spatial=PointBuffer(lon=121.5, lat=31.2, buffer_m=2048),
+    temporal=TemporalSpec.range("2022-06-01", "2022-09-01"),
+    fetch=FetchSpec(scale_m=10),
+)
+
+print(emb.data.shape)
+print(emb.meta["model"])
+print(emb.meta.get("sensor"))
+```
+
+#### `Embedding.meta` vs `describe_model()` / `Model.describe()`
+
+These two metadata surfaces are related, but they serve different purposes:
+
+| Surface | When you read it | What it means |
+|---|---|---|
+| `Embedding.meta` | After inference | Runtime result metadata for one concrete output |
+| `describe_model(model)` | Before inference | Static capability metadata for a model class |
+| `Model.describe()` | After constructing `Model(...)`, before or after inference | The same capability metadata, accessed from the model instance |
+
+Use `Embedding.meta` when you want to interpret a returned embedding.
+
+Use `describe_model()` or `Model.describe()` when you want to inspect what a model supports before you run it, such as supported outputs, default inputs, modality branches, or model-specific keyword arguments.
+
+#### `describe_model()` / `Model.describe()`
+
+`describe_model(model_id)` calls the embedder's `describe()` implementation without running inference or loading model weights. `Model.describe()` exposes the same capability dictionary on the class-based API.
+
+A typical `describe()` result contains fields such as:
+
+| Field | Meaning |
+|---|---|
+| `type` | Whether the model is `precomputed` or `on_the_fly`. |
+| `backend` | Supported backends or backend family. |
+| `inputs` | Default provider-facing input contract, often collection and bands. |
+| `temporal` | Supported temporal mode such as `year` or `range`. |
+| `output` | Supported output modes such as `pooled` and `grid`. |
+| `defaults` | Default runtime knobs such as `scale_m`, `cloudy_pct`, `composite`, or `image_size`. |
+| `modalities` | Optional modality-specific branches for multi-branch models. |
+| `model_config` | Machine-readable schema for supported model-specific kwargs such as `variant`. |
+
+Example:
+
+```python
+from rs_embed import Model, describe_model
+
+desc = describe_model("remoteclip")
+print(desc["output"])
+print(desc["defaults"]["image_size"])
+
+model = Model("remoteclip")
+print(model.describe()["type"])
+```
+
+Simple rule:
+
+- `describe_model()` tells you what a model can do
+- `Embedding.meta` tells you what happened in this particular run
 
 ---

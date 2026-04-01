@@ -28,7 +28,7 @@ from ..providers import ProviderBase
 # -----------------------------
 from ._vit_mae_utils import _s2_rgb_u8_from_chw
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw_shared,
 )
@@ -751,7 +751,6 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
             sensor=sensor_meta,
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra=extra,
         )
 
@@ -964,7 +963,6 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
                         sensor=sensor_meta,
                         temporal=t,
                         image_size=image_size,
-                        input_time=temporal_midpoint_str(t),
                         extra=extra,
                     )
                     out[i] = Embedding(data=vecs[j].astype(np.float32), meta=meta)
@@ -1001,7 +999,6 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
                     sensor=sensor_meta,
                     temporal=t,
                     image_size=image_size,
-                    input_time=temporal_midpoint_str(t),
                     extra=extra,
                 )
                 if tokens_or_vec.ndim != 2:

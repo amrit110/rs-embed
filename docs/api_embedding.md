@@ -20,7 +20,9 @@ Embedding(
 )
 ```
 
-`data` holds the embedding itself as a float32 vector or grid, and `meta` carries model information, resolved input information, and any export or check reports attached to the run.
+`data` holds the embedding itself as a float32 vector or grid, and `meta` carries the runtime metadata for that returned result.
+
+For the general `Embedding.meta` schema, common fields, and its relationship to `describe_model()` / `Model.describe()`, see [API Specs & Data Structures](api_specs.md#embedding).
 
 ---
 

@@ -24,7 +24,7 @@ from ..core.specs import (
 )
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .onthefly_terramind import _fetch_s2_sr_12_raw_chw
 from .runtime_utils import (
     is_provider_backend,
@@ -647,7 +647,6 @@ class FoMoEmbedder(EmbedderBase):
             },
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra={
                 "start": t.start,
                 "end": t.end,

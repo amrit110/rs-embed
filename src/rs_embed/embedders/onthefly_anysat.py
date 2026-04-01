@@ -26,7 +26,7 @@ from ..tools.temporal import temporal_frame_midpoints
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
 from .config_utils import model_config_value
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     coerce_input_to_tchw as _coerce_input_to_tchw,
 )
@@ -578,7 +578,6 @@ class AnySatEmbedder(EmbedderBase):
             },
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra={
                 "model_size": model_size,
                 "flash_attn": bool(flash_attn),

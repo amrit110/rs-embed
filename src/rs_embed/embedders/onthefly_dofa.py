@@ -24,6 +24,7 @@ from ..core.specs import (
 from ..providers import ProviderBase
 from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
 from .base import EmbedderBase
+from .meta_utils import build_meta
 from .runtime_utils import (
     coerce_single_input_chw,
 )
@@ -852,25 +853,36 @@ class DOFAEmbedder(EmbedderBase):
             model, x_bchw, wavelengths_um=wavelengths_um, device=device
         )
 
-        base_meta: dict[str, Any] = {
-            "model": self.model_name,
-            "type": "on_the_fly",
-            "backend": backend_l,
-            "variant": str(variant),
-            "output_mode": output.mode,
-            "device": str(device),
-            "preprocess": {
-                "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
-                "resize_meta": resize_meta,
+        source = (
+            getattr(sensor, "collection", None)
+            if sensor is not None
+            else ("tensor_input" if backend_l == "tensor" else self.input_spec.collection)
+        )
+        base_meta = build_meta(
+            model=self.model_name,
+            kind="on_the_fly",
+            backend=backend_l,
+            source=source,
+            sensor=sensor,
+            temporal=temporal,
+            image_size=image_size,
+            extra={
+                "variant": str(variant),
+                "output_mode": output.mode,
+                "device": str(device),
+                "preprocess": {
+                    "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
+                    "resize_meta": resize_meta,
+                },
+                "input_channels": int(c),
+                "wavelengths_um": list(map(float, wavelengths_um)),
+                "input_size_hw": (int(x_bchw.shape[2]), int(x_bchw.shape[3])),
+                "token_meta": tmeta,
+                **check_meta,
+                **mmeta,
+                **provider_meta,
             },
-            "input_channels": int(c),
-            "wavelengths_um": list(map(float, wavelengths_um)),
-            "input_size_hw": (int(x_bchw.shape[2]), int(x_bchw.shape[3])),
-            "token_meta": tmeta,
-            **check_meta,
-            **mmeta,
-            **provider_meta,
-        }
+        )
 
         if output.mode == "pooled":
             base_meta["pooled_shape"] = tuple(pooled.shape)
@@ -1071,32 +1083,38 @@ class DOFAEmbedder(EmbedderBase):
                 i = s0 + j
                 tokens = tokens_bnd[j]
                 pooled = pooled_bd[j]
-                base_meta: dict[str, Any] = {
-                    "model": self.model_name,
-                    "type": "on_the_fly",
-                    "backend": backend_l,
-                    "variant": str(variant),
-                    "output_mode": output.mode,
-                    "device": str(dev),
-                    "preprocess": {
-                        "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
-                        "resize_meta": resize_meta_all[i],
+                base_meta = build_meta(
+                    model=self.model_name,
+                    kind="on_the_fly",
+                    backend=backend_l,
+                    source="tensor_input" if backend_l == "tensor" else self.input_spec.collection,
+                    sensor=sensor,
+                    temporal=temporal,
+                    image_size=224,
+                    extra={
+                        "variant": str(variant),
+                        "output_mode": output.mode,
+                        "device": str(dev),
+                        "preprocess": {
+                            "strategy": "official_dofa_s2_stats_then_resize_to_224_bilinear",
+                            "resize_meta": resize_meta_all[i],
+                        },
+                        "input_channels": int(x_bchw_all[i].shape[0]),
+                        "wavelengths_um": list(map(float, wavelengths_um)),
+                        "input_size_hw": (
+                            int(x_bchw_all[i].shape[1]),
+                            int(x_bchw_all[i].shape[2]),
+                        ),
+                        "token_meta": tmeta,
+                        "batch_infer": True,
+                        "input_override": True,
+                        "normalization": "official_dofa_s2_stats",
+                        "normalization_source": "zhu_xlab_dofa_readme_demo",
+                        "normalization_input_scale": "raw_sr_0_10000_to_0_255",
+                        **mmeta,
+                        "raw_chw_shape": tuple(input_chws[i].shape),
                     },
-                    "input_channels": int(x_bchw_all[i].shape[0]),
-                    "wavelengths_um": list(map(float, wavelengths_um)),
-                    "input_size_hw": (
-                        int(x_bchw_all[i].shape[1]),
-                        int(x_bchw_all[i].shape[2]),
-                    ),
-                    "token_meta": tmeta,
-                    "batch_infer": True,
-                    "input_override": True,
-                    "normalization": "official_dofa_s2_stats",
-                    "normalization_source": "zhu_xlab_dofa_readme_demo",
-                    "normalization_input_scale": "raw_sr_0_10000_to_0_255",
-                    **mmeta,
-                    "raw_chw_shape": tuple(input_chws[i].shape),
-                }
+                )
 
                 if output.mode == "pooled":
                     base_meta["pooled_shape"] = tuple(pooled.shape)

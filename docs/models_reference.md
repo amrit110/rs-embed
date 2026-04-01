@@ -66,7 +66,7 @@ Here, "Default Fetch Resolution" refers to the default source-side resolution us
 
 Read this section before comparing any model that accepts `TemporalSpec.range(...)`.
 
-For most on-the-fly adapters, `TemporalSpec.range(start, end)` means "filter imagery in `[start, end)` and build one composite patch for model input," usually with `median` and optionally `mosaic` through `SensorSpec.composite`. In those adapters, `meta.input_time` is usually the midpoint of the requested window and should be read as metadata, or occasionally as an auxiliary time signal, rather than proof of a single-scene acquisition date.
+For most on-the-fly adapters, `TemporalSpec.range(start, end)` means "filter imagery in `[start, end)` and build one composite patch for model input," usually with `median` and optionally `mosaic` through `SensorSpec.composite`.
 
 The multi-frame adapters `agrifm`, `anysat`, and `galileo` instead split the requested range into sub-windows and composite one frame per bin. Current single-composite adapters include `remoteclip`, `satmae`, `satmaepp`, `satmaepp_s2_10b`, `scalemae`, `wildsat`, `prithvi`, `terrafm`, `terramind`, `dofa`, `fomo`, `thor`, and `satvision`.
 

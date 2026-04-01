@@ -23,7 +23,7 @@ from ..core.specs import (
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     coerce_single_input_chw,
 )
@@ -716,7 +716,6 @@ class TerraMindEmbedder(EmbedderBase):
             sensor=sensor_meta,
             temporal=temporal_used,
             image_size=image_size,
-            input_time=temporal_midpoint_str(temporal_used),
             extra={
                 "model_key": model_key,
                 "modality": modality,
@@ -936,7 +935,6 @@ class TerraMindEmbedder(EmbedderBase):
                 sensor=sensor_meta,
                 temporal=t,
                 image_size=image_size,
-                input_time=temporal_midpoint_str(t),
                 extra={
                     "model_key": model_key,
                     "modality": modality,

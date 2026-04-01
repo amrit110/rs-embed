@@ -12,7 +12,7 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str
+from .meta_utils import build_meta
 from .runtime_utils import (
     fetch_collection_patch_all_bands_chw as _fetch_collection_patch_all_bands_chw,
 )
@@ -98,7 +98,6 @@ class GSEAnnualEmbedder(EmbedderBase):
             sensor=None,
             temporal=temporal,
             image_size=None,
-            input_time=temporal_midpoint_str(temporal),
             extra={
                 "year": temporal.year,
                 "scale_m": scale_m,

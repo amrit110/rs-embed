@@ -24,7 +24,7 @@ from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
 from .config_utils import model_config_value
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
@@ -745,7 +745,6 @@ class THORBaseEmbedder(EmbedderBase):
             },
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra={
                 "hf_id": runtime_cfg["hf_id"],
                 "model_source": "vendored_rs_embed_runtime",

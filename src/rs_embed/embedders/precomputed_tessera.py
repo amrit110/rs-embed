@@ -20,6 +20,7 @@ from ..core.specs import (
     TemporalSpec,
 )
 from .base import EmbedderBase
+from .meta_utils import build_meta
 
 _EMBED_DIMS = (64, 128, 256, 512, 768, 1024)
 _TESSERA_PROJECTION_WARNED = False
@@ -359,20 +360,26 @@ class TesseraEmbedder(EmbedderBase):
         tile_crs = str(crop_meta.get("tile_crs", "unknown"))
         _warn_projection_once(tile_crs)
 
-        meta = {
-            "model": self.model_name,
-            "type": "precomputed",
-            "source": "geotessera.GeoTessera",
-            "cache_dir": cache_dir,
-            "bbox_4326": bounds,
-            "preferred_year": year,
-            "chw_shape": tuple(chw.shape),
-            "input_crs": "EPSG:4326",
-            "output_crs": tile_crs,
-            "projection_mode": "product_native_fixed",
-            "projection_note": _projection_note(tile_crs),
-            **crop_meta,
-        }
+        meta = build_meta(
+            model=self.model_name,
+            kind="precomputed",
+            backend=backend_n,
+            source="geotessera.GeoTessera",
+            sensor=None,
+            temporal=temporal,
+            image_size=None,
+            extra={
+                "cache_dir": cache_dir,
+                "bbox_4326": bounds,
+                "preferred_year": year,
+                "chw_shape": tuple(chw.shape),
+                "input_crs": "EPSG:4326",
+                "output_crs": tile_crs,
+                "projection_mode": "product_native_fixed",
+                "projection_note": _projection_note(tile_crs),
+                **crop_meta,
+            },
+        )
 
         if output.mode == "pooled":
             vec = _pool(chw, output.pooling)

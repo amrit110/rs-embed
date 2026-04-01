@@ -26,7 +26,7 @@ from ..providers import ProviderBase
 from ..tools.temporal import temporal_frame_midpoints
 from ._vit_mae_utils import ensure_torch
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_midpoint_str, temporal_to_range
+from .meta_utils import build_meta, temporal_to_range
 from .runtime_utils import (
     coerce_input_to_tchw as _coerce_input_to_tchw,
 )
@@ -661,7 +661,6 @@ class GalileoEmbedder(EmbedderBase):
             },
             temporal=t,
             image_size=image_size,
-            input_time=temporal_midpoint_str(t),
             extra={
                 "start": t.start,
                 "end": t.end,

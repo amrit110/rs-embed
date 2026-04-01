@@ -34,7 +34,6 @@ def _show_embedding(tag: str, emb) -> None:
             "type": meta.get("type"),
             "backend": meta.get("backend"),
             "source": meta.get("source"),
-            "input_time": meta.get("input_time"),
         },
     )
 
