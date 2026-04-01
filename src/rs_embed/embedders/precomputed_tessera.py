@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -21,6 +22,7 @@ from ..core.specs import (
 from .base import EmbedderBase
 
 _EMBED_DIMS = (64, 128, 256, 512, 768, 1024)
+_TESSERA_PROJECTION_WARNED = False
 
 
 def _buffer_m_to_deg(lat: float, buffer_m: float) -> tuple[float, float]:
@@ -250,6 +252,26 @@ def _mosaic_and_crop_strict_roi(
     return chw, meta
 
 
+def _projection_note(tile_crs: str) -> str:
+    return (
+        f"Tessera returns embeddings on the product-native tile CRS ({tile_crs}), "
+        "which may differ from the common provider-backed default grid in EPSG:3857. "
+        "Input spatial specs still use EPSG:4326."
+    )
+
+
+def _warn_projection_once(tile_crs: str) -> None:
+    global _TESSERA_PROJECTION_WARNED
+    if _TESSERA_PROJECTION_WARNED:
+        return
+    warnings.warn(
+        _projection_note(tile_crs),
+        category=UserWarning,
+        stacklevel=2,
+    )
+    _TESSERA_PROJECTION_WARNED = True
+
+
 @register("tessera")
 class TesseraEmbedder(EmbedderBase):
     DEFAULT_BATCH_WORKERS = 4
@@ -268,6 +290,7 @@ class TesseraEmbedder(EmbedderBase):
             "notes": [
                 "Precomputed GeoTessera tiles use a fixed source path; use backend='auto'.",
                 "TemporalSpec.range uses the start year for tile lookup in v0.1.",
+                "Embeddings stay on the product-native tile CRS rather than the common provider-backed EPSG:3857 grid.",
             ],
         }
 
@@ -333,6 +356,8 @@ class TesseraEmbedder(EmbedderBase):
             return gt.fetch_embeddings(tiles)
 
         chw, crop_meta = _mosaic_and_crop_strict_roi(_tiles_rows, bbox_4326=bbox)
+        tile_crs = str(crop_meta.get("tile_crs", "unknown"))
+        _warn_projection_once(tile_crs)
 
         meta = {
             "model": self.model_name,
@@ -342,6 +367,10 @@ class TesseraEmbedder(EmbedderBase):
             "bbox_4326": bounds,
             "preferred_year": year,
             "chw_shape": tuple(chw.shape),
+            "input_crs": "EPSG:4326",
+            "output_crs": tile_crs,
+            "projection_mode": "product_native_fixed",
+            "projection_note": _projection_note(tile_crs),
             **crop_meta,
         }
 

@@ -129,6 +129,7 @@ def test_tessera_get_embedding_ignores_input_chw(monkeypatch):
 
     embedder = TesseraEmbedder()
     embedder.model_name = "tessera"
+    monkeypatch.setattr(tessera_mod, "_TESSERA_PROJECTION_WARNED", True)
     monkeypatch.setattr(embedder, "_get_gt", lambda _cache: _FakeGeoTessera())
     monkeypatch.setattr(
         tessera_mod,
@@ -152,8 +153,11 @@ def test_tessera_get_embedding_ignores_input_chw(monkeypatch):
 
 
 def test_copernicus_get_embedding_ignores_input_chw(monkeypatch):
+    import rs_embed.embedders.precomputed_copernicus_embed as cop_mod
+
     embedder = CopernicusEmbedder()
     embedder.model_name = "copernicus"
+    monkeypatch.setattr(cop_mod, "_COPERNICUS_PROJECTION_WARNED", True)
     monkeypatch.setattr(
         embedder,
         "_get_dataset",

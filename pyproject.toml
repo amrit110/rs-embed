@@ -61,6 +61,7 @@ plot = [
 ]
 copernicus = [
   "tifffile>=2024.0.0",
+  "imagecodecs>=2024.0.0",
 ]
 terramind = [
   # TerraMind still loads its backbone through the TerraTorch registry.
@@ -69,6 +70,7 @@ terramind = [
 full = [
   "matplotlib>=3.10",
   "tifffile>=2024.0.0",
+  "imagecodecs>=2024.0.0",
   "terratorch==1.2.1",
 ]
 dev = [

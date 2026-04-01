@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -22,6 +23,7 @@ from .base import EmbedderBase
 from .meta_utils import build_meta
 
 SUPPORTED_YEARS = {2021}
+_COPERNICUS_PROJECTION_WARNED = False
 
 
 def _buffer_m_to_deg(lat: float, buffer_m: float) -> tuple[float, float]:
@@ -67,6 +69,26 @@ def _pool_chw(chw: np.ndarray, pooling: str) -> np.ndarray:
     raise ModelError(f"Unknown pooling='{pooling}' (expected 'mean' or 'max').")
 
 
+def _projection_note() -> str:
+    return (
+        "Copernicus returns embeddings on its fixed product grid in EPSG:4326 "
+        "(0.25 deg pixels), which differs from the common provider-backed default "
+        "grid in EPSG:3857. Input spatial specs still use EPSG:4326."
+    )
+
+
+def _warn_projection_once() -> None:
+    global _COPERNICUS_PROJECTION_WARNED
+    if _COPERNICUS_PROJECTION_WARNED:
+        return
+    warnings.warn(
+        _projection_note(),
+        category=UserWarning,
+        stacklevel=2,
+    )
+    _COPERNICUS_PROJECTION_WARNED = True
+
+
 @register("copernicus")
 class CopernicusEmbedder(EmbedderBase):
     """
@@ -97,6 +119,7 @@ class CopernicusEmbedder(EmbedderBase):
             "notes": [
                 "Uses a vendored GeoTIFF reader with bbox slicing ds[minlon:maxlon, minlat:maxlat].",
                 "ROIs smaller than a single Copernicus pixel raise an error.",
+                "Embeddings stay on the fixed product EPSG:4326 grid rather than the common provider-backed EPSG:3857 grid.",
             ],
         }
 
@@ -177,6 +200,7 @@ class CopernicusEmbedder(EmbedderBase):
             chw = img.detach().cpu().numpy().astype(np.float32)
         else:
             chw = np.asarray(img, dtype=np.float32)
+        _warn_projection_once()
 
         meta = build_meta(
             model=self.model_name,
@@ -192,6 +216,11 @@ class CopernicusEmbedder(EmbedderBase):
                 "bbox_4326": (minlon, minlat, maxlon, maxlat),
                 "chw_shape": tuple(chw.shape),
                 "dataset_path": getattr(ds, "path", None),
+                "input_crs": "EPSG:4326",
+                "output_crs": "EPSG:4326",
+                "projection_mode": "product_native_fixed",
+                "projection_note": _projection_note(),
+                "product_resolution_deg": (0.25, 0.25),
             },
         )
 

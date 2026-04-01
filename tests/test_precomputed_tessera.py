@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from affine import Affine
 
 from rs_embed.core.specs import BBox, OutputSpec, TemporalSpec
@@ -71,6 +72,7 @@ def test_tessera_pooled_uses_crop_canvas_not_full_mosaic(monkeypatch):
 
     embedder = TesseraEmbedder()
     embedder.model_name = "tessera"
+    monkeypatch.setattr(tessera_mod, "_TESSERA_PROJECTION_WARNED", False)
     monkeypatch.setattr(embedder, "_get_gt", lambda _cache: _FakeGeoTessera(_fake_rows()))
 
     zeros_calls = []
@@ -82,17 +84,22 @@ def test_tessera_pooled_uses_crop_canvas_not_full_mosaic(monkeypatch):
 
     monkeypatch.setattr(tessera_mod.np, "zeros", _zeros_probe)
 
-    emb = embedder.get_embedding(
-        spatial=BBox(minlon=4.2, minlat=3.2, maxlon=4.8, maxlat=3.8, crs="EPSG:4326"),
-        temporal=TemporalSpec.year(2021),
-        sensor=None,
-        output=OutputSpec.pooled(),
-        backend="auto",
-    )
+    with pytest.warns(UserWarning, match="product-native tile CRS"):
+        emb = embedder.get_embedding(
+            spatial=BBox(minlon=4.2, minlat=3.2, maxlon=4.8, maxlat=3.8, crs="EPSG:4326"),
+            temporal=TemporalSpec.year(2021),
+            sensor=None,
+            output=OutputSpec.pooled(),
+            backend="auto",
+        )
 
     # Mosaic covers 8x8; strict ROI covers 1x1.
     assert emb.meta["mosaic_hw"] == (8, 8)
     assert emb.meta["crop_hw"] == (1, 1)
+    assert emb.meta["input_crs"] == "EPSG:4326"
+    assert emb.meta["output_crs"] == "EPSG:4326"
+    assert emb.meta["projection_mode"] == "product_native_fixed"
+    assert "EPSG:3857" in emb.meta["projection_note"]
     assert (8, 8, 64) not in zeros_calls
     assert (1, 1, 64) in zeros_calls
     np.testing.assert_allclose(emb.data, np.full((64,), 4.0, dtype=np.float32))

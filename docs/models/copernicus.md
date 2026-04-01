@@ -12,6 +12,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
 | Primary input | `BBox` / `PointBuffer` in EPSG:4326, sliced via vendored GeoTIFF bbox indexing |
+| Product grid CRS | fixed `EPSG:4326` grid (not the common provider-backed EPSG:3857 default) |
 | Default resolution | 0.25° source product resolution |
 | Temporal mode | **strict** `TemporalSpec.year(2021)` in v0.1 |
 | Output modes | `pooled`, `grid` |
@@ -32,6 +33,9 @@ Copernicus Embed is a good fit for precomputed embedding workflows via local Geo
 ### Spatial
 
 The adapter accepts `BBox` directly and `PointBuffer`, which it converts to an EPSG:4326 bbox. Internally it slices the local GeoTIFF with bbox indexing via `ds[minlon:maxlon, minlat:maxlat]`.
+
+!!! warning
+    Copernicus keeps the product's fixed `EPSG:4326` grid with 0.25 degree pixels. That differs from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
 
 ### Temporal
 
@@ -87,6 +91,8 @@ The current adapter keeps `download=True`, and that is not env-configurable in v
 
 Copernicus follows the same precomputed-product pattern as the other local or provider-sampled embedding products. `pooled` applies spatial pooling over the sampled `CHW` embedding grid, and `grid` returns `(D,H,W)` in product space rather than raw imagery pixel space.
 
+The current adapter exposes this explicitly in metadata: `input_crs` is `EPSG:4326`, `output_crs` is the fixed product CRS `EPSG:4326`, and `product_resolution_deg` records the 0.25 degree grid spacing.
+
 ---
 
 ## Examples
@@ -119,6 +125,7 @@ emb = get_embedding(
 - year not supported (`2021` only in current adapter)
 - backend is not `auto`
 - missing `tifffile` dependency
+- missing `imagecodecs` dependency for compressed / predictor-encoded GeoTIFFs
 - dataset files missing/corrupt under `RS_EMBED_COP_DIR`
 - ROI is smaller than one Copernicus pixel (raises immediately)
 

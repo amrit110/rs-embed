@@ -107,7 +107,9 @@ Use it when the same model needs different large-ROI handling in different workf
 
 ### Precomputed
 
-Precomputed models read embeddings from existing embedding products. They are usually faster and simpler to run, but their temporal coverage and resolution are fixed by the product. Typical examples are `tessera`, `gse`, and `copernicus`.
+Precomputed models read embeddings from existing embedding products. They are usually faster and simpler to run, but their temporal coverage, resolution, and sometimes projection are fixed by the product. Typical examples are `tessera`, `gse`, and `copernicus`.
+
+For example, `tessera` and `copernicus` currently keep product-native grid semantics instead of following the common provider-backed EPSG:3857 sampling default used by many on-the-fly paths. That distinction matters for `grid` outputs and should be recorded when comparing models.
 
 ### On-the-fly
 

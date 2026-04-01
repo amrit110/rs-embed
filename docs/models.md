@@ -32,9 +32,9 @@ Some detail-page filenames still use older names for compatibility, but the cano
 
 | Model ID | Type | Primary Input / Source | Default Resolution | Outputs | Temporal mode | Notes | Detail |
 |---|---|---|---|---|---|---|---|
-| `tessera` | Precomputed | GeoTessera embedding tiles | 10m | `pooled`, `grid` | yearly coverage product | Fast baseline, source-fixed precomputed workflow | [detail](models/tessera.md) |
+| `tessera` | Precomputed | GeoTessera embedding tiles | 10m | `pooled`, `grid` | yearly coverage product | Fast baseline, source-fixed precomputed workflow; product-native fixed CRS | [detail](models/tessera.md) |
 | `gse` | Precomputed | Google Satellite Embedding (annual) | 10m | `pooled`, `grid` | `TemporalSpec.year(...)` | Annual product via provider path | [detail](models/gse.md) |
-| `copernicus` | Precomputed | Copernicus embeddings | 0.25° | `pooled`, `grid` | limited (2021) | Coarse resolution product | [detail](models/copernicus.md) |
+| `copernicus` | Precomputed | Copernicus embeddings | 0.25° | `pooled`, `grid` | limited (2021) | Coarse resolution product on fixed EPSG:4326 grid | [detail](models/copernicus.md) |
 
 ### On-the-fly Foundation Models
 
@@ -62,6 +62,8 @@ Some detail-page filenames still use older names for compatibility, but the cano
 ## Temporal and Comparison Notes (What People Usually Miss)
 
 `TemporalSpec.range(start, end)` is usually a compositing window rather than a single-scene selector, and `OutputSpec.grid()` may be a token or patch grid rather than a georeferenced raster, especially for ViT-like backbones. Cross-model comparisons are usually easiest with `OutputSpec.pooled()` plus fixed ROI, temporal, and compositing settings.
+
+Precomputed products can also keep their own product-native projection instead of the common provider-backed EPSG:3857 sampling grid. Today that matters especially for `tessera` and `copernicus`, so check each detail page before comparing grid outputs directly against on-the-fly models.
 
 On this page, "Default Resolution" means the default source-side fetch resolution, not the final resized tensor shape sent into the backbone. Multi-frame models such as `agrifm`, `anysat`, and `galileo` also need extra attention to frame count and temporal side inputs.
 

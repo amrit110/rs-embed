@@ -11,6 +11,7 @@
 | Adapter type | `precomputed` |
 | Typical backend | `auto` |
 | Primary input | `BBox` / `PointBuffer` in EPSG:4326 (converted to bbox) |
+| Product grid CRS | fixed tile-native CRS (not the common provider-backed EPSG:3857 default) |
 | Default resolution | 10m source product resolution |
 | Temporal mode | year-like selection (`year`; `range` uses start year fallback) |
 | Output modes | `pooled`, `grid` |
@@ -30,6 +31,9 @@ Tessera is a strong choice for fast precomputed baselines, large-area ROI extrac
 ### Spatial
 
 The adapter accepts `BBox` directly and `PointBuffer`, which it converts to `BBox` in EPSG:4326 using an approximate meter-to-degree conversion. Unsupported spatial types raise `ModelError`.
+
+!!! warning
+    Tessera still reads and returns embeddings in the product-native tile CRS after crop. That CRS may differ from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
 
 ### Temporal
 
@@ -77,6 +81,8 @@ Non-env override:
 ## Output Semantics
 
 Tessera follows the standard precomputed-product behavior. `pooled` applies spatial pooling over the cropped embedding grid, and `grid` returns the cropped `(D,H,W)` embedding grid in product pixel space after mosaic and crop rather than raw imagery space.
+
+The current adapter exposes this explicitly in metadata: `input_crs` stays `EPSG:4326`, while `output_crs` follows the fixed tile CRS used by the fetched product tiles.
 
 ---
 

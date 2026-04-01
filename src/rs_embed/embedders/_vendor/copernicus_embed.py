@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import math
 import os
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +15,7 @@ HF_REPO_ID = "torchgeo/copernicus_embed"
 HF_FILENAME = "embed_map_310k.tif"
 HF_REVISION = "435b4a7bdce6f6fdbf4272f9d6e54f2604f35fdb"
 HF_MIN_BYTES = 700 * 1024 * 1024
+_COPERNICUS_MEMMAP_FALLBACK_WARNED = False
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,16 @@ def _require_tifffile():
             "Install: pip install 'rs-embed[copernicus]' or pip install tifffile"
         ) from e
     return tifffile
+
+
+def _raise_for_missing_imagecodecs(exc: Exception) -> None:
+    msg = str(exc)
+    if "imagecodecs" not in msg:
+        return
+    raise ModelError(
+        "Copernicus embed GeoTIFF decoding requires the optional 'imagecodecs' package. "
+        "Install: pip install 'rs-embed[copernicus]' or pip install imagecodecs"
+    ) from exc
 
 
 def _infer_axis_order(shape: tuple[int, ...]) -> str:
@@ -270,7 +282,28 @@ class CopernicusEmbedGeoTiff:
     def array(self) -> np.ndarray:
         if self._array is None:
             tifffile = _require_tifffile()
-            self._array = tifffile.memmap(self.path)
+            try:
+                self._array = tifffile.memmap(self.path)
+            except ValueError as e:
+                _raise_for_missing_imagecodecs(e)
+                if "memory-mappable" not in str(e):
+                    raise
+                global _COPERNICUS_MEMMAP_FALLBACK_WARNED
+                if not _COPERNICUS_MEMMAP_FALLBACK_WARNED:
+                    warnings.warn(
+                        "Copernicus GeoTIFF is not directly memory-mappable; "
+                        "falling back to tifffile.asarray(out='memmap'). "
+                        "This may be slower on first access.",
+                        category=UserWarning,
+                        stacklevel=2,
+                    )
+                    _COPERNICUS_MEMMAP_FALLBACK_WARNED = True
+                try:
+                    with tifffile.TiffFile(self.path) as tif:
+                        self._array = tif.asarray(series=0, out="memmap")
+                except ValueError as e2:
+                    _raise_for_missing_imagecodecs(e2)
+                    raise
         return self._array
 
     def _slice_chw(self, row0: int, row1: int, col0: int, col1: int) -> np.ndarray:

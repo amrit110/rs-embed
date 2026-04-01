@@ -3,7 +3,9 @@ import sys
 import types
 
 import numpy as np
+import pytest
 
+from rs_embed.core.errors import ModelError
 from rs_embed.embedders._vendor import copernicus_embed as cop_mod
 
 
@@ -111,3 +113,61 @@ def test_copernicus_geotiff_dataset_rejects_subpixel_bbox(monkeypatch, tmp_path)
         assert "smaller than one dataset pixel" in str(e)
     else:
         raise AssertionError("Expected a subpixel bbox to raise an error.")
+
+
+def test_copernicus_geotiff_falls_back_when_source_is_not_memmappable(monkeypatch, tmp_path):
+    fake_path = tmp_path / cop_mod.HF_FILENAME
+    fake_path.write_bytes(b"x")
+    fake_arr = np.arange(2 * 721 * 1440, dtype=np.float32).reshape(2, 721, 1440)
+
+    class _FallbackTiffFile(_FakeTiffFile):
+        def asarray(self, *args, **kwargs):
+            assert kwargs.get("series", 0) == 0
+            assert kwargs.get("out") == "memmap"
+            return fake_arr
+
+    fake_tifffile = types.ModuleType("tifffile")
+    fake_tifffile.TiffFile = lambda path: _FallbackTiffFile(path, fake_arr.shape)
+
+    def _fake_memmap(path):
+        raise ValueError("image data are not memory-mappable")
+
+    fake_tifffile.memmap = _fake_memmap
+
+    monkeypatch.setitem(sys.modules, "tifffile", fake_tifffile)
+    monkeypatch.setattr(cop_mod, "_validate_large_file", lambda path, min_bytes=0: path)
+    monkeypatch.setattr(cop_mod, "_COPERNICUS_MEMMAP_FALLBACK_WARNED", False)
+
+    ds = cop_mod.CopernicusEmbedGeoTiff(paths=str(tmp_path), download=False)
+    with pytest.warns(UserWarning, match="not directly memory-mappable"):
+        sample = ds[-180.0:-179.5, 89.625:90.125]
+
+    assert sample["image"].shape == (2, 2, 2)
+    np.testing.assert_array_equal(sample["image"], fake_arr[:, 0:2, 0:2])
+
+
+def test_copernicus_geotiff_reports_missing_imagecodecs(monkeypatch, tmp_path):
+    fake_path = tmp_path / cop_mod.HF_FILENAME
+    fake_path.write_bytes(b"x")
+    fake_arr = np.arange(2 * 721 * 1440, dtype=np.float32).reshape(2, 721, 1440)
+
+    class _ImagecodecsTiffFile(_FakeTiffFile):
+        def asarray(self, *args, **kwargs):
+            raise ValueError("<PREDICTOR.FLOATINGPOINT: 3> requires the 'imagecodecs' package")
+
+    fake_tifffile = types.ModuleType("tifffile")
+    fake_tifffile.TiffFile = lambda path: _ImagecodecsTiffFile(path, fake_arr.shape)
+
+    def _fake_memmap(path):
+        raise ValueError("image data are not memory-mappable")
+
+    fake_tifffile.memmap = _fake_memmap
+
+    monkeypatch.setitem(sys.modules, "tifffile", fake_tifffile)
+    monkeypatch.setattr(cop_mod, "_validate_large_file", lambda path, min_bytes=0: path)
+    monkeypatch.setattr(cop_mod, "_COPERNICUS_MEMMAP_FALLBACK_WARNED", False)
+
+    ds = cop_mod.CopernicusEmbedGeoTiff(paths=str(tmp_path), download=False)
+    with pytest.warns(UserWarning, match="not directly memory-mappable"):
+        with pytest.raises(ModelError, match="requires the optional 'imagecodecs' package"):
+            ds[-180.0:-179.5, 89.625:90.125]
