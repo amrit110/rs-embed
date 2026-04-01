@@ -92,6 +92,8 @@ from .tools.runtime import (
 )
 from .tools.runtime import (
     reset_runtime as _reset_runtime_shared,
+)
+from .tools.runtime import (
     run_embedding_request as _run_embedding_request_shared,
 )
 

@@ -18,9 +18,9 @@ from typing import Any, TypeVar
 
 import numpy as np
 
+from ..core import registry as _runtime_registry
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
-from ..core import registry as _runtime_registry
 from ..core.registry import get_embedder_cls
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import FetchResult
