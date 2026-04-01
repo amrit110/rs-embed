@@ -36,27 +36,19 @@ emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 ## Install
 
 ```bash
+# base install
 pip install rs-embed
-```
 
-For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`), install the extra:
-
-```bash
+# add [terratorch] only if you use terramind
 pip install "rs-embed[terratorch]"
 ```
 
-For local development from the repository, using editable mode:
+For local development:
 
 ```bash
 git clone https://github.com/cybergis/rs-embed.git
 cd rs-embed
-pip install -e .
-```
-
-For editable development with the `terratorch` extra:
-
-```bash
-pip install -e ".[terratorch]"
+pip install -e .  # use -e ".[terratorch]" if you need terramind
 ```
 
 
