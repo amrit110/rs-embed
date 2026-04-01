@@ -146,7 +146,7 @@ _TERRAMIND_REGISTRATION_MODULES = (
 )
 
 _TERRAMIND_INSTALL_HINT = (
-    'TerraMind requires the optional terratorch dependency. Install it with: '
+    "TerraMind requires the optional terratorch dependency. Install it with: "
     'pip install "rs-embed[terramind]" '
     '(equivalent to: pip install "rs-embed[terratorch]").'
 )
