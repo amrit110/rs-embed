@@ -8,6 +8,7 @@ Provider selection/fetch helpers live in ``embedders.runtime_utils``.
 from __future__ import annotations
 
 import inspect
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ import numpy as np
 
 from ..core.embedding import Embedding
 from ..core.errors import ModelError
+from ..core import registry as _runtime_registry
 from ..core.registry import get_embedder_cls
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import FetchResult
@@ -57,6 +59,50 @@ def get_embedder_bundle_cached(model: str, backend: str, device: str, sensor_k: 
     cls = get_embedder_cls(model)
     emb = cls()
     return emb, RLock()
+
+
+def _clear_loaded_embedder_module_caches() -> int:
+    """Clear ``lru_cache`` wrappers found on already-imported embedder modules."""
+    cleared = 0
+    seen: set[int] = set()
+    for module_name, module in tuple(sys.modules.items()):
+        if module is None or not module_name.startswith("rs_embed.embedders."):
+            continue
+        for obj in vars(module).values():
+            cache_clear = getattr(obj, "cache_clear", None)
+            if not callable(cache_clear):
+                continue
+            obj_id = id(obj)
+            if obj_id in seen:
+                continue
+            cache_clear()
+            seen.add(obj_id)
+            cleared += 1
+    return cleared
+
+
+def reset_runtime() -> dict[str, int]:
+    """Clear embedder runtime caches without dropping registered classes.
+
+    This is a notebook-friendly escape hatch for recovering from stale runtime
+    state after failed lazy imports or cached loader state.  It preserves any
+    custom classes already registered in ``core.registry`` while clearing
+    instance caches and lazy-loader bookkeeping.
+    """
+    import_errors_cleared = len(_runtime_registry._REGISTRY_IMPORT_ERRORS)
+    _runtime_registry._REGISTRY_IMPORT_ERRORS.clear()
+
+    get_embedder_bundle_cached.cache_clear()
+    _embedder_method_accepts_parameter.cache_clear()
+    embedder_accepts_input_chw.cache_clear()
+    embedder_accepts_model_config.cache_clear()
+    embedder_module_caches_cleared = _clear_loaded_embedder_module_caches()
+
+    return {
+        "import_errors_cleared": int(import_errors_cleared),
+        "runtime_caches_cleared": 4,
+        "embedder_module_caches_cleared": int(embedder_module_caches_cleared),
+    }
 
 
 def sensor_key(sensor: SensorSpec | None) -> tuple:

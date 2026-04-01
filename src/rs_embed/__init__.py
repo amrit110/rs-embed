@@ -8,7 +8,14 @@ for the class-based (stateful) interface.
 """
 
 from ._version import __version__
-from .api import describe_model, export_batch, get_embedding, get_embeddings_batch, list_models
+from .api import (
+    describe_model,
+    export_batch,
+    get_embedding,
+    get_embeddings_batch,
+    list_models,
+    reset_runtime,
+)
 from .core.specs import (
     BBox,
     FetchSpec,
@@ -53,6 +60,7 @@ __all__ = [
     "get_embeddings_batch",
     "list_models",
     "describe_model",
+    "reset_runtime",
     # Export API
     "export_batch",
     "export_npz",

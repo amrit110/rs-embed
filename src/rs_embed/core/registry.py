@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from typing import Any
 
 from rs_embed.embedders.catalog import MODEL_SPECS, canonical_model_id
@@ -45,15 +46,24 @@ def _try_lazy_load_model(name: str) -> None:
         return
     module_name, class_name = spec
     fqmn = f"rs_embed.embedders.{module_name}"
+    sys_modules_before = frozenset(sys.modules.keys())
     try:
         mod = importlib.import_module(fqmn)
     except Exception as e:
+        _cleanup_failed_embedder_import(
+            fqmn=fqmn,
+            sys_modules_before=sys_modules_before,
+        )
         _REGISTRY_IMPORT_ERRORS[model_id] = e
         return
 
     try:
         cls = getattr(mod, class_name)
     except Exception as e:
+        _cleanup_failed_embedder_import(
+            fqmn=fqmn,
+            sys_modules_before=sys_modules_before,
+        )
         _REGISTRY_IMPORT_ERRORS[model_id] = e
         return
 
@@ -62,6 +72,30 @@ def _try_lazy_load_model(name: str) -> None:
     _REGISTRY[model_id] = cls
     cls.model_name = model_id
     _REGISTRY_IMPORT_ERRORS.pop(model_id, None)
+
+
+def _cleanup_failed_embedder_import(
+    *,
+    fqmn: str,
+    sys_modules_before: frozenset[str],
+) -> None:
+    """Remove modules imported during a failed lazy-load attempt.
+
+    A failed import can leave half-initialized embedder/vendor modules in
+    ``sys.modules`` for the lifetime of the notebook kernel.  Clean only the
+    modules created during this import attempt so the next retry gets a fresh
+    import path.
+    """
+    module_names = tuple(sys.modules.keys())
+    for mod_name in module_names:
+        if mod_name in sys_modules_before:
+            continue
+        if mod_name == fqmn or mod_name.startswith(f"{fqmn}."):
+            sys.modules.pop(mod_name, None)
+            continue
+        if mod_name.startswith("rs_embed.embedders._vendor"):
+            sys.modules.pop(mod_name, None)
+    importlib.invalidate_caches()
 
 
 def get_embedder_cls(name: str) -> type[Any]:

@@ -91,6 +91,7 @@ from .tools.runtime import (
     provider_factory_for_backend,
 )
 from .tools.runtime import (
+    reset_runtime as _reset_runtime_shared,
     run_embedding_request as _run_embedding_request_shared,
 )
 
@@ -154,6 +155,20 @@ def describe_model(model: str) -> dict[str, Any]:
     model_n = _normalize_model_name(model)
     cls = _get_embedder_cls(model_n)
     return cls().describe()
+
+
+def reset_runtime() -> dict[str, int]:
+    """Clear lazy-import/runtime caches in the current Python process.
+
+    This is mainly useful in notebooks after a failed model import or when you
+    want to force fresh embedder instances without restarting the kernel.
+
+    Returns
+    -------
+    dict[str, int]
+        Summary counts describing how many runtime/import caches were cleared.
+    """
+    return _reset_runtime_shared()
 
 
 def get_embedding(

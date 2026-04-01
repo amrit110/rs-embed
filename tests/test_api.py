@@ -4,12 +4,16 @@ These use a mock embedder registered in the test so they don't require
 GEE, torch, or any real model weights.
 """
 
+import functools
+import sys
+import types
+
 import numpy as np
 import pytest
 
 import rs_embed.api as api
 import rs_embed.tools.runtime as rt
-from rs_embed import list_models
+from rs_embed import list_models, reset_runtime
 from rs_embed.api import (
     _assert_supported,
     _validate_specs,
@@ -236,6 +240,35 @@ def test_get_embedding_unknown_model():
 
     with pytest.raises(ModelError, match="Unknown model"):
         get_embedding("nonexistent", spatial=_SPATIAL)
+
+
+def test_reset_runtime_clears_runtime_and_embedder_module_caches(monkeypatch):
+    rt.get_embedder_bundle_cached("mock_model", "auto", "auto", sensor_key(None))
+    rt.embedder_accepts_input_chw(type(_MockEmbedder))
+    rt.embedder_accepts_model_config(type(_MockVariantEmbedder))
+    registry._REGISTRY_IMPORT_ERRORS["remoteclip"] = RuntimeError("boom")
+
+    fake_mod = types.ModuleType("rs_embed.embedders._reset_runtime_fake")
+
+    @functools.lru_cache(maxsize=4)
+    def _cached_loader(x):
+        return x
+
+    fake_mod._cached_loader = _cached_loader
+    fake_mod._cached_loader(1)
+    monkeypatch.setitem(sys.modules, fake_mod.__name__, fake_mod)
+
+    summary = reset_runtime()
+
+    assert summary["import_errors_cleared"] == 1
+    assert summary["runtime_caches_cleared"] == 4
+    assert summary["embedder_module_caches_cleared"] >= 1
+    assert rt.get_embedder_bundle_cached.cache_info().currsize == 0
+    assert rt.embedder_accepts_input_chw.cache_info().currsize == 0
+    assert rt.embedder_accepts_model_config.cache_info().currsize == 0
+    assert _cached_loader.cache_info().currsize == 0
+    assert registry._REGISTRY_IMPORT_ERRORS == {}
+    assert registry.get_embedder_cls("mock_model") is _MockEmbedder
 
 
 def test_get_embedding_modality_resolves_default_sensor():
