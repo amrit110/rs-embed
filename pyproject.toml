@@ -33,6 +33,8 @@ dependencies = [
   "pyproj>=3.6",
   "affine>=2.4",
   "geotessera",
+  "tifffile>=2024.0.0",
+  "imagecodecs>=2024.0.0",
   "earthengine-api>=1.7.10",
   "geemap>=0.36.6",
   # Match the tested environment's lower bound instead of forcing needless upgrades.
@@ -59,18 +61,15 @@ terratorch = [
 plot = [
   "matplotlib>=3.10",
 ]
-copernicus = [
-  "tifffile>=2024.0.0",
-  "imagecodecs>=2024.0.0",
-]
+# Kept as an empty compatibility extra now that Copernicus runtime deps
+# are part of the base installation.
+copernicus = []
 terramind = [
   # TerraMind still loads its backbone through the TerraTorch registry.
   "terratorch==1.2.1",
 ]
 full = [
   "matplotlib>=3.10",
-  "tifffile>=2024.0.0",
-  "imagecodecs>=2024.0.0",
   "terratorch==1.2.1",
 ]
 dev = [

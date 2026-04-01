@@ -169,5 +169,5 @@ def test_copernicus_geotiff_reports_missing_imagecodecs(monkeypatch, tmp_path):
 
     ds = cop_mod.CopernicusEmbedGeoTiff(paths=str(tmp_path), download=False)
     with pytest.warns(UserWarning, match="not directly memory-mappable"):
-        with pytest.raises(ModelError, match="requires the optional 'imagecodecs' package"):
+        with pytest.raises(ModelError, match="requires 'imagecodecs'"):
             ds[-180.0:-179.5, 89.625:90.125]

@@ -20,6 +20,8 @@ cd rs-embed
 pip install -e .
 ```
 
+The base install already includes the GeoTIFF runtime used by `copernicus` (`tifffile` and `imagecodecs`).
+
 For models that depend on [terratorch](https://github.com/terrastackai/terratorch) (`terramind`):
 
 ```bash

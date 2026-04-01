@@ -16,7 +16,7 @@ For many ViT-like models, `OutputSpec.grid()` is a token or patch grid rather th
 
 ## Dependencies
 
-Different providers and models require different optional packages such as `earthengine-api`, `torch`, `rshf`, and `tifffile`. Missing optional dependencies usually fail only when you actually use the corresponding backend or model path.
+Different providers and models require different optional packages such as `terratorch`. Missing optional dependencies usually fail only when you actually use the corresponding model path.
 
 ## Known Edge Case
 

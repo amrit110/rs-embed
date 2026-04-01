@@ -124,8 +124,7 @@ emb = get_embedding(
 
 - year not supported (`2021` only in current adapter)
 - backend is not `auto`
-- missing `tifffile` dependency
-- missing `imagecodecs` dependency for compressed / predictor-encoded GeoTIFFs
+- broken local install missing the GeoTIFF stack (`tifffile` / `imagecodecs`)
 - dataset files missing/corrupt under `RS_EMBED_COP_DIR`
 - ROI is smaller than one Copernicus pixel (raises immediately)
 

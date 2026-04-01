@@ -17,6 +17,7 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 - The contribution and release workflow now treats `CHANGELOG.md` as the canonical source for user-visible release notes.
 - The tag-triggered release flow now validates `src/rs_embed/_version.py`, publishes to PyPI, and only then creates the GitHub Release.
 - The tag-triggered release flow now validates the matching `CHANGELOG.md` entry before publishing to PyPI, so a missing release-notes section fails early instead of after package upload.
+- The base package installation now includes the Copernicus GeoTIFF runtime (`tifffile` and `imagecodecs`) instead of requiring a separate extra.
 
 ### Deprecated
 

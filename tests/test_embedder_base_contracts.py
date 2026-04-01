@@ -176,7 +176,7 @@ def test_copernicus_get_embedding_ignores_input_chw(monkeypatch):
     np.testing.assert_allclose(emb.data, np.array([4.0, 5.0], dtype=np.float32))
 
 
-def test_copernicus_requires_optional_tifffile(monkeypatch):
+def test_copernicus_requires_tifffile(monkeypatch):
     import rs_embed.embedders._vendor.copernicus_embed as cop_mod
 
     real_import = __import__
@@ -190,7 +190,7 @@ def test_copernicus_requires_optional_tifffile(monkeypatch):
     monkeypatch.setattr("builtins.__import__", _fake_import)
     monkeypatch.setattr(cop_mod, "_validate_large_file", lambda path, min_bytes=0: path)
 
-    with pytest.raises(ModelError, match="rs-embed\\[copernicus\\]"):
+    with pytest.raises(ModelError, match="pip install tifffile"):
         cop_mod.load_geotiff_meta("/tmp/fake.tif")
 
 

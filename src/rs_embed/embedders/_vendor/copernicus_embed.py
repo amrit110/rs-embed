@@ -117,7 +117,7 @@ def _require_tifffile():
     except Exception as e:
         raise ModelError(
             "CopernicusEmbed requires tifffile for GeoTIFF access. "
-            "Install: pip install 'rs-embed[copernicus]' or pip install tifffile"
+            "Reinstall rs-embed or run: pip install tifffile"
         ) from e
     return tifffile
 
@@ -127,8 +127,8 @@ def _raise_for_missing_imagecodecs(exc: Exception) -> None:
     if "imagecodecs" not in msg:
         return
     raise ModelError(
-        "Copernicus embed GeoTIFF decoding requires the optional 'imagecodecs' package. "
-        "Install: pip install 'rs-embed[copernicus]' or pip install imagecodecs"
+        "Copernicus embed GeoTIFF decoding requires 'imagecodecs'. "
+        "Reinstall rs-embed or run: pip install imagecodecs"
     ) from exc
 
 
