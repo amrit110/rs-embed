@@ -193,13 +193,14 @@ def _download_galileo_model_folder(
 
 def _month_from_iso(iso_date: str) -> int:
     d = date.fromisoformat(str(iso_date))
-    return max(1, min(12, int(d.month)))
+    # Vendored Galileo month embeddings are indexed from 0..11, not 1..12.
+    return max(0, min(11, int(d.month) - 1))
 
 
 def _frame_month_sequence(temporal: TemporalSpec, *, n_frames: int) -> np.ndarray:
     mids = temporal_frame_midpoints(temporal, max(1, int(n_frames)))
     if not mids:
-        return np.full((max(1, int(n_frames)),), 6, dtype=np.int64)
+        return np.full((max(1, int(n_frames)),), 5, dtype=np.int64)
     return np.array([_month_from_iso(v) for v in mids], dtype=np.int64)
 
 
@@ -378,7 +379,7 @@ def _prepare_galileo_encoder_inputs(
 
     months_arr = np.asarray(months_seq, dtype=np.int64).reshape(-1)
     if months_arr.size == 0:
-        months_arr = np.full((t,), 6, dtype=np.int64)
+        months_arr = np.full((t,), 5, dtype=np.int64)
     if months_arr.size < t:
         months_arr = np.concatenate(
             [
@@ -389,7 +390,7 @@ def _prepare_galileo_encoder_inputs(
         )
     elif months_arr.size > t:
         months_arr = months_arr[:t]
-    months_arr = np.clip(months_arr, 1, 12).astype(np.int64)
+    months_arr = np.clip(months_arr, 0, 11).astype(np.int64)
     months = months_arr[None, :]
 
     data = {
@@ -407,8 +408,9 @@ def _prepare_galileo_encoder_inputs(
         "image_size": int(image_size),
         "patch_size": int(patch_size),
         "n_frames": int(t),
-        "months": tuple(int(v) for v in months_arr.tolist()),
-        "month": int(months_arr[len(months_arr) // 2]),
+        "months": tuple(int(v) + 1 for v in months_arr.tolist()),
+        "month": int(months_arr[len(months_arr) // 2]) + 1,
+        "month_indices": tuple(int(v) for v in months_arr.tolist()),
         "normalization": str(norm_mode),
         "include_ndvi": bool(include_ndvi),
         "s2_group_indices": tuple(int(i) for i in s2_group_indices),

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -142,6 +144,112 @@ def _satmaepp_preprocess_tensor_batch(
     return torch.stack(xs, dim=0)
 
 
+def _canonicalize_satmaepp_config(config: dict[str, Any]) -> dict[str, Any]:
+    cfg = dict(config)
+    aliases: dict[str, tuple[str, ...]] = {
+        "in_chans": ("in_chans", "num_channels", "in_channels", "channels"),
+        "img_size": ("img_size", "image_size"),
+        "patch_size": ("patch_size",),
+        "embed_dim": ("embed_dim", "hidden_size"),
+        "depth": ("depth", "num_hidden_layers"),
+        "num_heads": ("num_heads", "num_attention_heads"),
+        "decoder_embed_dim": ("decoder_embed_dim",),
+        "decoder_depth": ("decoder_depth",),
+        "decoder_num_heads": ("decoder_num_heads",),
+        "mlp_ratio": ("mlp_ratio",),
+        "proj_ratio": ("proj_ratio",),
+        "norm_pix_loss": ("norm_pix_loss",),
+    }
+    defaults: dict[str, Any] = {
+        "in_chans": 3,
+        "img_size": 224,
+        "patch_size": 16,
+        "embed_dim": 1024,
+        "depth": 24,
+        "num_heads": 16,
+        "decoder_embed_dim": 512,
+        "decoder_depth": 8,
+        "decoder_num_heads": 16,
+        "mlp_ratio": 4.0,
+        "proj_ratio": 4,
+        "norm_pix_loss": False,
+    }
+    for key, names in aliases.items():
+        value = None
+        for name in names:
+            if name in cfg:
+                value = cfg[name]
+                break
+        cfg[key] = defaults[key] if value is None else value
+    return cfg
+
+
+def _unwrap_satmaepp_state_dict(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict):
+        for key in ("state_dict", "model_state_dict", "model"):
+            nested = payload.get(key)
+            if isinstance(nested, dict):
+                return nested
+    if isinstance(payload, dict):
+        return payload
+    raise ModelError(f"Unsupported SatMAE++ checkpoint payload type: {type(payload).__name__}")
+
+
+def _load_satmaepp_from_snapshot(*, SatMAEPP: Any, model_id: str, dev: str):
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as e:
+        raise ModelError(
+            "SatMAE++ fallback loading requires huggingface_hub. Install: pip install huggingface_hub"
+        ) from e
+
+    ensure_torch()
+    import torch
+
+    snap_dir = Path(
+        snapshot_download(
+            repo_id=model_id,
+            allow_patterns=["config.json", "pytorch_model.bin", "model.safetensors"],
+        )
+    )
+    config_path = snap_dir / "config.json"
+    if not config_path.is_file():
+        raise ModelError(f"SatMAE++ snapshot is missing config.json: {snap_dir}")
+    cfg = _canonicalize_satmaepp_config(json.loads(config_path.read_text(encoding="utf-8")))
+    model = SatMAEPP(cfg)
+
+    ckpt_path = snap_dir / "pytorch_model.bin"
+    if ckpt_path.is_file():
+        payload = torch.load(str(ckpt_path), map_location="cpu")
+    else:
+        st_path = snap_dir / "model.safetensors"
+        if not st_path.is_file():
+            raise ModelError(f"SatMAE++ snapshot has no supported weights file: {snap_dir}")
+        try:
+            from safetensors.torch import load_file as load_safetensors
+        except Exception as e:
+            raise ModelError(
+                "SatMAE++ safetensors checkpoint requires safetensors. Install: pip install safetensors"
+            ) from e
+        payload = load_safetensors(str(st_path), device="cpu")
+
+    state_dict = _unwrap_satmaepp_state_dict(payload)
+    model.load_state_dict(state_dict, strict=True)
+    try:
+        model = model.to(dev).eval()
+    except Exception as _e:
+        pass
+
+    meta = {
+        "model_id": model_id,
+        "device": dev,
+        "in_chans": int(cfg["in_chans"]),
+        "load_path": str(snap_dir),
+        "load_mode": "manual_snapshot",
+    }
+    return model, meta
+
+
 @lru_cache(maxsize=8)
 def _load_satmaepp_cached(model_id: str, dev: str):
     ensure_torch()
@@ -151,7 +259,17 @@ def _load_satmaepp_cached(model_id: str, dev: str):
     except Exception as e:
         raise ModelError("SatMAE++ requires rshf. Install: pip install rshf") from e
 
-    model = SatMAEPP.from_pretrained(model_id)
+    try:
+        model = SatMAEPP.from_pretrained(model_id)
+        load_mode = "from_pretrained"
+    except AttributeError as e:
+        # Some rshf / transformers combinations instantiate a generic
+        # PreTrainedConfig that drops SatMAE++-specific fields such as in_chans.
+        if "in_chans" not in str(e):
+            raise
+        model, meta = _load_satmaepp_from_snapshot(SatMAEPP=SatMAEPP, model_id=model_id, dev=dev)
+        return model, meta
+
     cfg = getattr(model, "config", None)
     in_chans = int(getattr(cfg, "in_chans", 3)) if cfg is not None else 3
     if in_chans != 3:
@@ -163,7 +281,7 @@ def _load_satmaepp_cached(model_id: str, dev: str):
     except Exception as _e:
         pass
 
-    meta = {"model_id": model_id, "device": dev, "in_chans": in_chans}
+    meta = {"model_id": model_id, "device": dev, "in_chans": in_chans, "load_mode": load_mode}
     return model, meta
 
 
