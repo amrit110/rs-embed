@@ -527,8 +527,7 @@ def _fetch_s2_sr_10_raw_chw(
             f"Provider fetch returned shape={getattr(arr, 'shape', None)}; "
             f"expected [{len(_S2_SR_10_BANDS)},H,W]."
         )
-    arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
-    return np.clip(arr, 0.0, 10000.0).astype(np.float32)
+    return arr
 
 
 @register("satmaepp_s2_10b")
@@ -687,7 +686,6 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                     f"got {getattr(input_chw, 'shape', None)}"
                 )
             raw_chw = np.asarray(input_chw, dtype=np.float32)
-            raw_chw = np.clip(np.nan_to_num(raw_chw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0)
 
         model, wmeta = _load_satmaepp_s2(
             ckpt_repo=ckpt_repo,
@@ -1001,7 +999,6 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
                     f"got {getattr(input_chw, 'shape', None)} at index={i}"
                 )
             raw = np.asarray(input_chw, dtype=np.float32)
-            raw = np.clip(np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0)
             raws.append(raw)
 
         model, wmeta = _load_satmaepp_s2(

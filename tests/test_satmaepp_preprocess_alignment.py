@@ -1,8 +1,8 @@
 import numpy as np
 
 from rs_embed.core.specs import OutputSpec, PointBuffer, TemporalSpec
-from rs_embed.embedders.onthefly_satmaepp import SatMAEPPEmbedder
 from rs_embed.embedders._vit_mae_utils import fetch_s2_rgb_u8_from_provider
+from rs_embed.embedders.onthefly_satmaepp import SatMAEPPEmbedder
 
 
 def test_fetch_s2_rgb_u8_from_provider_allows_unresized_output(monkeypatch):
