@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `remoteclip` |
-| Aliases | `remoteclip_s2rgb` |
-| Family / Backbone | RemoteCLIP (CLIP-style ViT via `rshf.remoteclip.RemoteCLIP`) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider-backed; prefer `backend="auto"` in public API |
-| Primary input | S2 RGB (`B4,B3,B2`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `TemporalSpec.range(...)` required |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none |
+| Field                             | Value                                                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Model ID                          | `remoteclip`                                                                                                     |
+| Aliases                           | `remoteclip_s2rgb`                                                                                               |
+| Family / Backbone                 | RemoteCLIP (CLIP-style ViT via `rshf.remoteclip.RemoteCLIP`)                                                     |
+| Adapter type                      | `on-the-fly`                                                                                                     |
+| Typical backend                   | provider-backed; prefer `backend="auto"` in public API                                                           |
+| Primary input                     | S2 RGB (`B4,B3,B2`)                                                                                              |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                                                    |
+| Temporal mode                     | `TemporalSpec.range(...)` required                                                                               |
+| Output modes                      | `pooled`, `grid`                                                                                                 |
+| Extra side inputs                 | none                                                                                                             |
 | Training alignment (adapter path) | Medium (higher if wrapper `model.transform(...)` matches training pipeline; fallback is generic CLIP preprocess) |
 
 ---
@@ -61,11 +61,11 @@ The image size is fixed at `224` in this adapter path.
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_REMOTECLIP_FETCH_WORKERS` | `8` | Provider prefetch worker count for batch APIs |
-| `RS_EMBED_REMOTECLIP_BATCH_SIZE` | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs |
-| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` / `HUGGINGFACE_HOME` | unset | Controls HF cache path used for model snapshot downloads |
+| Env var                                                  | Default            | Effect                                                   |
+| -------------------------------------------------------- | ------------------ | -------------------------------------------------------- |
+| `RS_EMBED_REMOTECLIP_FETCH_WORKERS`                      | `8`                | Provider prefetch worker count for batch APIs            |
+| `RS_EMBED_REMOTECLIP_BATCH_SIZE`                         | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs                      |
+| `HUGGINGFACE_HUB_CACHE` / `HF_HOME` / `HUGGINGFACE_HOME` | unset              | Controls HF cache path used for model snapshot downloads |
 
 Checkpoint override (not env-based in this adapter):
 

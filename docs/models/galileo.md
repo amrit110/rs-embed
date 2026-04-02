@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `galileo` |
-| Family / Backbone | Galileo `Encoder` from vendored local runtime |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider-backed; prefer `backend="auto"` in public API |
-| Primary input | S2 10-band time series (`T,C,H,W`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (adapter normalizes via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | **required** `months` (per-frame month tokens), plus Galileo masks/tensors built by adapter |
-| Training alignment (adapter path) | Medium (depends on `FRAMES`, `IMG`, `PATCH`, normalization) |
+| Field                             | Value                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------- |
+| Model ID                          | `galileo`                                                                                   |
+| Family / Backbone                 | Galileo `Encoder` from vendored local runtime                                               |
+| Adapter type                      | `on-the-fly`                                                                                |
+| Typical backend                   | provider-backed; prefer `backend="auto"` in public API                                      |
+| Primary input                     | S2 10-band time series (`T,C,H,W`)                                                          |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                               |
+| Temporal mode                     | `range` in practice (adapter normalizes via shared helper)                                  |
+| Output modes                      | `pooled`, `grid`                                                                            |
+| Extra side inputs                 | **required** `months` (per-frame month tokens), plus Galileo masks/tensors built by adapter |
+| Training alignment (adapter path) | Medium (depends on `FRAMES`, `IMG`, `PATCH`, normalization)                                 |
 
 ---
 
@@ -68,20 +68,20 @@ Constraint:
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_GALILEO_MODEL_SIZE` | `nano` | Galileo model size selector (`models/<size>/`) |
-| `RS_EMBED_GALILEO_MODEL_PATH` | unset | Local model folder override containing `config.json` + `encoder.pt` |
-| `RS_EMBED_GALILEO_HF_REPO` | `nasaharvest/galileo` | Hugging Face repo used for snapshot download |
-| `RS_EMBED_GALILEO_CACHE_DIR` | `~/.cache/rs_embed/galileo` | Download cache dir for model snapshots |
-| `RS_EMBED_GALILEO_AUTO_DOWNLOAD` | `1` | Auto-download model folder from Hugging Face when `MODEL_PATH` is unset |
-| `RS_EMBED_GALILEO_IMG` | `64` | Frame resize target |
-| `RS_EMBED_GALILEO_PATCH` | `8` | Encoder patch size |
-| `RS_EMBED_GALILEO_FRAMES` | `8` | Number of temporal frames `T` |
-| `RS_EMBED_GALILEO_NORM` | `none` | S2 normalization mode (`none`, `unit_scale`, `per_tile_minmax`, `official_stats`) |
-| `RS_EMBED_GALILEO_ADD_LN` | `1` | Add layer norm on encoder exit |
-| `RS_EMBED_GALILEO_MONTH` | unset | Force a constant month (1..12) for all frames |
-| `RS_EMBED_GALILEO_FETCH_WORKERS` | `8` | Prefetch workers for batch APIs |
+| Env var                          | Default                     | Effect                                                                            |
+| -------------------------------- | --------------------------- | --------------------------------------------------------------------------------- |
+| `RS_EMBED_GALILEO_MODEL_SIZE`    | `nano`                      | Galileo model size selector (`models/<size>/`)                                    |
+| `RS_EMBED_GALILEO_MODEL_PATH`    | unset                       | Local model folder override containing `config.json` + `encoder.pt`               |
+| `RS_EMBED_GALILEO_HF_REPO`       | `nasaharvest/galileo`       | Hugging Face repo used for snapshot download                                      |
+| `RS_EMBED_GALILEO_CACHE_DIR`     | `~/.cache/rs_embed/galileo` | Download cache dir for model snapshots                                            |
+| `RS_EMBED_GALILEO_AUTO_DOWNLOAD` | `1`                         | Auto-download model folder from Hugging Face when `MODEL_PATH` is unset           |
+| `RS_EMBED_GALILEO_IMG`           | `64`                        | Frame resize target                                                               |
+| `RS_EMBED_GALILEO_PATCH`         | `8`                         | Encoder patch size                                                                |
+| `RS_EMBED_GALILEO_FRAMES`        | `8`                         | Number of temporal frames `T`                                                     |
+| `RS_EMBED_GALILEO_NORM`          | `none`                      | S2 normalization mode (`none`, `unit_scale`, `per_tile_minmax`, `official_stats`) |
+| `RS_EMBED_GALILEO_ADD_LN`        | `1`                         | Add layer norm on encoder exit                                                    |
+| `RS_EMBED_GALILEO_MONTH`         | unset                       | Force a constant month (1..12) for all frames                                     |
+| `RS_EMBED_GALILEO_FETCH_WORKERS` | `8`                         | Prefetch workers for batch APIs                                                   |
 
 ---
 

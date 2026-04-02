@@ -4,8 +4,6 @@ The `rs-embed` project welcomes bug reports, documentation fixes, model integrat
 
 If you want to add a new model adapter or change the embedder contract, start with [Extending](extending.md).
 
-
-
 ## GitHub Workflow
 
 All development happens on GitHub. If you already know what needs to change, the fastest path is usually to open a pull request. If the scope is still unclear, or if the change affects public API shape, model semantics, or repository direction, opening an issue first helps everyone start from the same written context.

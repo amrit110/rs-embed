@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `dofa` |
-| Family / Backbone | DOFA ViT (`base` / `large`, official checkpoints) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
-| Primary input | Raw Sentinel-2 SR CHW + wavelengths (µm) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | provider path requires `TemporalSpec.range(...)` |
-| Output modes | `pooled`, `grid` |
-| Model config keys | `variant` (default: `base`; choices: `base`, `large`) |
-| Extra side inputs | **required** wavelength vector (`wavelengths_um`) |
+| Field                             | Value                                                         |
+| --------------------------------- | ------------------------------------------------------------- |
+| Model ID                          | `dofa`                                                        |
+| Family / Backbone                 | DOFA ViT (`base` / `large`, official checkpoints)             |
+| Adapter type                      | `on-the-fly`                                                  |
+| Typical backend                   | provider backend (`gee`), also supports `backend="tensor"`    |
+| Primary input                     | Raw Sentinel-2 SR CHW + wavelengths (µm)                      |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                 |
+| Temporal mode                     | provider path requires `TemporalSpec.range(...)`              |
+| Output modes                      | `pooled`, `grid`                                              |
+| Model config keys                 | `variant` (default: `base`; choices: `base`, `large`)         |
+| Extra side inputs                 | **required** wavelength vector (`wavelengths_um`)             |
 | Training alignment (adapter path) | Medium-High (when wavelengths and band semantics are correct) |
 
 ---
@@ -93,15 +93,15 @@ The current implementation fixes image size at `224`, and the official preproces
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_DOFA_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_DOFA_BATCH_SIZE` | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs |
-| `RS_EMBED_DOFA_BASE_WEIGHTS` | unset | Local override for the base checkpoint file |
-| `RS_EMBED_DOFA_LARGE_WEIGHTS` | unset | Local override for the large checkpoint file |
-| `RS_EMBED_DOFA_WEIGHTS_DIR` | unset | Directory override containing DOFA checkpoint files |
-| `RS_EMBED_DOFA_HF_REPO_ID` | `earthflow/DOFA` | Hugging Face repo used for checkpoint download |
-| `RS_EMBED_DOFA_HF_REVISION` | `main` | Hugging Face revision used for checkpoint download |
+| Env var                       | Default            | Effect                                              |
+| ----------------------------- | ------------------ | --------------------------------------------------- |
+| `RS_EMBED_DOFA_FETCH_WORKERS` | `8`                | Provider prefetch workers for batch APIs            |
+| `RS_EMBED_DOFA_BATCH_SIZE`    | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs                 |
+| `RS_EMBED_DOFA_BASE_WEIGHTS`  | unset              | Local override for the base checkpoint file         |
+| `RS_EMBED_DOFA_LARGE_WEIGHTS` | unset              | Local override for the large checkpoint file        |
+| `RS_EMBED_DOFA_WEIGHTS_DIR`   | unset              | Directory override containing DOFA checkpoint files |
+| `RS_EMBED_DOFA_HF_REPO_ID`    | `earthflow/DOFA`   | Hugging Face repo used for checkpoint download      |
+| `RS_EMBED_DOFA_HF_REVISION`   | `main`             | Hugging Face revision used for checkpoint download  |
 
 Non-env model selection knobs:
 

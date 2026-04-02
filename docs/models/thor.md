@@ -4,20 +4,20 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `thor` |
-| Aliases | `thor_1_0_base` |
-| Family / Backbone | Fully vendored THOR runtime (`thor_v1_tiny` / `thor_v1_small` / `thor_v1_base` / `thor_v1_large`) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 SR 10-band `CHW` |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (composite window) |
-| Output modes | `pooled`, `grid` |
-| Model config keys | `variant` (default: `base`; choices: `tiny`, `small`, `base`, `large`) |
-| Extra side inputs | none required in current adapter |
-| Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved |
+| Field                             | Value                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Model ID                          | `thor`                                                                                            |
+| Aliases                           | `thor_1_0_base`                                                                                   |
+| Family / Backbone                 | Fully vendored THOR runtime (`thor_v1_tiny` / `thor_v1_small` / `thor_v1_base` / `thor_v1_large`) |
+| Adapter type                      | `on-the-fly`                                                                                      |
+| Typical backend                   | provider backend (`gee`)                                                                          |
+| Primary input                     | S2 SR 10-band `CHW`                                                                               |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                                     |
+| Temporal mode                     | `range` in practice (composite window)                                                            |
+| Output modes                      | `pooled`, `grid`                                                                                  |
+| Model config keys                 | `variant` (default: `base`; choices: `tiny`, `small`, `base`, `large`)                            |
+| Extra side inputs                 | none required in current adapter                                                                  |
+| Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved                        |
 
 ---
 
@@ -71,16 +71,16 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with adapter band order `B2,
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_THOR_MODEL_KEY` | `thor_v1_base` | THOR backbone key for the vendored runtime |
-| `RS_EMBED_THOR_CKPT` | unset | Local checkpoint path override |
-| `RS_EMBED_THOR_PRETRAINED` | `1` | Use pretrained weights (HF default path) |
-| `RS_EMBED_THOR_IMG` | `288` | Resize target image size |
-| `RS_EMBED_THOR_NORMALIZE` | `thor_stats` | `thor_stats`, `unit_scale`, or `none` |
-| `RS_EMBED_THOR_GROUP_MERGE` | `mean` | THOR group-grid aggregation: `mean`, `sum`, `concat` |
-| `RS_EMBED_THOR_PATCH_SIZE` | `16` | THOR flexi patch size parameter |
-| `RS_EMBED_THOR_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
+| Env var                       | Default        | Effect                                               |
+| ----------------------------- | -------------- | ---------------------------------------------------- |
+| `RS_EMBED_THOR_MODEL_KEY`     | `thor_v1_base` | THOR backbone key for the vendored runtime           |
+| `RS_EMBED_THOR_CKPT`          | unset          | Local checkpoint path override                       |
+| `RS_EMBED_THOR_PRETRAINED`    | `1`            | Use pretrained weights (HF default path)             |
+| `RS_EMBED_THOR_IMG`           | `288`          | Resize target image size                             |
+| `RS_EMBED_THOR_NORMALIZE`     | `thor_stats`   | `thor_stats`, `unit_scale`, or `none`                |
+| `RS_EMBED_THOR_GROUP_MERGE`   | `mean`         | THOR group-grid aggregation: `mean`, `sum`, `concat` |
+| `RS_EMBED_THOR_PATCH_SIZE`    | `16`           | THOR flexi patch size parameter                      |
+| `RS_EMBED_THOR_FETCH_WORKERS` | `8`            | Provider prefetch workers for batch APIs             |
 
 Notes:
 
@@ -88,9 +88,9 @@ Notes:
 
 ## Model-specific Settings
 
-| Key | Type | Default | Choices | Notes |
-|---|---|---|---|---|
-| `variant` | `string` | `base` | `tiny`, `small`, `base`, `large` | Backbone size selector. For export jobs, pass it through `ExportModelRequest.configure("thor", variant=...)`. |
+| Key       | Type     | Default | Choices                          | Notes                                                                                                         |
+| --------- | -------- | ------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `variant` | `string` | `base`  | `tiny`, `small`, `base`, `large` | Backbone size selector. For export jobs, pass it through `ExportModelRequest.configure("thor", variant=...)`. |
 
 Example:
 

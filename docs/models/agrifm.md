@@ -4,17 +4,17 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `agrifm` |
-| Family / Backbone | AgriFM (vendored Video Swin runtime + checkpoint loader) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 SR 10-band time series (`T,10,H,W`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (window split into `T` frames) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none required (adapter builds fixed frame stack) |
+| Field                             | Value                                                                 |
+| --------------------------------- | --------------------------------------------------------------------- |
+| Model ID                          | `agrifm`                                                              |
+| Family / Backbone                 | AgriFM (vendored Video Swin runtime + checkpoint loader)              |
+| Adapter type                      | `on-the-fly`                                                          |
+| Typical backend                   | provider backend (`gee`)                                              |
+| Primary input                     | S2 SR 10-band time series (`T,10,H,W`)                                |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                         |
+| Temporal mode                     | `range` in practice (window split into `T` frames)                    |
+| Output modes                      | `pooled`, `grid`                                                      |
+| Extra side inputs                 | none required (adapter builds fixed frame stack)                      |
 | Training alignment (adapter path) | High when `n_frames`, normalization, and checkpoint version are fixed |
 
 ---
@@ -65,23 +65,23 @@ For `input_chw`, the adapter accepts `CHW` with `C=10` and repeats that frame to
 
 ### Temporal / preprocessing
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_AGRIFM_FRAMES` | `8` | Fixed frame count `T` |
-| `RS_EMBED_AGRIFM_IMG` | `224` | Resize target image size |
-| `RS_EMBED_AGRIFM_NORM` | `agrifm_stats` | `agrifm_stats`, `unit_scale`, or `none` |
-| `RS_EMBED_AGRIFM_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
+| Env var                         | Default        | Effect                                   |
+| ------------------------------- | -------------- | ---------------------------------------- |
+| `RS_EMBED_AGRIFM_FRAMES`        | `8`            | Fixed frame count `T`                    |
+| `RS_EMBED_AGRIFM_IMG`           | `224`          | Resize target image size                 |
+| `RS_EMBED_AGRIFM_NORM`          | `agrifm_stats` | `agrifm_stats`, `unit_scale`, or `none`  |
+| `RS_EMBED_AGRIFM_FETCH_WORKERS` | `8`            | Provider prefetch workers for batch APIs |
 
 ### Checkpoint loading
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_AGRIFM_CKPT` | unset | Local checkpoint path |
-| `RS_EMBED_AGRIFM_AUTO_DOWNLOAD` | `1` | Allow checkpoint auto-download |
-| `RS_EMBED_AGRIFM_CACHE_DIR` | `~/.cache/rs_embed/agrifm` | Checkpoint cache dir |
-| `RS_EMBED_AGRIFM_CKPT_FILE` | `AgriFM.pth` | Cached checkpoint filename |
-| `RS_EMBED_AGRIFM_CKPT_URL` | project default URL | Checkpoint download URL |
-| `RS_EMBED_AGRIFM_CKPT_MIN_BYTES` | large-size threshold | Download validation threshold |
+| Env var                          | Default                    | Effect                         |
+| -------------------------------- | -------------------------- | ------------------------------ |
+| `RS_EMBED_AGRIFM_CKPT`           | unset                      | Local checkpoint path          |
+| `RS_EMBED_AGRIFM_AUTO_DOWNLOAD`  | `1`                        | Allow checkpoint auto-download |
+| `RS_EMBED_AGRIFM_CACHE_DIR`      | `~/.cache/rs_embed/agrifm` | Checkpoint cache dir           |
+| `RS_EMBED_AGRIFM_CKPT_FILE`      | `AgriFM.pth`               | Cached checkpoint filename     |
+| `RS_EMBED_AGRIFM_CKPT_URL`       | project default URL        | Checkpoint download URL        |
+| `RS_EMBED_AGRIFM_CKPT_MIN_BYTES` | large-size threshold       | Download validation threshold  |
 
 ## Output Semantics
 

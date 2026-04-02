@@ -4,17 +4,17 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `terramind` |
-| Family / Backbone | TerraMind via TerraTorch `BACKBONE_REGISTRY` |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
-| Primary input | S2 SR 12-band (`B1..B12` subset used by adapter order) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` (provider path normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none required in current adapter |
+| Field                             | Value                                                          |
+| --------------------------------- | -------------------------------------------------------------- |
+| Model ID                          | `terramind`                                                    |
+| Family / Backbone                 | TerraMind via TerraTorch `BACKBONE_REGISTRY`                   |
+| Adapter type                      | `on-the-fly`                                                   |
+| Typical backend                   | provider backend (`gee`), also supports `backend="tensor"`     |
+| Primary input                     | S2 SR 12-band (`B1..B12` subset used by adapter order)         |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                  |
+| Temporal mode                     | `range` (provider path normalized via shared helper)           |
+| Output modes                      | `pooled`, `grid`                                               |
+| Extra side inputs                 | none required in current adapter                               |
 | Training alignment (adapter path) | High when default TerraMind z-score normalization is preserved |
 
 ---
@@ -85,14 +85,14 @@ For provider overrides, `input_chw` must be `CHW` with 12 bands in the adapter f
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_TERRAMIND_MODEL_KEY` | `terramind_v1_small` | TerraMind backbone key |
-| `RS_EMBED_TERRAMIND_MODALITY` | `S2L2A` | Modality passed to TerraMind/TerraTorch |
-| `RS_EMBED_TERRAMIND_NORMALIZE` | `zscore` | Input normalization mode (`zscore` vs raw/none) |
-| `RS_EMBED_TERRAMIND_LAYER_INDEX` | `-1` | Which layer output to select when sequence-like outputs are returned |
-| `RS_EMBED_TERRAMIND_PRETRAINED` | `1` | Use pretrained weights |
-| `RS_EMBED_TERRAMIND_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
+| Env var                            | Default              | Effect                                                               |
+| ---------------------------------- | -------------------- | -------------------------------------------------------------------- |
+| `RS_EMBED_TERRAMIND_MODEL_KEY`     | `terramind_v1_small` | TerraMind backbone key                                               |
+| `RS_EMBED_TERRAMIND_MODALITY`      | `S2L2A`              | Modality passed to TerraMind/TerraTorch                              |
+| `RS_EMBED_TERRAMIND_NORMALIZE`     | `zscore`             | Input normalization mode (`zscore` vs raw/none)                      |
+| `RS_EMBED_TERRAMIND_LAYER_INDEX`   | `-1`                 | Which layer output to select when sequence-like outputs are returned |
+| `RS_EMBED_TERRAMIND_PRETRAINED`    | `1`                  | Use pretrained weights                                               |
+| `RS_EMBED_TERRAMIND_FETCH_WORKERS` | `8`                  | Provider prefetch workers for batch APIs                             |
 
 Fixed adapter behavior:
 

@@ -4,19 +4,19 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `gse` |
-| Aliases | `gse_annual` |
-| Family / Source | Google Satellite Embedding annual product (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`) |
-| Adapter type | `precomputed` |
-| Typical backend | provider-backed; prefer `backend="auto"` in public API |
-| Primary input | Provider-sampled annual embedding image collection |
-| Default resolution | 10m default provider sampling (`fetch.scale_m` / `sensor.scale_m`) |
-| Temporal mode | **strict** `TemporalSpec.year(...)` |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none |
-| Training alignment (adapter path) | N/A (precomputed product) |
+| Field                             | Value                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| Model ID                          | `gse`                                                                              |
+| Aliases                           | `gse_annual`                                                                       |
+| Family / Source                   | Google Satellite Embedding annual product (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`) |
+| Adapter type                      | `precomputed`                                                                      |
+| Typical backend                   | provider-backed; prefer `backend="auto"` in public API                             |
+| Primary input                     | Provider-sampled annual embedding image collection                                 |
+| Default resolution                | 10m default provider sampling (`fetch.scale_m` / `sensor.scale_m`)                 |
+| Temporal mode                     | **strict** `TemporalSpec.year(...)`                                                |
+| Output modes                      | `pooled`, `grid`                                                                   |
+| Extra side inputs                 | none                                                                               |
+| Training alignment (adapter path) | N/A (precomputed product)                                                          |
 
 ---
 
@@ -57,9 +57,9 @@ The provider fetch settings are fixed to collection `GOOGLE/SATELLITE_EMBEDDING/
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_GSE_BATCH_WORKERS` | `4` | Batch worker count for `get_embeddings_batch(...)` |
+| Env var                      | Default | Effect                                             |
+| ---------------------------- | ------- | -------------------------------------------------- |
+| `RS_EMBED_GSE_BATCH_WORKERS` | `4`     | Batch worker count for `get_embeddings_batch(...)` |
 
 Primary non-env sampling knob:
 

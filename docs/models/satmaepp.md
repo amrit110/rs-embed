@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | `satmaepp` (RGB) | `satmaepp_s2_10b` (S2-10B) |
-|---|---|---|
-| Canonical ID | `satmaepp` | `satmaepp_s2_10b` |
-| Aliases | `satmaepp_rgb`, `satmae++` | `satmaepp_sentinel10`, `satmaepp_s2` |
-| Adapter type | `on-the-fly` | `on-the-fly` |
-| Typical backend | provider backend (`gee`) | provider backend (`gee`) |
-| Primary input | S2 RGB (`B4,B3,B2`) | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | range window + single composite | range window + single composite |
-| Output modes | `pooled`, `grid` | `pooled`, `grid` |
-| Model config keys | none | `variant` (default: `large`; choices: `large`) |
-| Core extraction | `forward_encoder(mask_ratio=0.0)` | `forward_encoder(mask_ratio=0.0)` |
+| Field              | `satmaepp` (RGB)                              | `satmaepp_s2_10b` (S2-10B)                         |
+| ------------------ | --------------------------------------------- | -------------------------------------------------- |
+| Canonical ID       | `satmaepp`                                    | `satmaepp_s2_10b`                                  |
+| Aliases            | `satmaepp_rgb`, `satmae++`                    | `satmaepp_sentinel10`, `satmaepp_s2`               |
+| Adapter type       | `on-the-fly`                                  | `on-the-fly`                                       |
+| Typical backend    | provider backend (`gee`)                      | provider backend (`gee`)                           |
+| Primary input      | S2 RGB (`B4,B3,B2`)                           | S2 SR 10-band (`B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12`) |
+| Default resolution | 10m default provider fetch (`sensor.scale_m`) | 10m default provider fetch (`sensor.scale_m`)      |
+| Temporal mode      | range window + single composite               | range window + single composite                    |
+| Output modes       | `pooled`, `grid`                              | `pooled`, `grid`                                   |
+| Model config keys  | none                                          | `variant` (default: `large`; choices: `large`)     |
+| Core extraction    | `forward_encoder(mask_ratio=0.0)`             | `forward_encoder(mask_ratio=0.0)`                  |
 
 ---
 
@@ -66,14 +66,14 @@ The RGB variant defaults to `collection="COPERNICUS/S2_SR_HARMONIZED"`, `bands=(
 
 ### Key Environment Variables
 
-| Env var | Effect |
-|---|---|
-| `RS_EMBED_SATMAEPP_ID` | HF model ID / checkpoint selector |
-| `RS_EMBED_SATMAEPP_IMG` | Eval image size |
-| `RS_EMBED_SATMAEPP_CHANNEL_ORDER` | `rgb` or `bgr` preprocessing order |
-| `RS_EMBED_SATMAEPP_BGR` | Legacy BGR toggle |
+| Env var                           | Effect                                   |
+| --------------------------------- | ---------------------------------------- |
+| `RS_EMBED_SATMAEPP_ID`            | HF model ID / checkpoint selector        |
+| `RS_EMBED_SATMAEPP_IMG`           | Eval image size                          |
+| `RS_EMBED_SATMAEPP_CHANNEL_ORDER` | `rgb` or `bgr` preprocessing order       |
+| `RS_EMBED_SATMAEPP_BGR`           | Legacy BGR toggle                        |
 | `RS_EMBED_SATMAEPP_FETCH_WORKERS` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_SATMAEPP_BATCH_SIZE` | Inference batch size for batch APIs |
+| `RS_EMBED_SATMAEPP_BATCH_SIZE`    | Inference batch size for batch APIs      |
 
 ### Common Failure Modes
 
@@ -114,17 +114,17 @@ This path is stricter than the RGB path: `sensor.bands` must exactly match the 1
 
 ### Key Environment Variables
 
-| Env var | Effect |
-|---|---|
-| `RS_EMBED_SATMAEPP_S2_CKPT_REPO` | Checkpoint repo/source |
-| `RS_EMBED_SATMAEPP_S2_CKPT_FILE` | Checkpoint filename |
-| `RS_EMBED_SATMAEPP_S2_MODEL_FN` | Model constructor name |
-| `RS_EMBED_SATMAEPP_S2_IMG` | Eval image size |
-| `RS_EMBED_SATMAEPP_S2_PATCH` | Patch size |
-| `RS_EMBED_SATMAEPP_S2_GRID_REDUCE` | Group reduction mode for grid output |
-| `RS_EMBED_SATMAEPP_S2_WEIGHTS_ONLY` | Weights-only checkpoint loading toggle |
+| Env var                              | Effect                                   |
+| ------------------------------------ | ---------------------------------------- |
+| `RS_EMBED_SATMAEPP_S2_CKPT_REPO`     | Checkpoint repo/source                   |
+| `RS_EMBED_SATMAEPP_S2_CKPT_FILE`     | Checkpoint filename                      |
+| `RS_EMBED_SATMAEPP_S2_MODEL_FN`      | Model constructor name                   |
+| `RS_EMBED_SATMAEPP_S2_IMG`           | Eval image size                          |
+| `RS_EMBED_SATMAEPP_S2_PATCH`         | Patch size                               |
+| `RS_EMBED_SATMAEPP_S2_GRID_REDUCE`   | Group reduction mode for grid output     |
+| `RS_EMBED_SATMAEPP_S2_WEIGHTS_ONLY`  | Weights-only checkpoint loading toggle   |
 | `RS_EMBED_SATMAEPP_S2_FETCH_WORKERS` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_SATMAEPP_S2_BATCH_SIZE` | Inference batch size for batch APIs |
+| `RS_EMBED_SATMAEPP_S2_BATCH_SIZE`    | Inference batch size for batch APIs      |
 
 ### Common Failure Modes
 

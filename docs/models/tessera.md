@@ -4,19 +4,19 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `tessera` |
-| Family / Source | GeoTessera precomputed embeddings |
-| Adapter type | `precomputed` |
-| Typical backend | `auto` |
-| Primary input | `BBox` / `PointBuffer` in EPSG:4326 (converted to bbox) |
-| Product grid CRS | fixed tile-native CRS (not the common provider-backed EPSG:3857 default) |
-| Default resolution | 10m source product resolution |
-| Temporal mode | year-like selection (`year`; `range` uses start year fallback) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none |
-| Training alignment (adapter path) | N/A (precomputed product) |
+| Field                             | Value                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| Model ID                          | `tessera`                                                                |
+| Family / Source                   | GeoTessera precomputed embeddings                                        |
+| Adapter type                      | `precomputed`                                                            |
+| Typical backend                   | `auto`                                                                   |
+| Primary input                     | `BBox` / `PointBuffer` in EPSG:4326 (converted to bbox)                  |
+| Product grid CRS                  | fixed tile-native CRS (not the common provider-backed EPSG:3857 default) |
+| Default resolution                | 10m source product resolution                                            |
+| Temporal mode                     | year-like selection (`year`; `range` uses start year fallback)           |
+| Output modes                      | `pooled`, `grid`                                                         |
+| Extra side inputs                 | none                                                                     |
+| Training alignment (adapter path) | N/A (precomputed product)                                                |
 
 ---
 
@@ -33,7 +33,7 @@ Tessera is a strong choice for fast precomputed baselines, large-area ROI extrac
 The adapter accepts `BBox` directly and `PointBuffer`, which it converts to `BBox` in EPSG:4326 using an approximate meter-to-degree conversion. Unsupported spatial types raise `ModelError`.
 
 !!! warning
-    Tessera still reads and returns embeddings in the product-native tile CRS after crop. That CRS may differ from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
+Tessera still reads and returns embeddings in the product-native tile CRS after crop. That CRS may differ from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
 
 ### Temporal
 
@@ -67,10 +67,10 @@ The backend should be `auto`, although legacy `local` is still accepted for comp
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_TESSERA_CACHE` | unset (GeoTessera default) | Local GeoTessera cache directory |
-| `RS_EMBED_TESSERA_BATCH_WORKERS` | `4` | Batch worker count for `get_embeddings_batch(...)` |
+| Env var                          | Default                    | Effect                                             |
+| -------------------------------- | -------------------------- | -------------------------------------------------- |
+| `RS_EMBED_TESSERA_CACHE`         | unset (GeoTessera default) | Local GeoTessera cache directory                   |
+| `RS_EMBED_TESSERA_BATCH_WORKERS` | `4`                        | Batch worker count for `get_embeddings_batch(...)` |
 
 Non-env override:
 

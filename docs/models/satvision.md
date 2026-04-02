@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `satvision` |
-| Aliases | `satvision_toa` |
-| Family / Backbone | SatVision-TOA checkpoint (HF/local checkpoint loader) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | 14-channel TOA `CHW` (default MODIS/061/MOD021KM band order) |
-| Default resolution | 1000m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none (but channel calibration settings matter) |
+| Field                             | Value                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| Model ID                          | `satvision`                                                              |
+| Aliases                           | `satvision_toa`                                                          |
+| Family / Backbone                 | SatVision-TOA checkpoint (HF/local checkpoint loader)                    |
+| Adapter type                      | `on-the-fly`                                                             |
+| Typical backend                   | provider backend (`gee`)                                                 |
+| Primary input                     | 14-channel TOA `CHW` (default MODIS/061/MOD021KM band order)             |
+| Default resolution                | 1000m default provider fetch (`sensor.scale_m`)                          |
+| Temporal mode                     | `range` in practice (normalized via shared helper)                       |
+| Output modes                      | `pooled`, `grid`                                                         |
+| Extra side inputs                 | none (but channel calibration settings matter)                           |
 | Training alignment (adapter path) | High only when channel order + calibration match checkpoint expectations |
 
 ---
@@ -77,37 +77,37 @@ The adapter does not infer semantic channel order from the values themselves, so
 
 ### Model / weights
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_SATVISION_TOA_ID` | SatVision TOA HF model ID | HF model identifier |
-| `RS_EMBED_SATVISION_TOA_CKPT` | unset | Local checkpoint path override |
-| `RS_EMBED_SATVISION_TOA_AUTO_DOWNLOAD` | `1` | Allow HF download when local checkpoint not set |
-| `RS_EMBED_SATVISION_TOA_IMG` | `128` | Resize target image size |
-| `RS_EMBED_SATVISION_TOA_IN_CHANS` | `14` | Expected channel count |
-| `RS_EMBED_SATVISION_TOA_BATCH_SIZE` | CPU:`2`, CUDA:`8` | Inference batch size (batch APIs) |
-| `RS_EMBED_SATVISION_TOA_FETCH_WORKERS` | `8` | Provider prefetch workers (batch APIs) |
+| Env var                                | Default                   | Effect                                          |
+| -------------------------------------- | ------------------------- | ----------------------------------------------- |
+| `RS_EMBED_SATVISION_TOA_ID`            | SatVision TOA HF model ID | HF model identifier                             |
+| `RS_EMBED_SATVISION_TOA_CKPT`          | unset                     | Local checkpoint path override                  |
+| `RS_EMBED_SATVISION_TOA_AUTO_DOWNLOAD` | `1`                       | Allow HF download when local checkpoint not set |
+| `RS_EMBED_SATVISION_TOA_IMG`           | `128`                     | Resize target image size                        |
+| `RS_EMBED_SATVISION_TOA_IN_CHANS`      | `14`                      | Expected channel count                          |
+| `RS_EMBED_SATVISION_TOA_BATCH_SIZE`    | CPU:`2`, CUDA:`8`         | Inference batch size (batch APIs)               |
+| `RS_EMBED_SATVISION_TOA_FETCH_WORKERS` | `8`                       | Provider prefetch workers (batch APIs)          |
 
 ### Normalization / calibration
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_SATVISION_TOA_NORM` | `auto` | `auto`, `raw`, or `unit` |
-| `RS_EMBED_SATVISION_TOA_REFLECTANCE_IDXS` | adapter defaults | Reflectance channel indices |
-| `RS_EMBED_SATVISION_TOA_EMISSIVE_IDXS` | adapter defaults | Emissive channel indices |
-| `RS_EMBED_SATVISION_TOA_REF_DIV` | `100` | Reflectance divisor |
-| `RS_EMBED_SATVISION_TOA_EMISSIVE_MINS` | adapter defaults | Emissive min calibration values |
-| `RS_EMBED_SATVISION_TOA_EMISSIVE_MAXS` | adapter defaults | Emissive max calibration values |
+| Env var                                   | Default          | Effect                          |
+| ----------------------------------------- | ---------------- | ------------------------------- |
+| `RS_EMBED_SATVISION_TOA_NORM`             | `auto`           | `auto`, `raw`, or `unit`        |
+| `RS_EMBED_SATVISION_TOA_REFLECTANCE_IDXS` | adapter defaults | Reflectance channel indices     |
+| `RS_EMBED_SATVISION_TOA_EMISSIVE_IDXS`    | adapter defaults | Emissive channel indices        |
+| `RS_EMBED_SATVISION_TOA_REF_DIV`          | `100`            | Reflectance divisor             |
+| `RS_EMBED_SATVISION_TOA_EMISSIVE_MINS`    | adapter defaults | Emissive min calibration values |
+| `RS_EMBED_SATVISION_TOA_EMISSIVE_MAXS`    | adapter defaults | Emissive max calibration values |
 
 ### Default sensor overrides (if `sensor` omitted)
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_SATVISION_TOA_COLLECTION` | `MODIS/061/MOD021KM` | Default provider collection |
-| `RS_EMBED_SATVISION_TOA_BANDS` | default 14-band MODIS order | Override default band list |
-| `RS_EMBED_SATVISION_TOA_SCALE_M` | `1000` | Default fetch scale |
-| `RS_EMBED_SATVISION_TOA_CLOUDY_PCT` | `100` | Default cloud filter |
-| `RS_EMBED_SATVISION_TOA_FILL` | `0` | Default fill value |
-| `RS_EMBED_SATVISION_TOA_COMPOSITE` | `mosaic` | Default composite method |
+| Env var                             | Default                     | Effect                      |
+| ----------------------------------- | --------------------------- | --------------------------- |
+| `RS_EMBED_SATVISION_TOA_COLLECTION` | `MODIS/061/MOD021KM`        | Default provider collection |
+| `RS_EMBED_SATVISION_TOA_BANDS`      | default 14-band MODIS order | Override default band list  |
+| `RS_EMBED_SATVISION_TOA_SCALE_M`    | `1000`                      | Default fetch scale         |
+| `RS_EMBED_SATVISION_TOA_CLOUDY_PCT` | `100`                       | Default cloud filter        |
+| `RS_EMBED_SATVISION_TOA_FILL`       | `0`                         | Default fill value          |
+| `RS_EMBED_SATVISION_TOA_COMPOSITE`  | `mosaic`                    | Default composite method    |
 
 ---
 

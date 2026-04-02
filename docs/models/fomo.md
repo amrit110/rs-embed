@@ -4,17 +4,17 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `fomo` |
-| Family / Backbone | FoMo-Bench `MultiSpectralViT` (vendored local code + checkpoint loader) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 SR 12-band (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | **required modality keys** (adapter provides S2 defaults, configurable via env) |
+| Field                             | Value                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| Model ID                          | `fomo`                                                                                   |
+| Family / Backbone                 | FoMo-Bench `MultiSpectralViT` (vendored local code + checkpoint loader)                  |
+| Adapter type                      | `on-the-fly`                                                                             |
+| Typical backend                   | provider backend (`gee`)                                                                 |
+| Primary input                     | S2 SR 12-band (`B1,B2,B3,B4,B5,B6,B7,B8,B8A,B9,B11,B12`)                                 |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                            |
+| Temporal mode                     | `range` in practice (normalized via shared helper)                                       |
+| Output modes                      | `pooled`, `grid`                                                                         |
+| Extra side inputs                 | **required modality keys** (adapter provides S2 defaults, configurable via env)          |
 | Training alignment (adapter path) | Medium-High when `S2_KEYS`, normalization, and model config match checkpoint assumptions |
 
 ---
@@ -65,34 +65,35 @@ The FoMo forward path requires one modality key per channel. The default S2 mapp
 
 ### Core model / preprocessing
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_FOMO_IMG` | `64` | Resize target image size |
-| `RS_EMBED_FOMO_PATCH` | `16` | Patch size (used for model config + grid expectations) |
-| `RS_EMBED_FOMO_NORM` | `unit_scale` | `unit_scale`, `per_tile_minmax`, or `none` |
-| `RS_EMBED_FOMO_S2_KEYS` | adapter S2 default mapping | 12 comma-separated modality keys |
-| `RS_EMBED_FOMO_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
+| Env var                       | Default                    | Effect                                                 |
+| ----------------------------- | -------------------------- | ------------------------------------------------------ |
+| `RS_EMBED_FOMO_IMG`           | `64`                       | Resize target image size                               |
+| `RS_EMBED_FOMO_PATCH`         | `16`                       | Patch size (used for model config + grid expectations) |
+| `RS_EMBED_FOMO_NORM`          | `unit_scale`               | `unit_scale`, `per_tile_minmax`, or `none`             |
+| `RS_EMBED_FOMO_S2_KEYS`       | adapter S2 default mapping | 12 comma-separated modality keys                       |
+| `RS_EMBED_FOMO_FETCH_WORKERS` | `8`                        | Provider prefetch workers for batch APIs               |
 
 ### FoMo model config (advanced; keep aligned with checkpoint)
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_FOMO_DIM` | `768` | Model dim |
-| `RS_EMBED_FOMO_DEPTH` | `12` | Transformer depth |
-| `RS_EMBED_FOMO_HEADS` | `12` | Attention heads |
-| `RS_EMBED_FOMO_MLP_DIM` | `2048` | MLP dim |
-| `RS_EMBED_FOMO_NUM_CLASSES` | `1000` | Class head size (config compatibility) |
+| Env var                     | Default | Effect                                 |
+| --------------------------- | ------- | -------------------------------------- |
+| `RS_EMBED_FOMO_DIM`         | `768`   | Model dim                              |
+| `RS_EMBED_FOMO_DEPTH`       | `12`    | Transformer depth                      |
+| `RS_EMBED_FOMO_HEADS`       | `12`    | Attention heads                        |
+| `RS_EMBED_FOMO_MLP_DIM`     | `2048`  | MLP dim                                |
+| `RS_EMBED_FOMO_NUM_CLASSES` | `1000`  | Class head size (config compatibility) |
 
 ### Checkpoint loading
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_FOMO_CKPT` | unset | Local checkpoint path |
-| `RS_EMBED_FOMO_AUTO_DOWNLOAD` | `1` | Allow checkpoint auto-download |
-| `RS_EMBED_FOMO_CACHE_DIR` | `~/.cache/rs_embed/fomo` | Checkpoint cache dir |
-| `RS_EMBED_FOMO_CKPT_FILE` | default FoMo checkpoint filename | Cached ckpt filename |
-| `RS_EMBED_FOMO_CKPT_URL` | default Dropbox URL | Checkpoint download URL |
-| `RS_EMBED_FOMO_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
+| Env var                        | Default                          | Effect                         |
+| ------------------------------ | -------------------------------- | ------------------------------ |
+| `RS_EMBED_FOMO_CKPT`           | unset                            | Local checkpoint path          |
+| `RS_EMBED_FOMO_AUTO_DOWNLOAD`  | `1`                              | Allow checkpoint auto-download |
+| `RS_EMBED_FOMO_CACHE_DIR`      | `~/.cache/rs_embed/fomo`         | Checkpoint cache dir           |
+| `RS_EMBED_FOMO_CKPT_FILE`      | default FoMo checkpoint filename | Cached ckpt filename           |
+| `RS_EMBED_FOMO_CKPT_URL`       | default Dropbox URL              | Checkpoint download URL        |
+| `RS_EMBED_FOMO_CKPT_MIN_BYTES` | adapter threshold                | Download size sanity check     |
+
 ---
 
 ## Output Semantics

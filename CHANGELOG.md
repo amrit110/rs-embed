@@ -11,11 +11,13 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 ## [0.1.1] - 2026-04-01
 
 ### Added
+
 - Automated pull request changelog enforcement with a `skip-changelog` escape hatch for docs, tests, CI, and other internal-only changes.
 - Tag-driven GitHub Release publishing that uses the matching `CHANGELOG.md` section as the release notes.
 - Trusted Publishing release automation for PyPI and TestPyPI, including a manual TestPyPI dry run and install smoke test.
 
 ### Changed
+
 - The contribution and release workflow now treats `CHANGELOG.md` as the canonical source for user-visible release notes.
 - The tag-triggered release flow now validates `src/rs_embed/_version.py`, publishes to PyPI, and only then creates the GitHub Release.
 - The tag-triggered release flow now validates the matching `CHANGELOG.md` entry before publishing to PyPI, so a missing release-notes section fails early instead of after package upload.
@@ -27,11 +29,13 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 ### Removed
 
 ### Fixed
+
 - The TestPyPI smoke test now verifies package importability and the `rs-embed` CLI entry point, not just installability and version metadata.
 
 ## [0.1.0] - 2026-03-31
 
 ### Added
+
 - Initial public alpha release of `rs-embed`.
 - Unified ROI to embedding API centered on `get_embedding(...)`, `get_embeddings_batch(...)`, `export_batch(...)`, and `inspect_provider_patch(...)`.
 - Support for precomputed embedding products including `tessera`, `gse`, and `copernicus`.
