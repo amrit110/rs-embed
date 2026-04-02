@@ -1018,7 +1018,6 @@ def test_run_embedding_request_prefetched_path_normalizes_once(monkeypatch):
             data = np.zeros((2, 2), dtype=np.float32)
             return Embedding(data=data, meta={"y_axis_direction": "south_to_north"})
 
-
     registry.register("s2n_grid_mock")(_SouthNorthGridEmbedder)
 
     # Provide a fake prefetched input so the prefetched path is triggered

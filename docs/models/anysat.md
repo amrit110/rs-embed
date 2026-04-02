@@ -1,6 +1,6 @@
 # AnySat (`anysat`)
 
-> Multi-frame Sentinel-2 time-series adapter that builds AnySat inputs (`s2` + `s2_dates`) from a temporal window and returns patch-grid features or pooled vectors.
+> Multi-frame Sentinel-2 time-series adapter that builds AnySat inputs (`s2` + `s2_dates`) from a temporal window and returns dense sub-patch grids by default or pooled vectors.
 
 ## Quick Facts
 
@@ -53,11 +53,13 @@ For `input_chw`, the adapter accepts either `CHW` or `TCHW` with `C=10`. A `CHW`
   <span class="pipeline-arrow">-&gt;</span> build AnySat side inputs
      <span class="pipeline-branch">s2:</span> [1,T,10,H,W]
      <span class="pipeline-branch">s2_dates:</span> [1,T] from frame-bin DOY midpoints
-  <span class="pipeline-arrow">-&gt;</span> forward with output="patch" and patch_size=sensor.scale_m
+  <span class="pipeline-arrow">-&gt;</span> forward with AnySat spatial output
+     <span class="pipeline-branch">grid path:</span> default `output="dense"` (`grid_feature_mode="dense"`)
+     <span class="pipeline-branch">pooled path:</span> default compatibility path keeps `output="patch"`; optional `pooled_source="tile"` uses native AnySat tile output
   <span class="pipeline-arrow">-&gt;</span> map [B,H,W,D] -&gt; rs-embed grid [D,H,W]
   <span class="pipeline-arrow">-&gt;</span> output projection
-     <span class="pipeline-branch">pooled:</span> spatial mean / max over grid
-     <span class="pipeline-branch">grid:</span>   model patch grid</code></pre>
+     <span class="pipeline-branch">pooled:</span> spatial mean / max over patch grid
+     <span class="pipeline-branch">grid:</span>   dense sub-patch grid by default (or patch grid when overridden)</code></pre>
 
 Important constraint:
 
@@ -73,6 +75,8 @@ Important constraint:
 | `RS_EMBED_ANYSAT_IMG` | `24` | Per-frame resize target (square) |
 | `RS_EMBED_ANYSAT_NORM` | `per_tile_zscore` | Series normalization mode |
 | `RS_EMBED_ANYSAT_MODEL_SIZE` | `base` | AnySat model size |
+| `RS_EMBED_ANYSAT_GRID_MODE` | `dense` | Grid path native AnySat spatial output (`dense` or `patch`) |
+| `RS_EMBED_ANYSAT_POOLED_SOURCE` | `patch` | Pooled path source (`patch` compatibility pooling or native `tile`) |
 | `RS_EMBED_ANYSAT_FLASH_ATTN` | `0` | Enable flash attention path if supported |
 | `RS_EMBED_ANYSAT_PRETRAINED` | `1` | Load pretrained checkpoint weights |
 | `RS_EMBED_ANYSAT_CKPT` | unset | Local checkpoint override |
@@ -85,7 +89,7 @@ Important constraint:
 
 ## Output Semantics
 
-AnySat follows the standard patch-grid pattern for multi-frame adapters. `pooled` applies spatial pooling over the patch grid, and `grid` returns `(D,H,W)` in model patch space rather than georeferenced raster pixels. The more distinctive AnySat details, such as frame packaging and `doy0_values`, are recorded in metadata rather than requiring a long per-page output section.
+AnySat now uses two spatial output paths inside the adapter. `pooled` defaults to the historical rs-embed behavior and applies spatial pooling over the AnySat `patch` grid, which preserves the previous pooled vector dimensionality; pass `pooled_source="tile"` (or set `RS_EMBED_ANYSAT_POOLED_SOURCE=tile`) to use the native AnySat tile embedding instead. `grid` defaults to AnySat `dense`, so the returned `(D,H,W)` is a denser sub-patch feature map by default; pass `grid_feature_mode="patch"` to the public API (or set `RS_EMBED_ANYSAT_GRID_MODE=patch`) to recover the older patch-grid behavior. As with other on-the-fly models, this grid is model space rather than guaranteed georeferenced raster pixels.
 
 ---
 

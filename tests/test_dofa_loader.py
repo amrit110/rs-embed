@@ -107,8 +107,12 @@ def test_normalize_dofa_input_chw_uses_official_s2_stats_by_band():
         input_name="input_chw",
     )
 
-    expected_b4 = ((5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B4"][0]) / dofa._DOFA_S2_STATS_BY_BAND["B4"][1]
-    expected_b12 = ((5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B12"][0]) / dofa._DOFA_S2_STATS_BY_BAND["B12"][1]
+    expected_b4 = (
+        (5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B4"][0]
+    ) / dofa._DOFA_S2_STATS_BY_BAND["B4"][1]
+    expected_b12 = (
+        (5000.0 / 10000.0) * 255.0 - dofa._DOFA_S2_STATS_BY_BAND["B12"][0]
+    ) / dofa._DOFA_S2_STATS_BY_BAND["B12"][1]
 
     assert x.shape == (2, 1, 1)
     assert np.isclose(float(x[0, 0, 0]), expected_b4)

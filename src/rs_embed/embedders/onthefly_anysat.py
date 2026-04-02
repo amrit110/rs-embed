@@ -101,6 +101,38 @@ def _normalize_anysat_model_size(model_size: Any) -> str:
     return resolved
 
 
+def _normalize_anysat_grid_feature_mode(value: Any) -> str:
+    raw = str(value).strip().lower()
+    aliases = {
+        "dense": "dense",
+        "subpatch": "dense",
+        "subpatches": "dense",
+        "patch": "patch",
+        "patches": "patch",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(
+            f"Unknown AnySat grid_feature_mode={value!r} (expected one of: dense, patch)."
+        )
+    return resolved
+
+
+def _normalize_anysat_pooled_source(value: Any) -> str:
+    raw = str(value).strip().lower()
+    aliases = {
+        "patch": "patch",
+        "grid": "patch",
+        "tile": "tile",
+        "native": "tile",
+        "model": "tile",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ModelError(f"Unknown AnySat pooled_source={value!r} (expected one of: patch, tile).")
+    return resolved
+
+
 def _resolve_anysat_runtime_config(
     *,
     model_config: dict[str, Any] | None,
@@ -129,6 +161,16 @@ def _resolve_anysat_runtime_config(
 
     norm_mode = os.environ.get("RS_EMBED_ANYSAT_NORM", "per_tile_zscore").strip()
 
+    grid_feature_mode_v = model_config_value(model_config, "grid_feature_mode")
+    if grid_feature_mode_v is None:
+        grid_feature_mode_v = os.environ.get("RS_EMBED_ANYSAT_GRID_MODE", "dense")
+    grid_feature_mode = _normalize_anysat_grid_feature_mode(grid_feature_mode_v)
+
+    pooled_source_v = model_config_value(model_config, "pooled_source")
+    if pooled_source_v is None:
+        pooled_source_v = os.environ.get("RS_EMBED_ANYSAT_POOLED_SOURCE", "patch")
+    pooled_source = _normalize_anysat_pooled_source(pooled_source_v)
+
     ckpt_path = os.environ.get("RS_EMBED_ANYSAT_CKPT")
     ckpt_path = ckpt_path or None
 
@@ -156,6 +198,8 @@ def _resolve_anysat_runtime_config(
         "image_size": int(image_size),
         "n_frames": int(n_frames),
         "norm_mode": norm_mode,
+        "grid_feature_mode": grid_feature_mode,
+        "pooled_source": pooled_source,
         "ckpt_path": ckpt_path,
         "hf_repo": hf_repo,
         "hf_filename": hf_filename,
@@ -385,7 +429,55 @@ def _prepare_anysat_s2_input(
     }
 
 
-def _anysat_patch_features(
+def _anysat_spatial_features(
+    model: Any,
+    s2_input: dict[str, Any],
+    *,
+    patch_size_m: int,
+    feature_mode: str,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    ensure_torch()
+    import torch
+
+    if patch_size_m <= 0 or (patch_size_m % 10) != 0:
+        raise ModelError(
+            f"AnySat patch_size must be a positive multiple of 10 (meters), got {patch_size_m}"
+        )
+
+    native_output = str(feature_mode).strip().lower()
+    if native_output not in {"patch", "dense"}:
+        raise ModelError(
+            f"Unknown AnySat feature_mode={feature_mode!r} (expected 'patch' or 'dense')."
+        )
+
+    with torch.no_grad():
+        out = model(s2_input, patch_size=int(patch_size_m), output=native_output)
+
+    if not hasattr(out, "ndim") or int(out.ndim) != 4:
+        raise ModelError(
+            "AnySat output="
+            f"{native_output!r} returned unexpected shape/type: {type(out)} {getattr(out, 'shape', None)}"
+        )
+
+    # AnySat spatial outputs are [B,H,W,D] for both patch and dense.
+    if int(out.shape[0]) != 1:
+        raise ModelError(f"AnySat embedder expects B=1 per call, got {tuple(out.shape)}")
+    arr = out[0].detach().float().cpu().numpy().astype(np.float32)  # [H,W,D]
+    grid = np.transpose(arr, (2, 0, 1)).astype(np.float32)  # [D,H,W]
+    meta = {
+        "feature_mode": native_output,
+        "native_output_hw": (int(arr.shape[0]), int(arr.shape[1])),
+        "feature_dim": int(arr.shape[2]),
+        "patch_size_m": int(patch_size_m),
+    }
+    if native_output == "patch":
+        meta["patch_output_hw"] = meta["native_output_hw"]
+    else:
+        meta["dense_output_hw"] = meta["native_output_hw"]
+    return grid, meta
+
+
+def _anysat_tile_features(
     model: Any,
     s2_input: dict[str, Any],
     *,
@@ -400,24 +492,23 @@ def _anysat_patch_features(
         )
 
     with torch.no_grad():
-        out = model(s2_input, patch_size=int(patch_size_m), output="patch")
+        out = model(s2_input, patch_size=int(patch_size_m), output="tile")
 
-    if not hasattr(out, "ndim") or int(out.ndim) != 4:
+    if not hasattr(out, "ndim") or int(out.ndim) != 2:
         raise ModelError(
-            f"AnySat output='patch' returned unexpected shape/type: {type(out)} {getattr(out, 'shape', None)}"
+            "AnySat output='tile' returned unexpected shape/type: "
+            f"{type(out)} {getattr(out, 'shape', None)}"
         )
-
-    # AnySat patch output: [B,H,W,D]
     if int(out.shape[0]) != 1:
         raise ModelError(f"AnySat embedder expects B=1 per call, got {tuple(out.shape)}")
-    arr = out[0].detach().float().cpu().numpy().astype(np.float32)  # [H,W,D]
-    grid = np.transpose(arr, (2, 0, 1)).astype(np.float32)  # [D,H,W]
+
+    vec = out[0].detach().float().cpu().numpy().astype(np.float32)
     meta = {
-        "patch_output_hw": (int(arr.shape[0]), int(arr.shape[1])),
-        "feature_dim": int(arr.shape[2]),
+        "pooled_source": "tile",
+        "feature_dim": int(vec.shape[0]),
         "patch_size_m": int(patch_size_m),
     }
-    return grid, meta
+    return vec, meta
 
 
 @register("anysat")
@@ -458,19 +549,31 @@ class AnySatEmbedder(EmbedderBase):
                 "cloudy_pct": self.input_spec.cloudy_pct,
                 "composite": self.input_spec.composite,
                 "normalization": "per_tile_zscore",
+                "grid_feature_mode": "dense",
+                "pooled_source": "patch",
             },
             "model_config": {
                 "variant": {
                     "type": "string",
                     "default": "base",
                     "choices": ["base"],
-                }
+                },
+                "grid_feature_mode": {
+                    "type": "string",
+                    "default": "dense",
+                    "choices": ["dense", "patch"],
+                },
+                "pooled_source": {
+                    "type": "string",
+                    "default": "patch",
+                    "choices": ["patch", "tile"],
+                },
             },
             "notes": [
                 "AnySat expects S2 time-series + day-of-year dates.",
                 "This adapter builds T frames by splitting TemporalSpec.range into equal sub-windows.",
                 "Loads AnySat from a vendored local runtime and optional Hugging Face checkpoint.",
-                "grid output maps AnySat output='patch' to [D,H,W].",
+                "grid output defaults to AnySat output='dense'; pooled defaults to patch-grid pooling but can opt into native tile output.",
             ],
         }
 
@@ -514,6 +617,8 @@ class AnySatEmbedder(EmbedderBase):
         flash_attn = bool(runtime_cfg["flash_attn"])
         image_size = int(runtime_cfg["image_size"])
         norm_mode = str(runtime_cfg["norm_mode"])
+        grid_feature_mode = str(runtime_cfg["grid_feature_mode"])
+        pooled_source = str(runtime_cfg["pooled_source"])
         patch_size_m = int(ss.scale_m)
 
         if input_chw is None:
@@ -557,11 +662,22 @@ class AnySatEmbedder(EmbedderBase):
             norm_mode=norm_mode,
             device=dev,
         )
-        grid, fmeta = _anysat_patch_features(
-            model,
-            s2_input,
-            patch_size_m=patch_size_m,
-        )
+        feature_mode = grid_feature_mode if output.mode == "grid" else "patch"
+        pooled_vec = None
+        if output.mode == "pooled" and pooled_source == "tile":
+            pooled_vec, fmeta = _anysat_tile_features(
+                model,
+                s2_input,
+                patch_size_m=patch_size_m,
+            )
+            grid = None
+        else:
+            grid, fmeta = _anysat_spatial_features(
+                model,
+                s2_input,
+                patch_size_m=patch_size_m,
+                feature_mode=feature_mode,
+            )
 
         meta = build_meta(
             model=self.model_name,
@@ -582,6 +698,8 @@ class AnySatEmbedder(EmbedderBase):
                 "model_size": model_size,
                 "flash_attn": bool(flash_attn),
                 "normalization": norm_mode,
+                "grid_feature_mode": grid_feature_mode,
+                "pooled_source": pooled_source,
                 "start": t.start,
                 "end": t.end,
                 "n_frames": int(raw_tchw.shape[0]),
@@ -595,13 +713,21 @@ class AnySatEmbedder(EmbedderBase):
         )
 
         if output.mode == "pooled":
+            if pooled_vec is not None:
+                ometa = {
+                    **meta,
+                    "pooling": "tile_native",
+                    "requested_pooling": output.pooling,
+                    "pooled_shape": tuple(pooled_vec.shape),
+                }
+                return Embedding(data=pooled_vec, meta=ometa)
             if output.pooling == "max":
                 vec = np.max(grid, axis=(1, 2)).astype(np.float32)
             else:
                 vec = np.mean(grid, axis=(1, 2)).astype(np.float32)
             ometa = {
                 **meta,
-                "pooling": f"patch_{output.pooling}",
+                "pooling": f"{feature_mode}_{output.pooling}",
                 "pooled_shape": tuple(vec.shape),
             }
             return Embedding(data=vec, meta=ometa)
@@ -609,7 +735,7 @@ class AnySatEmbedder(EmbedderBase):
         if output.mode == "grid":
             gmeta = {
                 **meta,
-                "grid_kind": "patch_tokens",
+                "grid_kind": "dense_subpatch" if feature_mode == "dense" else "patch_tokens",
                 "grid_hw": (int(grid.shape[1]), int(grid.shape[2])),
                 "grid_shape": tuple(grid.shape),
             }
