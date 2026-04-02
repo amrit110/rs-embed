@@ -562,7 +562,9 @@ def _prepare_galileo_encoder_inputs(
         "months": tuple(int(v) + 1 for v in months_arr.tolist()),
         "month": int(months_arr[len(months_arr) // 2]) + 1,
         "month_indices": tuple(int(v) for v in months_arr.tolist()),
-        "normalization": "official_stats" if _is_galileo_official_stats_mode(mode_l) else str(mode_l),
+        "normalization": "official_stats"
+        if _is_galileo_official_stats_mode(mode_l)
+        else str(mode_l),
         "include_ndvi": False,
         "s2_group_indices": tuple(int(i) for i in s2_group_indices),
     }
@@ -671,7 +673,9 @@ class GalileoEmbedder(EmbedderBase):
         cloudy_pct=30,
         temporal_mode="multi",
         n_frames=8,
-        normalization=NormalizationSpec(mode="s2_sr_raw"),  # adapter keeps raw SR; model-side prep is configurable
+        normalization=NormalizationSpec(
+            mode="s2_sr_raw"
+        ),  # adapter keeps raw SR; model-side prep is configurable
         image_size=64,
         expected_channels=10,
     )
