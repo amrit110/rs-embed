@@ -167,7 +167,7 @@ emb_s2 = get_embedding(
 ```python
 # RGB variant:
 # export RS_EMBED_SATMAEPP_ID=...
-# export RS_EMBED_SATMAEPP_CHANNEL_ORDER=bgr
+# export RS_EMBED_SATMAEPP_CHANNEL_ORDER=rgb
 #
 # S2-10B variant:
 # export RS_EMBED_SATMAEPP_S2_IMG=224

@@ -7,12 +7,12 @@ from rs_embed.embedders.onthefly_satmaepp import SatMAEPPEmbedder
 from rs_embed.embedders.onthefly_satmaepp_s2 import SatMAEPPSentinel10Embedder
 
 
-def test_satmaepp_channel_order_defaults_to_bgr_for_fmow_rgb(monkeypatch):
+def test_satmaepp_channel_order_defaults_to_rgb_for_fmow_rgb(monkeypatch):
     import rs_embed.embedders.onthefly_satmaepp as satpp
 
     monkeypatch.delenv("RS_EMBED_SATMAEPP_CHANNEL_ORDER", raising=False)
     monkeypatch.delenv("RS_EMBED_SATMAEPP_BGR", raising=False)
-    assert satpp._resolve_satmaepp_channel_order("MVRL/satmaepp_ViT-L_pretrain_fmow_rgb") == "bgr"
+    assert satpp._resolve_satmaepp_channel_order("MVRL/satmaepp_ViT-L_pretrain_fmow_rgb") == "rgb"
 
 
 def test_satmaepp_channel_order_respects_env_override(monkeypatch):
@@ -88,9 +88,10 @@ def test_satmaepp_batch_loads_once_and_batches_forward(monkeypatch):
     monkeypatch.setenv("RS_EMBED_SATMAEPP_BATCH_SIZE", "2")
 
     def _fake_fetch(*, spatial, temporal, sensor, out_size, provider):
+        assert out_size is None
         calls["fetch"] += 1
         v = int(spatial.lon) + 20
-        return np.full((out_size, out_size, 3), v, dtype=np.uint8)
+        return np.full((7, 9, 3), v, dtype=np.uint8)
 
     def _fake_load(*, model_id, device):
         calls["load"] += 1

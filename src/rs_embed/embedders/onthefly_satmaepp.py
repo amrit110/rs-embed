@@ -25,7 +25,6 @@ from ._vit_mae_utils import (
     ensure_torch,
     fetch_s2_rgb_u8_from_provider,
     pool_from_tokens,
-    resize_rgb_u8,
     temporal_to_range,
     tokens_to_grid_dhw,
 )
@@ -56,7 +55,7 @@ def _resolve_satmaepp_channel_order(model_id: str) -> str:
     Priority:
       1) RS_EMBED_SATMAEPP_CHANNEL_ORDER in {"rgb","bgr"}
       2) RS_EMBED_SATMAEPP_BGR boolean (legacy knob)
-      3) auto heuristic: default BGR for known fmow_rgb checkpoint
+      3) auto heuristic: default RGB for the official fmow_rgb checkpoint
     """
     order = str(os.environ.get("RS_EMBED_SATMAEPP_CHANNEL_ORDER", "")).strip().lower()
     if order in {"rgb", "bgr"}:
@@ -71,7 +70,7 @@ def _resolve_satmaepp_channel_order(model_id: str) -> str:
 
     mid = str(model_id).strip().lower()
     if "fmow_rgb" in mid:
-        return "bgr"
+        return "rgb"
     return "rgb"
 
 
@@ -395,7 +394,7 @@ class SatMAEPPEmbedder(EmbedderBase):
                 "scale_m": self.input_spec.scale_m,
                 "cloudy_pct": self.input_spec.cloudy_pct,
                 "composite": self.input_spec.composite,
-                "channel_order": "bgr",
+                "channel_order": "rgb",
             },
         }
 
@@ -437,7 +436,7 @@ class SatMAEPPEmbedder(EmbedderBase):
                 spatial=spatial,
                 temporal=t,
                 sensor=sensor,
-                out_size=image_size,
+                out_size=None,
                 provider=self._get_provider(backend),
             )
         else:
@@ -450,7 +449,6 @@ class SatMAEPPEmbedder(EmbedderBase):
                 )
             s2_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
             rgb_u8 = (s2_chw.transpose(1, 2, 0) * 255.0).astype(np.uint8)
-            rgb_u8 = resize_rgb_u8(rgb_u8, image_size)
 
         model, wmeta = _load_satmaepp(model_id=model_id, device=device)
         dev = wmeta.get("device", device)
@@ -544,7 +542,7 @@ class SatMAEPPEmbedder(EmbedderBase):
                 spatial=sp,
                 temporal=t,
                 sensor=sensor,
-                out_size=image_size,
+                out_size=None,
                 provider=provider,
             )
             return i, rgb
@@ -681,7 +679,7 @@ class SatMAEPPEmbedder(EmbedderBase):
                 )
             s2_chw = np.clip(input_chw.astype(np.float32) / 10000.0, 0.0, 1.0)
             rgb_u8 = (s2_chw.transpose(1, 2, 0) * 255.0).astype(np.uint8)
-            rgb_u8_all.append(resize_rgb_u8(rgb_u8, image_size))
+            rgb_u8_all.append(rgb_u8)
 
         model, wmeta = _load_satmaepp(model_id=model_id, device=device)
         dev = wmeta.get("device", device)

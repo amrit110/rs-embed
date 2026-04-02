@@ -42,7 +42,7 @@ def fetch_s2_rgb_u8_from_provider(
     spatial: SpatialSpec,
     temporal: TemporalSpec | None,
     sensor: SensorSpec,
-    out_size: int,
+    out_size: int | None,
     provider: ProviderBase | None = None,
     backend: str = "auto",
     default_temporal: tuple[str, str] = ("2022-06-01", "2022-09-01"),
@@ -50,8 +50,8 @@ def fetch_s2_rgb_u8_from_provider(
     """
     Single source of truth for "ROI+time -> uint8 RGB patch".
 
-    Uses shared runtime helpers to fetch S2 RGB CHW, converts to uint8 HWC,
-    then resizes to out_size.
+    Uses shared runtime helpers to fetch S2 RGB CHW and converts to uint8 HWC.
+    When ``out_size`` is provided, the HWC image is resized to that square size.
     """
     t = temporal_to_range(temporal, default_temporal)
 
@@ -90,7 +90,9 @@ def fetch_s2_rgb_u8_from_provider(
         raise ModelError("Provider input inspection failed: " + "; ".join(report.get("issues", [])))
 
     rgb_u8 = _s2_rgb_u8_from_chw(s2_chw)
-    return resize_rgb_u8(rgb_u8, out_size)
+    if out_size is None:
+        return rgb_u8
+    return resize_rgb_u8(rgb_u8, int(out_size))
 
 
 # -------------------------
