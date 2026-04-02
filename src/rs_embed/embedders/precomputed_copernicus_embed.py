@@ -156,7 +156,6 @@ class CopernicusEmbedder(EmbedderBase):
         device: str = "auto",
         input_chw: np.ndarray | None = None,
     ) -> Embedding:
-
         if temporal is None:
             raise ModelError("copernicus_embed requires TemporalSpec.year(YYYY).")
         if temporal.mode != "year":

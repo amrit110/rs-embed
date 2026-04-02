@@ -211,7 +211,6 @@ _TEMPORAL = TemporalSpec.year(2024)
 
 
 def test_get_embedding_returns_embedding():
-
     emb = get_embedding("mock_model", spatial=_SPATIAL, temporal=_TEMPORAL)
     assert isinstance(emb, Embedding)
     assert emb.data.shape == (8,)
@@ -219,7 +218,6 @@ def test_get_embedding_returns_embedding():
 
 
 def test_get_embedding_output_modes():
-
     emb_pooled = get_embedding("mock_model", spatial=_SPATIAL, output=OutputSpec.pooled())
     assert emb_pooled.meta["output"] == "pooled"
 
@@ -228,7 +226,6 @@ def test_get_embedding_output_modes():
 
 
 def test_get_embedding_precomputed_default_backend_auto_resolves_to_auto():
-
     registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
 
     emb = get_embedding("mock_precomputed_local", spatial=_SPATIAL)
@@ -237,7 +234,6 @@ def test_get_embedding_precomputed_default_backend_auto_resolves_to_auto():
 
 
 def test_get_embedding_unknown_model():
-
     with pytest.raises(ModelError, match="Unknown model"):
         get_embedding("nonexistent", spatial=_SPATIAL)
 
@@ -272,7 +268,6 @@ def test_reset_runtime_clears_runtime_and_embedder_module_caches(monkeypatch):
 
 
 def test_get_embedding_modality_resolves_default_sensor():
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
     emb = get_embedding("mock_multi", spatial=_SPATIAL, modality="s1", backend="gee")
@@ -284,7 +279,6 @@ def test_get_embedding_modality_resolves_default_sensor():
 
 
 def test_get_embedding_fetch_resolves_default_sensor():
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
     emb = get_embedding(
@@ -302,7 +296,6 @@ def test_get_embedding_fetch_resolves_default_sensor():
 
 
 def test_get_embedding_rejects_sensor_and_fetch_together():
-
     with pytest.raises(ModelError, match="Use either sensor=... or fetch=..., not both"):
         get_embedding(
             "mock_model",
@@ -313,19 +306,16 @@ def test_get_embedding_rejects_sensor_and_fetch_together():
 
 
 def test_get_embedding_rejects_unsupported_modality():
-
     with pytest.raises(ModelError, match="does not expose modality"):
         get_embedding("mock_model", spatial=_SPATIAL, modality="s1")
 
 
 def test_get_embedding_rejects_model_kwargs_for_unsupported_model():
-
     with pytest.raises(ModelError, match="does not accept model-specific keyword arguments"):
         get_embedding("mock_model", spatial=_SPATIAL, variant="large")
 
 
 def test_get_embedding_passes_model_kwargs_to_variant_aware_model():
-
     registry.register("mock_variant")(_MockVariantEmbedder)
 
     emb = get_embedding(
@@ -343,7 +333,6 @@ def test_get_embedding_passes_model_kwargs_to_variant_aware_model():
 
 
 def test_get_embeddings_batch():
-
     spatials = [
         PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
         PointBuffer(lon=1.0, lat=1.0, buffer_m=256),
@@ -356,7 +345,6 @@ def test_get_embeddings_batch():
 
 
 def test_get_embeddings_batch_empty():
-
     with pytest.raises(ModelError, match="non-empty"):
         get_embeddings_batch("mock_model", spatials=[], temporal=_TEMPORAL)
 
@@ -376,7 +364,6 @@ def test_get_embeddings_batch_with_sensor():
 
 
 def test_get_embeddings_batch_modality_merges_into_sensor():
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     sensor = SensorSpec(collection="COPERNICUS/S1_GRD", bands=("VV", "VH"), scale_m=20)
     results = get_embeddings_batch(
@@ -394,7 +381,6 @@ def test_get_embeddings_batch_modality_merges_into_sensor():
 
 
 def test_get_embeddings_batch_precomputed_default_backend_auto_resolves_to_auto():
-
     registry.register("mock_precomputed_local")(_MockPrecomputedLocalEmbedder)
 
     results = get_embeddings_batch(
@@ -406,7 +392,6 @@ def test_get_embeddings_batch_precomputed_default_backend_auto_resolves_to_auto(
 
 
 def test_get_embeddings_batch_passes_model_kwargs_to_variant_aware_model():
-
     registry.register("mock_variant")(_MockVariantEmbedder)
 
     results = get_embeddings_batch(
@@ -424,13 +409,11 @@ def test_get_embeddings_batch_passes_model_kwargs_to_variant_aware_model():
 
 
 def test_validate_specs_invalid_spatial_type():
-
     with pytest.raises(ModelError, match="Invalid spatial spec type"):
         _validate_specs(spatial="not-spatial", temporal=None, output=OutputSpec.pooled())
 
 
 def test_validate_specs_bad_output_mode():
-
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "unknown")
     object.__setattr__(bad_output, "pooling", "mean")
@@ -439,7 +422,6 @@ def test_validate_specs_bad_output_mode():
 
 
 def test_validate_specs_rejects_legacy_output_scale_m():
-
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
     object.__setattr__(bad_output, "scale_m", 10)
@@ -449,7 +431,6 @@ def test_validate_specs_rejects_legacy_output_scale_m():
 
 
 def test_validate_specs_bad_pooling():
-
     bad_output = OutputSpec.__new__(OutputSpec)
     object.__setattr__(bad_output, "mode", "pooled")
     object.__setattr__(bad_output, "pooling", "median")
@@ -458,7 +439,6 @@ def test_validate_specs_bad_pooling():
 
 
 def test_validate_specs_ok():
-
     _validate_specs(spatial=_SPATIAL, temporal=_TEMPORAL, output=OutputSpec.pooled())
     _validate_specs(spatial=_SPATIAL, temporal=None, output=OutputSpec.grid())
 
@@ -505,7 +485,6 @@ class _BrokenDescribeEmbedder(EmbedderBase):
 
 
 def test_assert_supported_wrong_backend():
-
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
     with pytest.raises(ModelError, match="does not support backend"):
@@ -513,7 +492,6 @@ def test_assert_supported_wrong_backend():
 
 
 def test_assert_supported_wrong_output():
-
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
     with pytest.raises(ModelError, match="does not support output.mode"):
@@ -521,7 +499,6 @@ def test_assert_supported_wrong_output():
 
 
 def test_assert_supported_wrong_temporal():
-
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
     with pytest.raises(ModelError, match="expects TemporalSpec.mode='year'"):
@@ -534,7 +511,6 @@ def test_assert_supported_wrong_temporal():
 
 
 def test_assert_supported_ok():
-
     emb = _BackendLimitedEmbedder()
     emb.model_name = "limited"
     _assert_supported(
@@ -543,7 +519,6 @@ def test_assert_supported_ok():
 
 
 def test_assert_supported_broken_describe_raises_model_error():
-
     emb = _BrokenDescribeEmbedder()
     emb.model_name = "broken"
     with pytest.raises(ModelError, match="describe\\(\\) failed"):
@@ -556,12 +531,10 @@ def test_assert_supported_broken_describe_raises_model_error():
 
 
 def test_sensor_key_none():
-
     assert sensor_key(None) == ("__none__",)
 
 
 def test_sensor_key_deterministic_and_differs():
-
     s1 = SensorSpec(collection="A", bands=("B1",), modality="s1")
     s2 = SensorSpec(collection="A", bands=("B1",), modality="s2")
     assert sensor_key(s1) == sensor_key(s1)
@@ -569,7 +542,6 @@ def test_sensor_key_deterministic_and_differs():
 
 
 def test_sensor_cache_key_deterministic_and_differs():
-
     s1 = SensorSpec(collection="A", bands=("B1",), modality="s1")
     s2 = SensorSpec(collection="A", bands=("B1",), modality="s2")
     assert isinstance(_sensor_cache_key(s1), str)
@@ -583,7 +555,6 @@ def test_sensor_cache_key_deterministic_and_differs():
 
 
 def test_export_batch_empty_spatials():
-
     with pytest.raises(ModelError, match="non-empty"):
         export_batch(
             spatials=[],
@@ -614,7 +585,6 @@ def test_export_batch_rejects_non_list_spatials():
 
 
 def test_export_batch_empty_models():
-
     with pytest.raises(ModelError, match="non-empty"):
         export_batch(
             spatials=[_SPATIAL],
@@ -625,7 +595,6 @@ def test_export_batch_empty_models():
 
 
 def test_export_batch_unsupported_format():
-
     with pytest.raises(ModelError, match="Unsupported export format"):
         export_batch(
             spatials=[_SPATIAL],
@@ -658,7 +627,6 @@ def test_export_batch_accepts_netcdf_format(tmp_path):
 
 
 def test_export_batch_names_length_mismatch(tmp_path):
-
     with pytest.raises(ModelError, match="same length"):
         export_batch(
             spatials=[_SPATIAL, _SPATIAL],
@@ -669,7 +637,6 @@ def test_export_batch_names_length_mismatch(tmp_path):
 
 
 def test_export_batch_combined_target_requires_out_file():
-
     with pytest.raises(ModelError, match="requires out_file"):
         export_batch(
             spatials=[_SPATIAL],
@@ -680,7 +647,6 @@ def test_export_batch_combined_target_requires_out_file():
 
 
 def test_export_batch_per_item_target_requires_out_dir():
-
     with pytest.raises(ModelError, match="requires out_dir"):
         export_batch(
             spatials=[_SPATIAL],
@@ -691,7 +657,6 @@ def test_export_batch_per_item_target_requires_out_dir():
 
 
 def test_export_batch_per_item_layout(tmp_path):
-
     export_batch(
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
@@ -709,7 +674,6 @@ def test_export_batch_per_item_layout(tmp_path):
 
 
 def test_export_batch_combined_layout(tmp_path):
-
     export_batch(
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
@@ -727,7 +691,6 @@ def test_export_batch_combined_layout(tmp_path):
 
 
 def test_export_batch_object_style_target_and_config(tmp_path):
-
     export_batch(
         spatials=[_SPATIAL],
         temporal=_TEMPORAL,
@@ -745,7 +708,6 @@ def test_export_batch_object_style_target_and_config(tmp_path):
 
 
 def test_public_list_models_uses_catalog_not_runtime_registry():
-
     models = list_models()
     assert "remoteclip" in models
     assert "remoteclip_s2rgb" not in models
@@ -753,14 +715,12 @@ def test_public_list_models_uses_catalog_not_runtime_registry():
 
 
 def test_public_list_models_can_include_aliases():
-
     models = list_models(include_aliases=True)
     assert "remoteclip" in models
     assert "remoteclip_s2rgb" in models
 
 
 def test_export_batch_infer_batch_size_is_independent_from_chunk_size(monkeypatch, tmp_path):
-
     captured = {}
 
     def _fake_run(self):
@@ -783,7 +743,6 @@ def test_export_batch_infer_batch_size_is_independent_from_chunk_size(monkeypatc
 
 
 def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
 
@@ -811,7 +770,6 @@ def test_export_batch_modality_resolves_model_sensor(monkeypatch, tmp_path):
 
 
 def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
 
@@ -841,7 +799,6 @@ def test_export_batch_fetch_resolves_model_sensor(monkeypatch, tmp_path):
 
 
 def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
 
     monkeypatch.setattr(
@@ -869,7 +826,6 @@ def test_export_batch_rejects_sensor_and_fetch_conflict(monkeypatch, tmp_path):
 
 
 def test_export_batch_export_model_request_applies_per_model_overrides(monkeypatch, tmp_path):
-
     registry.register("mock_multi")(_MockMultimodalEmbedder)
     captured = {}
 
@@ -907,7 +863,6 @@ def test_export_batch_export_model_request_applies_per_model_overrides(monkeypat
 
 
 def test_export_batch_export_model_request_preserves_model_config(monkeypatch, tmp_path):
-
     registry.register("mock_variant")(_MockVariantEmbedder)
     captured = {}
 
@@ -931,7 +886,6 @@ def test_export_batch_export_model_request_preserves_model_config(monkeypatch, t
 
 
 def test_export_batch_rejects_model_config_for_unsupported_model(tmp_path):
-
     with pytest.raises(ModelError, match="does not accept model-specific keyword arguments"):
         export_batch(
             spatials=[_SPATIAL],

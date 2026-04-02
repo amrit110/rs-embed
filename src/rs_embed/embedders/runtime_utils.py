@@ -121,7 +121,11 @@ def resolve_device_auto_torch(device: str) -> str:
     try:
         import torch
 
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
     except Exception as _e:
         return "cpu"
 
