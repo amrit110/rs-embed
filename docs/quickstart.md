@@ -28,7 +28,6 @@ cd rs-embed
 pip install -e .  # use -e ".[terratorch]" if you need terramind
 ```
 
-
 Repository examples are available in `examples/playground.ipynb` and `examples/quickstart.py`.
 
 If this is your first time using Google Earth Engine, authenticate once:
@@ -61,7 +60,6 @@ meta = emb.meta
 ```
 
 Use `backend="auto"` unless you need to force a provider path such as `backend="gee"`.
-
 
 ### 2. Many ROIs, one model: `get_embeddings_batch(...)`
 

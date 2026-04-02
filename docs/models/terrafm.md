@@ -4,19 +4,19 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `terrafm` |
-| Aliases | `terrafm_b` |
-| Family / Backbone | TerraFM-B from Hugging Face (`MBZUAI/TerraFM`) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`), also supports `backend="tensor"` |
-| Primary input | S2 SR 12-band or S1 VV/VH (selected by `sensor.modality`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | provider path requires `TemporalSpec.range(...)` (v0.1 behavior) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | modality settings on `sensor` (`modality`, `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`) |
-| Training alignment (adapter path) | Medium-High when modality-specific preprocessing matches the intended TerraFM path |
+| Field                             | Value                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Model ID                          | `terrafm`                                                                                               |
+| Aliases                           | `terrafm_b`                                                                                             |
+| Family / Backbone                 | TerraFM-B from Hugging Face (`MBZUAI/TerraFM`)                                                          |
+| Adapter type                      | `on-the-fly`                                                                                            |
+| Typical backend                   | provider backend (`gee`), also supports `backend="tensor"`                                              |
+| Primary input                     | S2 SR 12-band or S1 VV/VH (selected by `sensor.modality`)                                               |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                                           |
+| Temporal mode                     | provider path requires `TemporalSpec.range(...)` (v0.1 behavior)                                        |
+| Output modes                      | `pooled`, `grid`                                                                                        |
+| Extra side inputs                 | modality settings on `sensor` (`modality`, `use_float_linear`, `s1_require_iw`, `s1_relax_iw_on_empty`) |
+| Training alignment (adapter path) | Medium-High when modality-specific preprocessing matches the intended TerraFM path                      |
 
 ---
 
@@ -106,10 +106,10 @@ The tensor backend does apply the adapter's modality-specific normalization. In 
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_TERRAFM_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_TERRAFM_BATCH_SIZE` | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs |
+| Env var                          | Default            | Effect                                   |
+| -------------------------------- | ------------------ | ---------------------------------------- |
+| `RS_EMBED_TERRAFM_FETCH_WORKERS` | `8`                | Provider prefetch workers for batch APIs |
+| `RS_EMBED_TERRAFM_BATCH_SIZE`    | CPU:`8`, CUDA:`64` | Inference batch size for batch APIs      |
 
 Related cache envs (used by HF asset download path):
 

@@ -13,7 +13,11 @@
   --rs-inline-code-bg: rgba(15, 23, 42, 0.06);
   --rs-inline-code-color: #334155;
   --rs-warm-soft: rgba(180, 120, 35, 0.08);
-  --rs-pipeline-bg: linear-gradient(180deg, rgba(247, 250, 252, 0.98), rgba(240, 247, 245, 0.98));
+  --rs-pipeline-bg: linear-gradient(
+    180deg,
+    rgba(247, 250, 252, 0.98),
+    rgba(240, 247, 245, 0.98)
+  );
   --rs-pipeline-step: #0f172a;
   --rs-pipeline-arrow: #1f7a66;
   --rs-pipeline-branch: #3452a5;
@@ -275,5 +279,4 @@
   .md-typeset h2 {
     font-size: 1.2rem;
   }
-
 }

@@ -71,11 +71,11 @@ That gives you one combined export artifact in the default `.npz` format, includ
 
 ### 1. Required dataset definition
 
-| Parameter | Meaning |
-|---|---|
-| `spatials` | Non-empty list of `BBox` or `PointBuffer`. |
+| Parameter  | Meaning                                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `spatials` | Non-empty list of `BBox` or `PointBuffer`.                                                                              |
 | `temporal` | `TemporalSpec` or `None`. The parameter is optional at the API level, but some models or data sources still require it. |
-| `models` | Non-empty list of model IDs or `ExportModelRequest(...)`. |
+| `models`   | Non-empty list of model IDs or `ExportModelRequest(...)`.                                                               |
 
 ### 2. Output location and layout
 
@@ -96,14 +96,14 @@ For `combined`, the output extension is normalized from `config.format` if missi
 
 These usually apply to all models in the call:
 
-| Setting | Typical use |
-|---|---|
-| `backend` | Keep `backend="auto"` unless you need a specific provider such as `"gee"`. |
-| `device` | `"auto"` is the normal choice. |
-| `output` | Usually `OutputSpec.pooled()`. |
-| `fetch` | Shared `FetchSpec` for resolution or compositing overrides. |
-| `sensor` | Shared `SensorSpec` for advanced on-the-fly source overrides. |
-| `modality` | Shared modality override for models that expose multiple public branches. |
+| Setting    | Typical use                                                                |
+| ---------- | -------------------------------------------------------------------------- |
+| `backend`  | Keep `backend="auto"` unless you need a specific provider such as `"gee"`. |
+| `device`   | `"auto"` is the normal choice.                                             |
+| `output`   | Usually `OutputSpec.pooled()`.                                             |
+| `fetch`    | Shared `FetchSpec` for resolution or compositing overrides.                |
+| `sensor`   | Shared `SensorSpec` for advanced on-the-fly source overrides.              |
+| `modality` | Shared modality override for models that expose multiple public branches.  |
 
 Use per-model overrides only when one model needs different settings.
 
@@ -125,14 +125,14 @@ If both are provided, inline values on `ExportModelRequest(...)` take precedence
 
 The most important ones are:
 
-| Option | Meaning |
-|---|---|
-| `format` | `"npz"` or `"netcdf"`. |
-| `save_inputs` | Save model-ready input patches. |
-| `save_embeddings` | Save embedding arrays. |
-| `save_manifest` | Save JSON manifest metadata. |
-| `resume` | Skip items already exported. |
-| `input_prep` | Large-ROI policy, usually `"resize"` or `"tile"`. |
+| Option            | Meaning                                           |
+| ----------------- | ------------------------------------------------- |
+| `format`          | `"npz"` or `"netcdf"`.                            |
+| `save_inputs`     | Save model-ready input patches.                   |
+| `save_embeddings` | Save embedding arrays.                            |
+| `save_manifest`   | Save JSON manifest metadata.                      |
+| `resume`          | Skip items already exported.                      |
+| `input_prep`      | Large-ROI policy, usually `"resize"` or `"tile"`. |
 
 You can usually ignore the rest until you need performance tuning or failure recovery.
 
@@ -329,7 +329,7 @@ Model scheduling is serial, so one model runs at a time. Batch inference is used
 If provider-backed export is used and both `save_inputs=True` and `save_embeddings=True`, rs-embed reuses the fetched input patch for both writing and embedding inference instead of downloading it twice.
 
 !!! tip "Simple rule"
-    Start with `ExportTarget.combined(...)` + `ExportConfig()`.
-    Add `ExportModelRequest.configure(...)` only for the few models that need per-model sensor, fetch, modality, or variant overrides.
+Start with `ExportTarget.combined(...)` + `ExportConfig()`.
+Add `ExportModelRequest.configure(...)` only for the few models that need per-model sensor, fetch, modality, or variant overrides.
 
 ---

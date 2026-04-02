@@ -42,8 +42,8 @@ Model loading is lazy:
 - The class is inserted into the runtime registry.
 
 !!! tip
-    Put your embedder in `rs_embed/embedders/` and add it to `src/rs_embed/embedders/catalog.py`.
-    If it's not in `MODEL_SPECS`, string-based lookup (`get_embedding("...")`) will not find it.
+Put your embedder in `rs_embed/embedders/` and add it to `src/rs_embed/embedders/catalog.py`.
+If it's not in `MODEL_SPECS`, string-based lookup (`get_embedding("...")`) will not find it.
 
 ---
 
@@ -116,7 +116,7 @@ The stable extension points are:
 ```
 
 !!! note
-    `describe()` must stay fast. It should not trigger checkpoint downloads, provider setup, or heavy model loading.
+`describe()` must stay fast. It should not trigger checkpoint downloads, provider setup, or heavy model loading.
 
 Important fields currently consumed by rs-embed:
 
@@ -219,10 +219,11 @@ Recommended extension pattern:
   and `modality=...` resolution can reuse your model cleanly.
 
 You can follow existing implementations in:
+
 - `rs_embed/embedders/onthefly_*.py`
 
 !!! tip
-    Keep provider IO separate from model inference whenever possible. That makes batching, caching, and export reuse simpler.
+Keep provider IO separate from model inference whenever possible. That makes batching, caching, and export reuse simpler.
 
 ---
 
@@ -272,7 +273,7 @@ if input_chw is None:
 ```
 
 !!! important
-    This is the key to avoiding “download twice” when `save_inputs=True` and `save_embeddings=True`.
+This is the key to avoiding “download twice” when `save_inputs=True` and `save_embeddings=True`.
 
 ---
 
@@ -352,7 +353,7 @@ if output.mode == "grid" and not supported:
 
 ## Optional Dependencies
 
-Many embedders rely on optional packages (e.g., `torch`, `ee`).  
+Many embedders rely on optional packages (e.g., `torch`, `ee`).
 
 Recommended pattern:
 
@@ -413,6 +414,7 @@ def test_toy_model_get_embedding():
 
 If your model supports input reuse and batch export, add a small `export_batch` test using `monkeypatch` to avoid real network calls.  
 See existing patterns in:
+
 - `tests/test_export_batch.py`
 - `tests/test_gee_provider.py`
 
@@ -433,7 +435,6 @@ Update docs in these places as needed:
 - `docs/models_reference.md` if the model adds important preprocessing or comparison caveats
 
 Use [Model Detail Template](model_detail_template.md) for the detailed page structure.
-
 
 ---
 

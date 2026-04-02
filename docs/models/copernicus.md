@@ -4,21 +4,20 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `copernicus` |
-| Aliases | `copernicus_embed` |
-| Family / Source | `torchgeo/copernicus_embed` GeoTIFF redistribution on Hugging Face |
-| Adapter type | `precomputed` |
-| Typical backend | `auto` |
-| Primary input | `BBox` / `PointBuffer` in EPSG:4326, sliced via vendored GeoTIFF bbox indexing |
-| Product grid CRS | fixed `EPSG:4326` grid (not the common provider-backed EPSG:3857 default) |
-| Default resolution | 0.25° source product resolution |
-| Temporal mode | **strict** `TemporalSpec.year(2021)` in v0.1 |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none |
-| Training alignment (adapter path) | N/A (precomputed product) |
-
+| Field                             | Value                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| Model ID                          | `copernicus`                                                                   |
+| Aliases                           | `copernicus_embed`                                                             |
+| Family / Source                   | `torchgeo/copernicus_embed` GeoTIFF redistribution on Hugging Face             |
+| Adapter type                      | `precomputed`                                                                  |
+| Typical backend                   | `auto`                                                                         |
+| Primary input                     | `BBox` / `PointBuffer` in EPSG:4326, sliced via vendored GeoTIFF bbox indexing |
+| Product grid CRS                  | fixed `EPSG:4326` grid (not the common provider-backed EPSG:3857 default)      |
+| Default resolution                | 0.25° source product resolution                                                |
+| Temporal mode                     | **strict** `TemporalSpec.year(2021)` in v0.1                                   |
+| Output modes                      | `pooled`, `grid`                                                               |
+| Extra side inputs                 | none                                                                           |
+| Training alignment (adapter path) | N/A (precomputed product)                                                      |
 
 ---
 
@@ -35,7 +34,7 @@ Copernicus Embed is a good fit for precomputed embedding workflows via local Geo
 The adapter accepts `BBox` directly and `PointBuffer`, which it converts to an EPSG:4326 bbox. Internally it slices the local GeoTIFF with bbox indexing via `ds[minlon:maxlon, minlat:maxlat]`.
 
 !!! warning
-    Copernicus keeps the product's fixed `EPSG:4326` grid with 0.25 degree pixels. That differs from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
+Copernicus keeps the product's fixed `EPSG:4326` grid with 0.25 degree pixels. That differs from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
 
 ### Temporal
 
@@ -72,10 +71,10 @@ Notes:
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_COP_DIR` | `data/copernicus_embed` | Local Copernicus embed GeoTIFF directory |
-| `RS_EMBED_COPERNICUS_BATCH_WORKERS` | `4` | Batch worker count for `get_embeddings_batch(...)` |
+| Env var                             | Default                 | Effect                                             |
+| ----------------------------------- | ----------------------- | -------------------------------------------------- |
+| `RS_EMBED_COP_DIR`                  | `data/copernicus_embed` | Local Copernicus embed GeoTIFF directory           |
+| `RS_EMBED_COPERNICUS_BATCH_WORKERS` | `4`                     | Batch worker count for `get_embeddings_batch(...)` |
 
 Non-env override:
 

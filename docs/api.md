@@ -13,14 +13,15 @@ Most users only need four public entry points: `get_embedding(...)`, `get_embedd
 
 ## Choose by Task
 
-| I want to... | Read this page |
-|---|---|
-| understand spatial/temporal/output specs | [API: Specs and Data Structures](api_specs.md) |
-| get one embedding or batch embeddings | [API: Embedding](api_embedding.md) |
-| build export pipelines and datasets | [API: Export](api_export.md) |
-| inspect raw provider patches before inference | [API: Inspect](api_inspect.md) |
+| I want to...                                  | Read this page                                 |
+| --------------------------------------------- | ---------------------------------------------- |
+| understand spatial/temporal/output specs      | [API: Specs and Data Structures](api_specs.md) |
+| get one embedding or batch embeddings         | [API: Embedding](api_embedding.md)             |
+| build export pipelines and datasets           | [API: Export](api_export.md)                   |
+| inspect raw provider patches before inference | [API: Inspect](api_inspect.md)                 |
 
 ---
+
 ## Useful Extras
 
 `export_npz(...)` is a compatibility wrapper around `export_batch(...)` for single-ROI `.npz`, `inspect_gee_patch(...)` is the older GEE-focused name for `inspect_provider_patch(...)`, and `list_models()` is the stable public helper for inspecting the model catalog.

@@ -2,7 +2,6 @@
 
 This page covers single-ROI and batch embedding APIs.
 
-
 Related pages: [API: Specs and Data Structures](api_specs.md), [API: Export](api_export.md), and [API: Inspect](api_inspect.md).
 
 ---
@@ -55,30 +54,30 @@ Computes the embedding for a single ROI.
 
 Core inputs:
 
-| Parameter | Meaning |
-|---|---|
-| `model` | Model ID. See [Supported Models](models.md) or call `rs_embed.list_models()`. |
-| `spatial` | `BBox` or `PointBuffer`. |
-| `temporal` | `TemporalSpec` or `None`. The parameter is optional at the API level, but some models or data sources still require it. |
-| `sensor` | Full input descriptor for on-the-fly models. Most precomputed models can leave this as `None`. When provided, it overrides source-level details such as collection, bands, scale, and compositing. |
-| `fetch` | Lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`. It is applied on top of the model's resolved default sensor and cannot be combined with `sensor`. |
-| `output` | Usually `OutputSpec.pooled()` or `OutputSpec.grid(...)`. |
+| Parameter  | Meaning                                                                                                                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`    | Model ID. See [Supported Models](models.md) or call `rs_embed.list_models()`.                                                                                                                                    |
+| `spatial`  | `BBox` or `PointBuffer`.                                                                                                                                                                                         |
+| `temporal` | `TemporalSpec` or `None`. The parameter is optional at the API level, but some models or data sources still require it.                                                                                          |
+| `sensor`   | Full input descriptor for on-the-fly models. Most precomputed models can leave this as `None`. When provided, it overrides source-level details such as collection, bands, scale, and compositing.               |
+| `fetch`    | Lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`. It is applied on top of the model's resolved default sensor and cannot be combined with `sensor`. |
+| `output`   | Usually `OutputSpec.pooled()` or `OutputSpec.grid(...)`.                                                                                                                                                         |
 
 Runtime and branch selection:
 
-| Parameter | Meaning |
-|---|---|
-| `modality` | Optional model-facing modality selector such as `s1`, `s2`, or `s2_l2a` for models that expose multiple branches. The API normalizes common aliases such as `sentinel-1 -> s1` and `sentinel-2 -> s2`. |
-| `backend` | Access backend. `backend="auto"` is the public default and the recommended choice. Precomputed models typically expect `auto`, while provider-backed on-the-fly paths commonly use `gee` through the auto resolver. |
-| `device` | `"auto"`, `"cpu"`, or `"cuda"` for torch-backed models. |
-| `input_prep` | `"resize"` (default), `"tile"`, `"auto"`, `InputPrepSpec(...)`, or `None`. `None` is treated like the default resize path. |
+| Parameter    | Meaning                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modality`   | Optional model-facing modality selector such as `s1`, `s2`, or `s2_l2a` for models that expose multiple branches. The API normalizes common aliases such as `sentinel-1 -> s1` and `sentinel-2 -> s2`.              |
+| `backend`    | Access backend. `backend="auto"` is the public default and the recommended choice. Precomputed models typically expect `auto`, while provider-backed on-the-fly paths commonly use `gee` through the auto resolver. |
+| `device`     | `"auto"`, `"cpu"`, or `"cuda"` for torch-backed models.                                                                                                                                                             |
+| `input_prep` | `"resize"` (default), `"tile"`, `"auto"`, `InputPrepSpec(...)`, or `None`. `None` is treated like the default resize path.                                                                                          |
 
 Model-specific settings:
 
-| Parameter | Meaning |
-|---|---|
-| `variant` | Common model-specific selector passed through `**model_kwargs`, for example `variant="large"` or `variant="base"`. Only models that declare variant support accept it. |
-| `**model_kwargs` | Model-specific settings passed directly as keyword arguments, such as `variant="large"`. Accepted keys depend on the model. |
+| Parameter        | Meaning                                                                                                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `variant`        | Common model-specific selector passed through `**model_kwargs`, for example `variant="large"` or `variant="base"`. Only models that declare variant support accept it. |
+| `**model_kwargs` | Model-specific settings passed directly as keyword arguments, such as `variant="large"`. Accepted keys depend on the model.                                            |
 
 #### Rules And Contracts
 
@@ -153,30 +152,30 @@ Batch-computes embeddings for multiple ROIs using the same embedder instance (of
 
 Core inputs:
 
-| Parameter | Meaning |
-|---|---|
-| `model` | Model ID. See [Supported Models](models.md) or call `rs_embed.list_models()`. |
-| `spatials` | Non-empty `List[SpatialSpec]`. Each item is a `BBox` or `PointBuffer`. Output order matches input order. |
-| `temporal` | `TemporalSpec` or `None`. The parameter is optional at the API level, but some models or data sources still require it. |
-| `sensor` | Full input descriptor for on-the-fly models. Most precomputed models can leave this as `None`. When provided, it overrides source-level details such as collection, bands, scale, and compositing. |
-| `fetch` | Lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`. It is applied on top of the model's resolved default sensor and cannot be combined with `sensor`. |
-| `output` | Usually `OutputSpec.pooled()` or `OutputSpec.grid(...)`. |
+| Parameter  | Meaning                                                                                                                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`    | Model ID. See [Supported Models](models.md) or call `rs_embed.list_models()`.                                                                                                                                    |
+| `spatials` | Non-empty `List[SpatialSpec]`. Each item is a `BBox` or `PointBuffer`. Output order matches input order.                                                                                                         |
+| `temporal` | `TemporalSpec` or `None`. The parameter is optional at the API level, but some models or data sources still require it.                                                                                          |
+| `sensor`   | Full input descriptor for on-the-fly models. Most precomputed models can leave this as `None`. When provided, it overrides source-level details such as collection, bands, scale, and compositing.               |
+| `fetch`    | Lightweight sampling override for common cases such as `scale_m`, `cloudy_pct`, `composite`, and `fill_value`. It is applied on top of the model's resolved default sensor and cannot be combined with `sensor`. |
+| `output`   | Usually `OutputSpec.pooled()` or `OutputSpec.grid(...)`.                                                                                                                                                         |
 
 Runtime and branch selection:
 
-| Parameter | Meaning |
-|---|---|
-| `modality` | Optional model-facing modality selector such as `s1`, `s2`, or `s2_l2a` for models that expose multiple branches. The API normalizes common aliases such as `sentinel-1 -> s1` and `sentinel-2 -> s2`. |
-| `backend` | Access backend. `backend="auto"` is the public default and the recommended choice. Precomputed models typically expect `auto`, while provider-backed on-the-fly paths commonly use `gee` through the auto resolver. |
-| `device` | `"auto"`, `"cpu"`, or `"cuda"` for torch-backed models. |
-| `input_prep` | `"resize"` (default), `"tile"`, `"auto"`, `InputPrepSpec(...)`, or `None`. `None` is treated like the default resize path. |
+| Parameter    | Meaning                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modality`   | Optional model-facing modality selector such as `s1`, `s2`, or `s2_l2a` for models that expose multiple branches. The API normalizes common aliases such as `sentinel-1 -> s1` and `sentinel-2 -> s2`.              |
+| `backend`    | Access backend. `backend="auto"` is the public default and the recommended choice. Precomputed models typically expect `auto`, while provider-backed on-the-fly paths commonly use `gee` through the auto resolver. |
+| `device`     | `"auto"`, `"cpu"`, or `"cuda"` for torch-backed models.                                                                                                                                                             |
+| `input_prep` | `"resize"` (default), `"tile"`, `"auto"`, `InputPrepSpec(...)`, or `None`. `None` is treated like the default resize path.                                                                                          |
 
 Model-specific settings:
 
-| Parameter | Meaning |
-|---|---|
-| `variant` | Common model-specific selector passed through `**model_kwargs`, for example `variant="large"` or `variant="base"`. Only models that declare variant support accept it. |
-| `**model_kwargs` | Model-specific settings passed directly as keyword arguments, such as `variant="large"`. Accepted keys depend on the model. |
+| Parameter        | Meaning                                                                                                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `variant`        | Common model-specific selector passed through `**model_kwargs`, for example `variant="large"` or `variant="base"`. Only models that declare variant support accept it. |
+| `**model_kwargs` | Model-specific settings passed directly as keyword arguments, such as `variant="large"`. Accepted keys depend on the model.                                            |
 
 #### Rules And Contracts
 

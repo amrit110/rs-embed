@@ -24,18 +24,18 @@ Goal: make every model page answer the same questions quickly, so users can comp
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `<model_id>` |
-| Family / Backbone | `TODO` |
-| Adapter type | `precomputed` / `on-the-fly` |
-| Typical backend | `auto` / `gee` / provider-specific |
-| Primary input | `TODO` |
-| Temporal mode | `year` / `range` / model-specific |
-| Output modes | `pooled`, `grid` |
-| Model config keys | none / `variant` / `TODO` |
-| Extra side inputs | none / `TODO` |
-| Training alignment (adapter path) | Low / Medium / High + short note |
+| Field                             | Value                              |
+| --------------------------------- | ---------------------------------- |
+| Model ID                          | `<model_id>`                       |
+| Family / Backbone                 | `TODO`                             |
+| Adapter type                      | `precomputed` / `on-the-fly`       |
+| Typical backend                   | `auto` / `gee` / provider-specific |
+| Primary input                     | `TODO`                             |
+| Temporal mode                     | `year` / `range` / model-specific  |
+| Output modes                      | `pooled`, `grid`                   |
+| Model config keys                 | none / `variant` / `TODO`          |
+| Extra side inputs                 | none / `TODO`                      |
+| Training alignment (adapter path) | Low / Medium / High + short note   |
 
 ---
 
@@ -89,7 +89,9 @@ Recommended display pattern in MkDocs Material:
 Example:
 
 ```html
-<pre class="pipeline-flow"><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
+<pre
+  class="pipeline-flow"
+><code><span class="pipeline-root">INPUT</span>  provider fetch / input_chw
   <span class="pipeline-arrow">-&gt;</span> normalize
   <span class="pipeline-arrow">-&gt;</span> model-specific prep
      <span class="pipeline-branch">resize:</span> ...
@@ -111,8 +113,8 @@ Suggested content checklist:
 ### Environment variables that change behavior
 
 | Env var | Default | Effect |
-|---|---|---|
-| `TODO` | `TODO` | `TODO` |
+| ------- | ------- | ------ |
+| `TODO`  | `TODO`  | `TODO` |
 
 ---
 

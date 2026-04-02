@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `scalemae` |
-| Aliases | `scalemae_rgb` |
-| Family / Backbone | ScaleMAE via `rshf.scalemae.ScaleMAE` |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 RGB (`B4,B3,B2`) + `input_res_m` |
-| Default resolution | 10m default provider fetch / semantic scale (`sensor.scale_m`) |
-| Temporal mode | range window in practice (normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | **required semantic scale** (`sensor.scale_m` passed as `input_res_m`) |
+| Field                             | Value                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| Model ID                          | `scalemae`                                                                      |
+| Aliases                           | `scalemae_rgb`                                                                  |
+| Family / Backbone                 | ScaleMAE via `rshf.scalemae.ScaleMAE`                                           |
+| Adapter type                      | `on-the-fly`                                                                    |
+| Typical backend                   | provider backend (`gee`)                                                        |
+| Primary input                     | S2 RGB (`B4,B3,B2`) + `input_res_m`                                             |
+| Default resolution                | 10m default provider fetch / semantic scale (`sensor.scale_m`)                  |
+| Temporal mode                     | range window in practice (normalized via shared helper)                         |
+| Output modes                      | `pooled`, `grid`                                                                |
+| Extra side inputs                 | **required semantic scale** (`sensor.scale_m` passed as `input_res_m`)          |
 | Training alignment (adapter path) | Medium-High when `sensor.scale_m` matches the actual input resolution semantics |
 
 ---
@@ -79,12 +79,12 @@ Important:
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_SCALEMAE_ID` | `MVRL/scalemae-vitlarge-800` | HF model ID for `ScaleMAE.from_pretrained(...)` |
-| `RS_EMBED_SCALEMAE_IMG` | `224` | Resize / preprocess image size |
-| `RS_EMBED_SCALEMAE_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_SCALEMAE_BATCH_SIZE` | CPU:`8`, CUDA:`32` | Inference batch size for batch APIs |
+| Env var                           | Default                      | Effect                                          |
+| --------------------------------- | ---------------------------- | ----------------------------------------------- |
+| `RS_EMBED_SCALEMAE_ID`            | `MVRL/scalemae-vitlarge-800` | HF model ID for `ScaleMAE.from_pretrained(...)` |
+| `RS_EMBED_SCALEMAE_IMG`           | `224`                        | Resize / preprocess image size                  |
+| `RS_EMBED_SCALEMAE_FETCH_WORKERS` | `8`                          | Provider prefetch workers for batch APIs        |
+| `RS_EMBED_SCALEMAE_BATCH_SIZE`    | CPU:`8`, CUDA:`32`           | Inference batch size for batch APIs             |
 
 Non-env but critical:
 

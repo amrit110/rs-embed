@@ -4,20 +4,20 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `prithvi` |
-| Aliases | `prithvi_eo_v2_s2_6b` |
-| Family / Backbone | Prithvi-EO v2 via vendored `PrithviMAE` runtime |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee` via public API) |
-| Primary input | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`) |
-| Default resolution | 30m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` preferred; adapter normalizes `year`/`None` to a range |
-| Output modes | `pooled`, `grid` |
-| Model config keys | `variant` (default: `prithvi_eo_v2_100_tl`) |
-| Extra side inputs | **required** temporal coords + location coords (derived by adapter) |
-| Training alignment (adapter path) | Medium (depends on preprocessing mode and resize/pad choices) |
+| Field                             | Value                                                               |
+| --------------------------------- | ------------------------------------------------------------------- |
+| Model ID                          | `prithvi`                                                           |
+| Aliases                           | `prithvi_eo_v2_s2_6b`                                               |
+| Family / Backbone                 | Prithvi-EO v2 via vendored `PrithviMAE` runtime                     |
+| Adapter type                      | `on-the-fly`                                                        |
+| Typical backend                   | provider backend (`gee` via public API)                             |
+| Primary input                     | S2 6-band (`BLUE,GREEN,RED,NIR_NARROW,SWIR_1,SWIR_2`)               |
+| Default resolution                | 30m default provider fetch (`sensor.scale_m`)                       |
+| Temporal mode                     | `range` preferred; adapter normalizes `year`/`None` to a range      |
+| Output modes                      | `pooled`, `grid`                                                    |
+| Model config keys                 | `variant` (default: `prithvi_eo_v2_100_tl`)                         |
+| Extra side inputs                 | **required** temporal coords + location coords (derived by adapter) |
+| Training alignment (adapter path) | Medium (depends on preprocessing mode and resize/pad choices)       |
 
 ---
 
@@ -26,7 +26,6 @@
 Prithvi is a good fit for multispectral Sentinel-2 experiments that need more than RGB, token or grid-level feature inspection with a ViT-style backbone, or comparisons where explicit time and location conditioning are part of the model path.
 
 Use carefully when comparing Prithvi against models without side inputs, because the derived time and location signals can affect behavior. It is also worth treating preprocessing mode (`resize` vs `pad`) as part of the experiment definition.
-
 
 ---
 
@@ -72,24 +71,24 @@ The default sensor is `COPERNICUS/S2_SR_HARMONIZED` with bands `("BLUE", "GREEN"
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_PRITHVI_KEY` | `prithvi_eo_v2_100_tl` | Prithvi variant selector |
-| `RS_EMBED_PRITHVI_PRETRAINED` | `1` | Use pretrained weights vs random init |
-| `RS_EMBED_PRITHVI_CACHE_DIR` | unset | Optional Hugging Face cache dir for config/checkpoint downloads |
-| `RS_EMBED_PRITHVI_WEIGHTS_ONLY` | `1` | `torch.load(..., weights_only=...)` compatibility toggle |
-| `RS_EMBED_PRITHVI_PREP` | `resize` | Input prep mode: `resize` or `pad` |
-| `RS_EMBED_PRITHVI_IMG` | `224` | Target square size for `resize` mode |
-| `RS_EMBED_PRITHVI_PATCH_MULT` | `16` | Pad multiple for `pad` mode |
-| `RS_EMBED_PRITHVI_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
-| `RS_EMBED_PRITHVI_BATCH_SIZE` | CPU:`4`, CUDA:`16` | Inference batch size for batch APIs |
+| Env var                          | Default                | Effect                                                          |
+| -------------------------------- | ---------------------- | --------------------------------------------------------------- |
+| `RS_EMBED_PRITHVI_KEY`           | `prithvi_eo_v2_100_tl` | Prithvi variant selector                                        |
+| `RS_EMBED_PRITHVI_PRETRAINED`    | `1`                    | Use pretrained weights vs random init                           |
+| `RS_EMBED_PRITHVI_CACHE_DIR`     | unset                  | Optional Hugging Face cache dir for config/checkpoint downloads |
+| `RS_EMBED_PRITHVI_WEIGHTS_ONLY`  | `1`                    | `torch.load(..., weights_only=...)` compatibility toggle        |
+| `RS_EMBED_PRITHVI_PREP`          | `resize`               | Input prep mode: `resize` or `pad`                              |
+| `RS_EMBED_PRITHVI_IMG`           | `224`                  | Target square size for `resize` mode                            |
+| `RS_EMBED_PRITHVI_PATCH_MULT`    | `16`                   | Pad multiple for `pad` mode                                     |
+| `RS_EMBED_PRITHVI_FETCH_WORKERS` | `8`                    | Provider prefetch workers for batch APIs                        |
+| `RS_EMBED_PRITHVI_BATCH_SIZE`    | CPU:`4`, CUDA:`16`     | Inference batch size for batch APIs                             |
 
 ---
 
 ## Model-specific Settings
 
-| Key | Type | Default | Choices |
-|---|---|---|---|
+| Key       | Type     | Default                | Choices                                                                |
+| --------- | -------- | ---------------------- | ---------------------------------------------------------------------- |
 | `variant` | `string` | `prithvi_eo_v2_100_tl` | `prithvi_eo_v2_100_tl`, `prithvi_eo_v2_300_tl`, `prithvi_eo_v2_600_tl` |
 
 Notes:

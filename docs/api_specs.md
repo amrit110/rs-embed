@@ -58,7 +58,7 @@ TemporalSpec.range("2022-06-01", "2022-09-01")
 ```
 
 !!! warning "Temporal range is a window"
-    `TemporalSpec.range(start, end)` is treated as a half-open interval `[start, end)`, so `end` is excluded.
+`TemporalSpec.range(start, end)` is treated as a half-open interval `[start, end)`, so `end` is excluded.
 
 Temporal semantics in provider and on-the-fly paths: `TemporalSpec.range(start, end)` is interpreted as a half-open window `[start, end)`, so `end` is excluded. In GEE-backed fetch paths, that window is used to filter an image collection and then apply a compositing reducer such as `median` or `mosaic`. The fetched input is therefore usually a composite over the whole window rather than an automatically selected single-day scene. If you want to approximate a single-day query, use a one-day window such as `TemporalSpec.range("2022-06-01", "2022-06-02")`.
 
@@ -87,27 +87,27 @@ SensorSpec(
 )
 ```
 
-| Field | Meaning |
-|---|---|
-| `collection` | GEE collection or image ID. |
-| `bands` | Band names as a tuple. |
-| `scale_m` | Sampling resolution in meters. |
-| `cloudy_pct` | Best-effort cloud filter, subject to collection properties. |
-| `fill_value` | No-data fill value. |
-| `composite` | Temporal compositing method, usually `median` or `mosaic`. |
-| `modality` | Optional model-facing modality selector for models with multiple branches. |
-| `orbit` | Optional orbit or pass filter for sensor families that support it. |
-| `use_float_linear` | Selects linear-scale floating-point products when a sensor family offers both linear and dB variants. |
-| `s1_require_iw` | Prefer Sentinel-1 `IW` scenes only on provider-backed S1 fetch paths. |
-| `s1_relax_iw_on_empty` | Retry without the `IW` filter when strict S1 `IW` fetch returns no imagery. |
-| `check_*` | Optional input checks and quicklook saving; see [API: Inspect](api_inspect.md#inspect_gee_patch). |
+| Field                  | Meaning                                                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `collection`           | GEE collection or image ID.                                                                           |
+| `bands`                | Band names as a tuple.                                                                                |
+| `scale_m`              | Sampling resolution in meters.                                                                        |
+| `cloudy_pct`           | Best-effort cloud filter, subject to collection properties.                                           |
+| `fill_value`           | No-data fill value.                                                                                   |
+| `composite`            | Temporal compositing method, usually `median` or `mosaic`.                                            |
+| `modality`             | Optional model-facing modality selector for models with multiple branches.                            |
+| `orbit`                | Optional orbit or pass filter for sensor families that support it.                                    |
+| `use_float_linear`     | Selects linear-scale floating-point products when a sensor family offers both linear and dB variants. |
+| `s1_require_iw`        | Prefer Sentinel-1 `IW` scenes only on provider-backed S1 fetch paths.                                 |
+| `s1_relax_iw_on_empty` | Retry without the `IW` filter when strict S1 `IW` fetch returns no imagery.                           |
+| `check_*`              | Optional input checks and quicklook saving; see [API: Inspect](api_inspect.md#inspect_gee_patch).     |
 
 !!! note
-    For **precomputed** models (e.g., directly reading offline embedding products), `sensor` is usually ignored or set to `None`.
+For **precomputed** models (e.g., directly reading offline embedding products), `sensor` is usually ignored or set to `None`.
 
 !!! note
-    Public embedding/export APIs also accept a top-level `modality=...` convenience argument.
-    When provided, rs-embed resolves it into the model's sensor/input contract and validates that the model explicitly supports that modality.
+Public embedding/export APIs also accept a top-level `modality=...` convenience argument.
+When provided, rs-embed resolves it into the model's sensor/input contract and validates that the model explicitly supports that modality.
 
 ### FetchSpec
 
@@ -123,12 +123,12 @@ FetchSpec(
 )
 ```
 
-| Field | Meaning |
-|---|---|
-| `scale_m` | Sampling resolution override. |
-| `cloudy_pct` | Cloud filter override. |
-| `fill_value` | No-data fill override. |
-| `composite` | Temporal compositing override. |
+| Field        | Meaning                        |
+| ------------ | ------------------------------ |
+| `scale_m`    | Sampling resolution override.  |
+| `cloudy_pct` | Cloud filter override.         |
+| `fill_value` | No-data fill override.         |
+| `composite`  | Temporal compositing override. |
 
 Recommended rule: use `fetch=FetchSpec(...)` for normal public API usage. Use `sensor=SensorSpec(...)` only when you need advanced control over `collection`, `bands`, `modality`, or similar source-level details.
 
@@ -152,7 +152,6 @@ emb = get_embedding(
 ### OutputSpec
 
 `OutputSpec` controls the embedding output shape: a **pooled vector** or a **dense grid**.
-
 
 ```python
 OutputSpec(
@@ -180,11 +179,9 @@ OutputSpec(
 Sampling resolution is no longer configured on `OutputSpec`.
 Use `fetch=FetchSpec(scale_m=...)` for resolution overrides.
 
-
 #### `pooled`
 
 > ROI-level Vector Embedding
-
 
 `pooled` represents one whole ROI (Region of Interest) using a single vector `(D,)`.
 
@@ -212,10 +209,9 @@ $$
 v_d = \frac{1}{HW} \sum_{y,x} g_{d,y,x}
 $$
 
-
 #### `grid`
-> ROI-level Spatial Embedding Field
 
+> ROI-level Spatial Embedding Field
 
 `grid` returns a spatial embedding field `(D, H, W)`, where each spatial location maps to a vector.
 
@@ -226,7 +222,7 @@ Embedding.data.shape == (D, H, W)
 ```
 
 !!! note
-    `data` can be returned as `xarray.DataArray`, with metadata in `meta` or `attrs`. For precomputed geospatial products, that metadata may include CRS and crop context. For ViT token grids, it usually describes patch-grid structure rather than georeferenced pixel coordinates.
+`data` can be returned as `xarray.DataArray`, with metadata in `meta` or `attrs`. For precomputed geospatial products, that metadata may include CRS and crop context. For ViT token grids, it usually describes patch-grid structure rather than georeferenced pixel coordinates.
 
 How `grid` is produced:
 
@@ -238,7 +234,8 @@ How `grid` is produced:
 
 ---
 
-### InputPrepSpec 
+### InputPrepSpec
+
 > Optional Large-ROI Input Policy
 
 `InputPrepSpec` controls API-level handling of large on-the-fly inputs before model inference.
@@ -278,7 +275,6 @@ Tile size defaults to `embedder.describe()["defaults"]["image_size"]` when avail
 ![tiles](assets/tiles.png)
 
 <!-- <img src="./docs/assets/tiles.png" width="500" alt="icon" /> -->
-
 
 ---
 
@@ -342,19 +338,19 @@ This is the main metadata users should inspect across the public embedding APIs.
 
 All built-in embedders now share the same minimum `Embedding.meta` contract. These fields should always be present, even when a specific model has little to say for one of them:
 
-| Field | Meaning |
-|---|---|
-| `model` | Model identifier that produced the embedding. |
-| `type` | Execution family such as `precomputed` or `on_the_fly`. |
-| `backend` | Backend used at runtime, such as `auto` or `gee`. |
-| `source` | Source dataset, collection, or checkpoint family used by the embedder. |
-| `sensor` | Effective sensor metadata attached to the returned embedding. |
-| `temporal` | Serialized temporal request as interpreted by the embedder. |
-| `image_size` | Model input image size when the embedder records it. |
-| `pooling` | Pooling semantics for pooled outputs, such as `token_mean`, `patch_mean`, or `mean_hw`. |
-| `grid_hw` | Grid height and width for grid outputs in model feature space. |
-| `cls_removed` | Whether a CLS token was removed before pooling or grid reshaping. |
-| `input_prep` | API-side input preprocessing metadata, for example whether the request resolved to `resize`, `tile`, or `auto -> tile`. |
+| Field         | Meaning                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `model`       | Model identifier that produced the embedding.                                                                           |
+| `type`        | Execution family such as `precomputed` or `on_the_fly`.                                                                 |
+| `backend`     | Backend used at runtime, such as `auto` or `gee`.                                                                       |
+| `source`      | Source dataset, collection, or checkpoint family used by the embedder.                                                  |
+| `sensor`      | Effective sensor metadata attached to the returned embedding.                                                           |
+| `temporal`    | Serialized temporal request as interpreted by the embedder.                                                             |
+| `image_size`  | Model input image size when the embedder records it.                                                                    |
+| `pooling`     | Pooling semantics for pooled outputs, such as `token_mean`, `patch_mean`, or `mean_hw`.                                 |
+| `grid_hw`     | Grid height and width for grid outputs in model feature space.                                                          |
+| `cls_removed` | Whether a CLS token was removed before pooling or grid reshaping.                                                       |
+| `input_prep`  | API-side input preprocessing metadata, for example whether the request resolved to `resize`, `tile`, or `auto -> tile`. |
 
 Model-specific adapters can still attach additional keys beyond this stable base, such as checkpoint IDs, normalization details, token counts, frame counts, CRS hints, crop provenance, or modality-specific runtime flags.
 
@@ -379,11 +375,11 @@ print(emb.meta.get("sensor"))
 
 These two metadata surfaces are related, but they serve different purposes:
 
-| Surface | When you read it | What it means |
-|---|---|---|
-| `Embedding.meta` | After inference | Runtime result metadata for one concrete output |
-| `describe_model(model)` | Before inference | Static capability metadata for a model class |
-| `Model.describe()` | After constructing `Model(...)`, before or after inference | The same capability metadata, accessed from the model instance |
+| Surface                 | When you read it                                           | What it means                                                  |
+| ----------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `Embedding.meta`        | After inference                                            | Runtime result metadata for one concrete output                |
+| `describe_model(model)` | Before inference                                           | Static capability metadata for a model class                   |
+| `Model.describe()`      | After constructing `Model(...)`, before or after inference | The same capability metadata, accessed from the model instance |
 
 Use `Embedding.meta` when you want to interpret a returned embedding.
 
@@ -395,16 +391,16 @@ Use `describe_model()` or `Model.describe()` when you want to inspect what a mod
 
 A typical `describe()` result contains fields such as:
 
-| Field | Meaning |
-|---|---|
-| `type` | Whether the model is `precomputed` or `on_the_fly`. |
-| `backend` | Supported backends or backend family. |
-| `inputs` | Default provider-facing input contract, often collection and bands. |
-| `temporal` | Supported temporal mode such as `year` or `range`. |
-| `output` | Supported output modes such as `pooled` and `grid`. |
-| `defaults` | Default runtime knobs such as `scale_m`, `cloudy_pct`, `composite`, or `image_size`. |
-| `modalities` | Optional modality-specific branches for multi-branch models. |
-| `model_config` | Machine-readable schema for supported model-specific kwargs such as `variant`. |
+| Field          | Meaning                                                                              |
+| -------------- | ------------------------------------------------------------------------------------ |
+| `type`         | Whether the model is `precomputed` or `on_the_fly`.                                  |
+| `backend`      | Supported backends or backend family.                                                |
+| `inputs`       | Default provider-facing input contract, often collection and bands.                  |
+| `temporal`     | Supported temporal mode such as `year` or `range`.                                   |
+| `output`       | Supported output modes such as `pooled` and `grid`.                                  |
+| `defaults`     | Default runtime knobs such as `scale_m`, `cloudy_pct`, `composite`, or `image_size`. |
+| `modalities`   | Optional modality-specific branches for multi-branch models.                         |
+| `model_config` | Machine-readable schema for supported model-specific kwargs such as `variant`.       |
 
 Example:
 

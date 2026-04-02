@@ -4,18 +4,18 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `anysat` |
-| Family / Backbone | AnySat (vendored local runtime) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider-backed; prefer `backend="auto"` in public API |
-| Primary input | S2 10-band time series (`T,C,H,W`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (adapter normalizes `year`/`None` to range) |
-| Output modes | `pooled`, `grid` |
-| Model config keys | `variant` (default: `base`; choices: `base`) |
-| Extra side inputs | **required** `s2_dates` (per-frame DOY values) |
+| Field                             | Value                                                               |
+| --------------------------------- | ------------------------------------------------------------------- |
+| Model ID                          | `anysat`                                                            |
+| Family / Backbone                 | AnySat (vendored local runtime)                                     |
+| Adapter type                      | `on-the-fly`                                                        |
+| Typical backend                   | provider-backed; prefer `backend="auto"` in public API              |
+| Primary input                     | S2 10-band time series (`T,C,H,W`)                                  |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                       |
+| Temporal mode                     | `range` in practice (adapter normalizes `year`/`None` to range)     |
+| Output modes                      | `pooled`, `grid`                                                    |
+| Model config keys                 | `variant` (default: `base`; choices: `base`)                        |
+| Extra side inputs                 | **required** `s2_dates` (per-frame DOY values)                      |
 | Training alignment (adapter path) | Medium (depends on frame count, normalization mode, and image size) |
 
 ---
@@ -69,23 +69,22 @@ Important constraint:
 
 ## Environment Variables / Tuning Knobs
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_ANYSAT_FRAMES` | `8` | Number of temporal frames `T` |
-| `RS_EMBED_ANYSAT_IMG` | `24` | Per-frame resize target (square) |
-| `RS_EMBED_ANYSAT_NORM` | `per_tile_zscore` | Series normalization mode |
-| `RS_EMBED_ANYSAT_MODEL_SIZE` | `base` | AnySat model size |
-| `RS_EMBED_ANYSAT_GRID_MODE` | `dense` | Grid path native AnySat spatial output (`dense` or `patch`) |
-| `RS_EMBED_ANYSAT_POOLED_SOURCE` | `patch` | Pooled path source (`patch` compatibility pooling or native `tile`) |
-| `RS_EMBED_ANYSAT_FLASH_ATTN` | `0` | Enable flash attention path if supported |
-| `RS_EMBED_ANYSAT_PRETRAINED` | `1` | Load pretrained checkpoint weights |
-| `RS_EMBED_ANYSAT_CKPT` | unset | Local checkpoint override |
-| `RS_EMBED_ANYSAT_HF_REPO` | `g-astruc/AnySat` | Hugging Face repo used for checkpoint download |
-| `RS_EMBED_ANYSAT_HF_FILE` | `models/AnySat.pth` | Checkpoint file inside the Hugging Face repo |
-| `RS_EMBED_ANYSAT_CACHE_DIR` | `~/.cache/rs_embed/anysat` | Checkpoint cache dir |
-| `RS_EMBED_ANYSAT_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
-| `RS_EMBED_ANYSAT_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
-
+| Env var                          | Default                    | Effect                                                              |
+| -------------------------------- | -------------------------- | ------------------------------------------------------------------- |
+| `RS_EMBED_ANYSAT_FRAMES`         | `8`                        | Number of temporal frames `T`                                       |
+| `RS_EMBED_ANYSAT_IMG`            | `24`                       | Per-frame resize target (square)                                    |
+| `RS_EMBED_ANYSAT_NORM`           | `per_tile_zscore`          | Series normalization mode                                           |
+| `RS_EMBED_ANYSAT_MODEL_SIZE`     | `base`                     | AnySat model size                                                   |
+| `RS_EMBED_ANYSAT_GRID_MODE`      | `dense`                    | Grid path native AnySat spatial output (`dense` or `patch`)         |
+| `RS_EMBED_ANYSAT_POOLED_SOURCE`  | `patch`                    | Pooled path source (`patch` compatibility pooling or native `tile`) |
+| `RS_EMBED_ANYSAT_FLASH_ATTN`     | `0`                        | Enable flash attention path if supported                            |
+| `RS_EMBED_ANYSAT_PRETRAINED`     | `1`                        | Load pretrained checkpoint weights                                  |
+| `RS_EMBED_ANYSAT_CKPT`           | unset                      | Local checkpoint override                                           |
+| `RS_EMBED_ANYSAT_HF_REPO`        | `g-astruc/AnySat`          | Hugging Face repo used for checkpoint download                      |
+| `RS_EMBED_ANYSAT_HF_FILE`        | `models/AnySat.pth`        | Checkpoint file inside the Hugging Face repo                        |
+| `RS_EMBED_ANYSAT_CACHE_DIR`      | `~/.cache/rs_embed/anysat` | Checkpoint cache dir                                                |
+| `RS_EMBED_ANYSAT_CKPT_MIN_BYTES` | adapter threshold          | Download size sanity check                                          |
+| `RS_EMBED_ANYSAT_FETCH_WORKERS`  | `8`                        | Provider prefetch workers for batch APIs                            |
 
 ## Output Semantics
 
@@ -117,7 +116,6 @@ emb = get_embedding(
 # export RS_EMBED_ANYSAT_NORM=per_tile_zscore
 # export RS_EMBED_ANYSAT_IMG=24
 ```
-
 
 ---
 

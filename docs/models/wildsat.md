@@ -4,17 +4,17 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `wildsat` |
-| Family / Backbone | WildSAT checkpoint loader + torchvision backbones (`vitb16`, `vitl16`, `resnet50`, `swint`) |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 RGB (`B4,B3,B2`) |
-| Default resolution | 10m default provider fetch (`sensor.scale_m`) |
-| Temporal mode | `range` in practice (normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | none (but checkpoint/arch/image-head settings matter) |
+| Field                             | Value                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| Model ID                          | `wildsat`                                                                                     |
+| Family / Backbone                 | WildSAT checkpoint loader + torchvision backbones (`vitb16`, `vitl16`, `resnet50`, `swint`)   |
+| Adapter type                      | `on-the-fly`                                                                                  |
+| Typical backend                   | provider backend (`gee`)                                                                      |
+| Primary input                     | S2 RGB (`B4,B3,B2`)                                                                           |
+| Default resolution                | 10m default provider fetch (`sensor.scale_m`)                                                 |
+| Temporal mode                     | `range` in practice (normalized via shared helper)                                            |
+| Output modes                      | `pooled`, `grid`                                                                              |
+| Extra side inputs                 | none (but checkpoint/arch/image-head settings matter)                                         |
 | Training alignment (adapter path) | Medium (depends on checkpoint source, arch inference, normalization mode, and feature source) |
 
 ---
@@ -73,29 +73,29 @@ If `grid` is requested but ViT tokens are unavailable, for example with a non-Vi
 
 ### Runtime / feature extraction
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_WILDSAT_ARCH` | `auto` | Backbone arch hint (`vitb16`, `vitl16`, `resnet50`, `swint`, or `auto`) |
-| `RS_EMBED_WILDSAT_IMG` | `224` | Resize target image size |
-| `RS_EMBED_WILDSAT_NORM` | `minmax` | `minmax`, `unit_scale`, or `none` |
-| `RS_EMBED_WILDSAT_FEATURE` | `image_head` | Feature source: `auto`, `image_head`, `backbone` |
-| `RS_EMBED_WILDSAT_IMAGE_BRANCH` | `3` | Preferred decoder branch for image head extraction |
-| `RS_EMBED_WILDSAT_POOLED_FROM_TOKENS` | `0` | If true and ViT tokens available, pooled output uses token pooling |
-| `RS_EMBED_WILDSAT_GRID_FROM_TOKENS` | `1` | Enable ViT token extraction for grid/token-based pooling |
-| `RS_EMBED_WILDSAT_FETCH_WORKERS` | `8` | Provider prefetch workers for batch APIs |
+| Env var                               | Default      | Effect                                                                  |
+| ------------------------------------- | ------------ | ----------------------------------------------------------------------- |
+| `RS_EMBED_WILDSAT_ARCH`               | `auto`       | Backbone arch hint (`vitb16`, `vitl16`, `resnet50`, `swint`, or `auto`) |
+| `RS_EMBED_WILDSAT_IMG`                | `224`        | Resize target image size                                                |
+| `RS_EMBED_WILDSAT_NORM`               | `minmax`     | `minmax`, `unit_scale`, or `none`                                       |
+| `RS_EMBED_WILDSAT_FEATURE`            | `image_head` | Feature source: `auto`, `image_head`, `backbone`                        |
+| `RS_EMBED_WILDSAT_IMAGE_BRANCH`       | `3`          | Preferred decoder branch for image head extraction                      |
+| `RS_EMBED_WILDSAT_POOLED_FROM_TOKENS` | `0`          | If true and ViT tokens available, pooled output uses token pooling      |
+| `RS_EMBED_WILDSAT_GRID_FROM_TOKENS`   | `1`          | Enable ViT token extraction for grid/token-based pooling                |
+| `RS_EMBED_WILDSAT_FETCH_WORKERS`      | `8`          | Provider prefetch workers for batch APIs                                |
 
 ### Checkpoint path / download
 
-| Env var | Default | Effect |
-|---|---|---|
-| `RS_EMBED_WILDSAT_CKPT` | unset | Local checkpoint path |
-| `RS_EMBED_WILDSAT_AUTO_DOWNLOAD` | `1` | Allow auto-download if `CKPT` not set |
-| `RS_EMBED_WILDSAT_CACHE_DIR` | `~/.cache/rs_embed/wildsat` | Checkpoint cache dir |
-| `RS_EMBED_WILDSAT_CKPT_MIN_BYTES` | adapter threshold | Download size sanity check |
-| `RS_EMBED_WILDSAT_GDRIVE_ID` | official sample file id | Google Drive source (default auto-download path) |
-| `RS_EMBED_WILDSAT_CKPT_FILE` | `vitb16-imagenet-bnfc.pth` | Local cached filename for GDrive path |
-| `RS_EMBED_WILDSAT_HF_REPO` | unset | Optional HF repo override (must pair with `HF_FILE`) |
-| `RS_EMBED_WILDSAT_HF_FILE` | unset | Optional HF file override (must pair with `HF_REPO`) |
+| Env var                           | Default                     | Effect                                               |
+| --------------------------------- | --------------------------- | ---------------------------------------------------- |
+| `RS_EMBED_WILDSAT_CKPT`           | unset                       | Local checkpoint path                                |
+| `RS_EMBED_WILDSAT_AUTO_DOWNLOAD`  | `1`                         | Allow auto-download if `CKPT` not set                |
+| `RS_EMBED_WILDSAT_CACHE_DIR`      | `~/.cache/rs_embed/wildsat` | Checkpoint cache dir                                 |
+| `RS_EMBED_WILDSAT_CKPT_MIN_BYTES` | adapter threshold           | Download size sanity check                           |
+| `RS_EMBED_WILDSAT_GDRIVE_ID`      | official sample file id     | Google Drive source (default auto-download path)     |
+| `RS_EMBED_WILDSAT_CKPT_FILE`      | `vitb16-imagenet-bnfc.pth`  | Local cached filename for GDrive path                |
+| `RS_EMBED_WILDSAT_HF_REPO`        | unset                       | Optional HF repo override (must pair with `HF_FILE`) |
+| `RS_EMBED_WILDSAT_HF_FILE`        | unset                       | Optional HF file override (must pair with `HF_REPO`) |
 
 ---
 
