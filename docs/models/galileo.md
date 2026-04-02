@@ -1,6 +1,6 @@
 # Galileo (`galileo`)
 
-> Multi-frame Sentinel-2 adapter that constructs Galileo encoder inputs (including `months`) from a temporal window and returns pooled vectors or S2-group patch-token grids.
+> Multi-frame Sentinel-2 adapter that constructs Galileo encoder inputs (including `months`) from a temporal window and returns pooled vectors or patch-token grids.
 
 ## Quick Facts
 
@@ -15,7 +15,7 @@
 | Temporal mode | `range` in practice (adapter normalizes via shared helper) |
 | Output modes | `pooled`, `grid` |
 | Extra side inputs | **required** `months` (per-frame month tokens), plus Galileo masks/tensors built by adapter |
-| Training alignment (adapter path) | Medium (depends on `FRAMES`, `IMG`, `PATCH`, normalization, NDVI inclusion) |
+| Training alignment (adapter path) | Medium (depends on `FRAMES`, `IMG`, `PATCH`, normalization) |
 
 ---
 
@@ -48,18 +48,17 @@ For `input_chw`, the adapter accepts `CHW` or `TCHW` with `C=10` through the sha
      <span class="pipeline-detail">frame-bin midpoints or RS_EMBED_GALILEO_MONTH override</span>
   <span class="pipeline-arrow">-&gt;</span> resize frames to RS_EMBED_GALILEO_IMG=64 if needed
   <span class="pipeline-arrow">-&gt;</span> normalize series with RS_EMBED_GALILEO_NORM
-     <span class="pipeline-branch">default:</span> unit_scale
+     <span class="pipeline-branch">default:</span> none
+     <span class="pipeline-detail">use `official_stats` to match Galileo pretraining normalization</span>
   <span class="pipeline-arrow">-&gt;</span> build encoder tensors + masks
      <span class="pipeline-branch">inputs:</span> s_t_x, sp_x, t_x, st_x
      <span class="pipeline-branch">masks:</span>  s_t_m, sp_m, t_m, st_m
      <span class="pipeline-branch">side input:</span> months
-  <span class="pipeline-arrow">-&gt;</span> optional NDVI injection
-     <span class="pipeline-detail">when RS_EMBED_GALILEO_INCLUDE_NDVI=1 and model space supports NDVI</span>
   <span class="pipeline-arrow">-&gt;</span> Galileo encoder forward
      <span class="pipeline-detail">patch_size=RS_EMBED_GALILEO_PATCH=8</span>
   <span class="pipeline-arrow">-&gt;</span> output projection
      <span class="pipeline-branch">pooled:</span> visible-token average
-     <span class="pipeline-branch">grid:</span>   average S2 space-time groups to grid</code></pre>
+     <span class="pipeline-branch">grid:</span>   official-style patch mean over visible tokens</code></pre>
 
 Constraint:
 
@@ -79,9 +78,8 @@ Constraint:
 | `RS_EMBED_GALILEO_IMG` | `64` | Frame resize target |
 | `RS_EMBED_GALILEO_PATCH` | `8` | Encoder patch size |
 | `RS_EMBED_GALILEO_FRAMES` | `8` | Number of temporal frames `T` |
-| `RS_EMBED_GALILEO_NORM` | `unit_scale` | S2 normalization mode |
+| `RS_EMBED_GALILEO_NORM` | `none` | S2 normalization mode (`none`, `unit_scale`, `per_tile_minmax`, `official_stats`) |
 | `RS_EMBED_GALILEO_ADD_LN` | `1` | Add layer norm on encoder exit |
-| `RS_EMBED_GALILEO_INCLUDE_NDVI` | `1` | Include NDVI channel when supported |
 | `RS_EMBED_GALILEO_MONTH` | unset | Force a constant month (1..12) for all frames |
 | `RS_EMBED_GALILEO_FETCH_WORKERS` | `8` | Prefetch workers for batch APIs |
 
@@ -95,7 +93,7 @@ The default pooled path uses Galileo's pooled token output, recorded with `token
 
 ### `OutputSpec.grid()`
 
-`OutputSpec.grid()` returns S2-related Galileo space-time-group patch tokens as `xarray.DataArray` `(D,H,W)`. The grid is produced by selecting S2 groups and averaging over time and channel-group axes. This is model token structure rather than georeferenced raster space.
+`OutputSpec.grid()` returns a Galileo patch-token grid as `xarray.DataArray` `(D,H,W)`. The adapter now follows Galileo's own patch-level token averaging path when available, so each spatial position is the mean of visible tokens assigned to that patch. This is model token structure rather than georeferenced raster space.
 
 ---
 
@@ -122,8 +120,7 @@ emb = get_embedding(
 # export RS_EMBED_GALILEO_FRAMES=8
 # export RS_EMBED_GALILEO_IMG=64
 # export RS_EMBED_GALILEO_PATCH=8
-# export RS_EMBED_GALILEO_NORM=unit_scale
-# export RS_EMBED_GALILEO_INCLUDE_NDVI=1
+# export RS_EMBED_GALILEO_NORM=official_stats
 ```
 
 ---
@@ -145,7 +142,7 @@ Verify temporal window, frame count, and month sequence in metadata first. Inspe
 
 ## Reproducibility Notes
 
-Keep the temporal window, `RS_EMBED_GALILEO_FRAMES`, `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`, normalization mode, NDVI inclusion, month override, and model source fixed and recorded.
+Keep the temporal window, `RS_EMBED_GALILEO_FRAMES`, `RS_EMBED_GALILEO_IMG`, `RS_EMBED_GALILEO_PATCH`, normalization mode, month override, and model source fixed and recorded.
 
 ---
 
