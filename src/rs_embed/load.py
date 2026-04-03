@@ -125,10 +125,7 @@ class ExportResult:
         """
         if model not in self.models:
             available = sorted(self.models)
-            raise KeyError(
-                f"Model {model!r} not found in export. "
-                f"Available models: {available}"
-            )
+            raise KeyError(f"Model {model!r} not found in export. Available models: {available}")
         result = self.models[model]
         if result.embeddings is None:
             raise ValueError(
@@ -254,8 +251,7 @@ def _load_arrays(arrays_path: str, fmt: str) -> dict[str, np.ndarray]:
             import xarray as xr
         except ImportError as exc:
             raise ImportError(
-                "xarray is required to load NetCDF exports. "
-                "Install with: pip install xarray"
+                "xarray is required to load NetCDF exports. Install with: pip install xarray"
             ) from exc
         ds = xr.open_dataset(arrays_path)
         try:
@@ -273,9 +269,7 @@ def _load_json(json_path: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Failed to load manifest {json_path!r}: {exc}") from exc
     if not isinstance(data, dict):
-        raise ValueError(
-            f"Manifest {json_path!r} is not a JSON object."
-        )
+        raise ValueError(f"Manifest {json_path!r} is not a JSON object.")
     return data
 
 
@@ -438,18 +432,14 @@ def _load_per_item(directory: str) -> ExportResult:
             # Embeddings
             emb_meta = entry.get("embedding") or {}
             emb_key = (
-                emb_meta.get("npz_key")
-                if isinstance(emb_meta, dict)
-                else None
+                emb_meta.get("npz_key") if isinstance(emb_meta, dict) else None
             ) or _EMBEDDING_KEY_SINGLE.format(model=key)
             emb_arr = arrays.get(emb_key)
 
             # Inputs
             inp_meta = entry.get("input") or {}
             inp_key = (
-                inp_meta.get("npz_key")
-                if isinstance(inp_meta, dict)
-                else None
+                inp_meta.get("npz_key") if isinstance(inp_meta, dict) else None
             ) or _INPUT_KEY_SINGLE.format(model=key)
             inp_arr = arrays.get(inp_key)
 
