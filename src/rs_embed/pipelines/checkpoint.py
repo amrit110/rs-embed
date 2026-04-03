@@ -7,6 +7,7 @@ write/load operations for per-item and combined layouts.
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Any
 
 import numpy as np
@@ -139,6 +140,11 @@ class CheckpointManager:
                 try:
                     arrays = load_saved_arrays(fmt=fmt, out_path=out_path)
                 except Exception as _e:
+                    warnings.warn(
+                        f"Could not load checkpoint arrays from '{out_path}': {_e}. "
+                        "Starting with empty array cache; all inputs will be re-fetched.",
+                        stacklevel=4,
+                    )
                     arrays = {}
                 if resume_manifest is not None:
                     manifest = dict(resume_manifest)

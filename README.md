@@ -76,7 +76,7 @@ See the visualization helper and end-to-end notebook in the repository:
 - [`examples/plot_utils.py`](https://github.com/cybergis/rs-embed/blob/main/examples/plot_utils.py)
 - [`examples/playground.ipynb`](https://github.com/cybergis/rs-embed/blob/main/examples/playground.ipynb)
 
-<img src="https://raw.githubusercontent.com/cybergis/rs-embed/main/docs/assets/vis.png" width=650 />
+<img src="https://raw.githubusercontent.com/cybergis/rs-embed/main/docs/assets/vis.png" width=750 />
 
 ## Main API
 

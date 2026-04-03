@@ -53,6 +53,13 @@ class _EmbeddingRequestContext:
     lock: Any
 
 
+@lru_cache(maxsize=64)
+def describe_model_cached(model_n: str) -> dict[str, Any]:
+    """Return cached ``describe()`` output for a model class (no weights loaded)."""
+    cls = get_embedder_cls(model_n)
+    return cls().describe()
+
+
 @lru_cache(maxsize=32)
 def get_embedder_bundle_cached(model: str, backend: str, device: str, sensor_k: tuple):
     """Return (embedder instance, instance lock)."""
@@ -93,6 +100,7 @@ def reset_runtime() -> dict[str, int]:
     _runtime_registry._REGISTRY_IMPORT_ERRORS.clear()
 
     get_embedder_bundle_cached.cache_clear()
+    describe_model_cached.cache_clear()
     _embedder_method_accepts_parameter.cache_clear()
     embedder_accepts_input_chw.cache_clear()
     embedder_accepts_model_config.cache_clear()
@@ -100,7 +108,7 @@ def reset_runtime() -> dict[str, int]:
 
     return {
         "import_errors_cleared": int(import_errors_cleared),
-        "runtime_caches_cleared": 4,
+        "runtime_caches_cleared": 5,
         "embedder_module_caches_cleared": int(embedder_module_caches_cleared),
     }
 
@@ -123,8 +131,8 @@ def sensor_key(sensor: SensorSpec | None) -> tuple:
     return (
         sensor.collection,
         sensor.bands,
-        int(sensor.scale_m),
-        int(sensor.cloudy_pct),
+        sensor.scale_m,
+        sensor.cloudy_pct,
         float(sensor.fill_value),
         str(sensor.composite),
         getattr(sensor, "modality", None),
@@ -376,23 +384,28 @@ def fetch_api_side_inputs(
 
     # Use the embedder's fetch_input() when available; fall back to generic.
     results: list[FetchResult] = []
-    for spatial in spatials:
-        fr = embedder.fetch_input(
-            provider,
-            spatial=spatial,
-            temporal=temporal,
-            sensor=sensor_eff,
-        )
-        if fr is not None:
-            results.append(fr)
-        else:
-            raw = fetch_gee_patch_raw(
+    for idx, spatial in enumerate(spatials):
+        try:
+            fr = embedder.fetch_input(
                 provider,
                 spatial=spatial,
                 temporal=temporal,
                 sensor=sensor_eff,
             )
-            results.append(FetchResult(data=raw, meta={}))
+            if fr is not None:
+                results.append(fr)
+            else:
+                raw = fetch_gee_patch_raw(
+                    provider,
+                    spatial=spatial,
+                    temporal=temporal,
+                    sensor=sensor_eff,
+                )
+                results.append(FetchResult(data=raw, meta={}))
+        except Exception as exc:
+            raise ModelError(
+                f"Failed to fetch API-side input for spatial[{idx}] ({spatial}): {exc}"
+            ) from exc
     return results
 
 
@@ -417,7 +430,7 @@ def run_embedding_request(
     )
     if prefetched_inputs is not None:
         out: list[Embedding] = []
-        for spatial, fr in zip(spatials, prefetched_inputs, strict=False):
+        for spatial, fr in zip(spatials, prefetched_inputs, strict=True):
             with ctx.lock:
                 emb = _call_embedder_get_embedding_with_input_prep(
                     embedder=ctx.embedder,

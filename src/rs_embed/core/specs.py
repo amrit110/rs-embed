@@ -41,8 +41,16 @@ class BBox:
         """
         if self.crs != "EPSG:4326":
             raise SpecError("BBox currently must be EPSG:4326 (v0.1).")
-        if not (self.minlon < self.maxlon and self.minlat < self.maxlat):
-            raise SpecError("Invalid bbox bounds.")
+        if not (-180.0 <= self.minlon < self.maxlon <= 180.0):
+            raise SpecError(
+                "Invalid bbox bounds: longitudes must be in [-180, 180] with minlon < maxlon; "
+                f"got minlon={self.minlon}, maxlon={self.maxlon}."
+            )
+        if not (-90.0 <= self.minlat < self.maxlat <= 90.0):
+            raise SpecError(
+                "Invalid bbox bounds: latitudes must be in [-90, 90] with minlat < maxlat; "
+                f"got minlat={self.minlat}, maxlat={self.maxlat}."
+            )
 
 
 @dataclass(frozen=True)

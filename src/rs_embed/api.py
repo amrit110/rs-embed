@@ -82,6 +82,7 @@ from .tools.normalization import (
 from .tools.progress import create_progress as _create_progress
 from .tools.runtime import (
     _prepare_embedding_request_context,
+    describe_model_cached as _describe_model_cached,
     provider_factory_for_backend,
 )
 from .tools.runtime import (
@@ -149,8 +150,7 @@ def describe_model(model: str) -> dict[str, Any]:
     ['pooled', 'grid']
     """
     model_n = _normalize_model_name(model)
-    cls = _get_embedder_cls(model_n)
-    return cls().describe()
+    return dict(_describe_model_cached(model_n))
 
 
 def reset_runtime() -> dict[str, int]:

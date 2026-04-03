@@ -220,11 +220,11 @@ class BatchExporter:
         finally:
             if prefetch_pipeline_ex is not None:
                 prefetch_pipeline_ex.shutdown(wait=True)
+            for bar in model_progress.values():
+                bar.close()
+            progress.close()
 
         manifests.sort(key=lambda x: int(x.get("point_index", -1)))
-        for bar in model_progress.values():
-            bar.close()
-        progress.close()
         return manifests
 
     # ── combined export ────────────────────────────────────────────
@@ -633,7 +633,7 @@ class BatchExporter:
                 finally:
                     writer_ex.shutdown(wait=True)
         finally:
-            if writer_ex is not None and not writer_ex._shutdown:
+            if writer_ex is not None:
                 writer_ex.shutdown(wait=True)
 
     def _write_payload_sync(
