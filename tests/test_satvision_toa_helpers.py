@@ -124,7 +124,6 @@ def test_satvision_default_modis_fetch_prefers_proxy(monkeypatch):
 
 
 def test_satvision_fetch_rejects_custom_gee_sensor():
-
     sensor = SensorSpec(
         collection="TEST/COLL",
         bands=tuple(f"B{i}" for i in range(14)),

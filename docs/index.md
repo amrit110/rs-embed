@@ -46,7 +46,7 @@ Most workflows revolve around three functions: `get_embedding(...)` for one ROI,
 | Get one embedding for one ROI    | [Quickstart](quickstart.md)   | `get_embedding(...)`          |
 | Compute embeddings for many ROIs | [Quickstart](quickstart.md)   | `get_embeddings_batch(...)`   |
 | Build an export dataset          | [Quickstart](quickstart.md)   | `export_batch(...)`           |
-| Compare model assumptions        | [Models](models.md)           | model tables + detail pages    |
+| Compare model assumptions        | [Models](models.md)           | model tables + detail pages   |
 | Inspect a raw provider patch     | [Inspect API](api_inspect.md) | `inspect_provider_patch(...)` |
 
 ---

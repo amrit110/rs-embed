@@ -82,8 +82,10 @@ from .tools.normalization import (
 from .tools.progress import create_progress as _create_progress
 from .tools.runtime import (
     _prepare_embedding_request_context,
-    describe_model_cached as _describe_model_cached,
     provider_factory_for_backend,
+)
+from .tools.runtime import (
+    describe_model_cached as _describe_model_cached,
 )
 from .tools.runtime import (
     reset_runtime as _reset_runtime_shared,

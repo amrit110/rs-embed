@@ -60,7 +60,9 @@ def _combined_npz(
     manifest = {
         "n_items": N_ITEMS,
         "status": status,
-        "spatials": [{"type": "PointBuffer", "lon": 121.5 + i, "lat": 31.2} for i in range(N_ITEMS)],
+        "spatials": [
+            {"type": "PointBuffer", "lon": 121.5 + i, "lat": 31.2} for i in range(N_ITEMS)
+        ],
         "temporal": {"start": "2022-06-01", "end": "2022-09-01"},
         "models": [
             {
@@ -93,7 +95,9 @@ def _per_item_dir(
         emb = np.random.rand(N_DIM).astype(np.float32)
         arrays: dict[str, np.ndarray] = {f"embedding__{key}": emb}
         if save_inputs:
-            arrays[f"input_chw__{key}"] = np.random.rand(N_BANDS, IMG_SIZE, IMG_SIZE).astype(np.float32)
+            arrays[f"input_chw__{key}"] = np.random.rand(N_BANDS, IMG_SIZE, IMG_SIZE).astype(
+                np.float32
+            )
 
         npz_path = os.path.join(directory, f"p{i:05d}.npz")
         np.savez(npz_path, **arrays)
@@ -532,10 +536,7 @@ class TestLoadPerItem:
         np.testing.assert_array_equal(mr.embeddings[0], np.zeros(N_DIM))
 
     def test_all_failed_model_has_none_embeddings(self, tmp_path):
-        from rs_embed.tools.serialization import sanitize_key
-
         model = "remoteclip"
-        key = sanitize_key(model)
         d = str(tmp_path)
 
         for i in range(N_ITEMS):
@@ -616,7 +617,6 @@ class TestExportResultErrors:
         npz_path, _ = _combined_npz(str(tmp_path), status="failed")
         result = load_export(npz_path)
         # status=failed means no embeddings array
-        mr = result.models["remoteclip"]
         mr_failed = ModelResult(
             name="remoteclip",
             status="failed",

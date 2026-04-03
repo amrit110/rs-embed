@@ -4,19 +4,19 @@
 
 ## Quick Facts
 
-| Field | Value |
-|---|---|
-| Model ID | `scalemae` |
-| Aliases | `scalemae_rgb` |
-| Family / Backbone | ScaleMAE via `rshf.scalemae.ScaleMAE` |
-| Adapter type | `on-the-fly` |
-| Typical backend | provider backend (`gee`) |
-| Primary input | S2 RGB (`B4,B3,B2`) + `input_res_m` |
-| Default resolution | 10m default provider fetch / source scale (`sensor.scale_m`) |
-| Temporal mode | range window in practice (normalized via shared helper) |
-| Output modes | `pooled`, `grid` |
-| Extra side inputs | **required effective scale** (`input_res_m` derived from `sensor.scale_m` after preprocess) |
-| Training alignment (adapter path) | High when `sensor.scale_m` matches the source patch resolution semantics |
+| Field                             | Value                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------- |
+| Model ID                          | `scalemae`                                                                                  |
+| Aliases                           | `scalemae_rgb`                                                                              |
+| Family / Backbone                 | ScaleMAE via `rshf.scalemae.ScaleMAE`                                                       |
+| Adapter type                      | `on-the-fly`                                                                                |
+| Typical backend                   | provider backend (`gee`)                                                                    |
+| Primary input                     | S2 RGB (`B4,B3,B2`) + `input_res_m`                                                         |
+| Default resolution                | 10m default provider fetch / source scale (`sensor.scale_m`)                                |
+| Temporal mode                     | range window in practice (normalized via shared helper)                                     |
+| Output modes                      | `pooled`, `grid`                                                                            |
+| Extra side inputs                 | **required effective scale** (`input_res_m` derived from `sensor.scale_m` after preprocess) |
+| Training alignment (adapter path) | High when `sensor.scale_m` matches the source patch resolution semantics                    |
 
 ---
 

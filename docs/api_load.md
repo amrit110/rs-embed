@@ -20,7 +20,7 @@ Use `load_export(...)` to read any export produced by [`export_batch`](api_expor
 
 ### Mental Model
 
-`load_export(...)` answers one question: *where is the export?*
+`load_export(...)` answers one question: _where is the export?_
 
 - Pass a **file** (`.npz`, `.nc`, or `.json`) to load a **combined** export.
 - Pass a **directory** to load a **per-item** export.
@@ -43,17 +43,17 @@ result = load_export("exports/per_item_run/")
 
 ## Parameters
 
-| Parameter | Meaning                                                                           |
-| --------- | --------------------------------------------------------------------------------- |
+| Parameter | Meaning                                                                          |
+| --------- | -------------------------------------------------------------------------------- |
 | `path`    | Path to a `.npz`/`.nc`/`.json` file (combined) or a directory (per-item export). |
 
 ### Raises
 
-| Exception         | When                                                                  |
-| ----------------- | --------------------------------------------------------------------- |
-| `FileNotFoundError` | Path does not exist.                                                |
-| `ValueError`      | Path exists but cannot be interpreted as an rs-embed export.          |
-| `ImportError`     | NetCDF export requested but `xarray` is not installed.                |
+| Exception           | When                                                         |
+| ------------------- | ------------------------------------------------------------ |
+| `FileNotFoundError` | Path does not exist.                                         |
+| `ValueError`        | Path exists but cannot be interpreted as an rs-embed export. |
+| `ImportError`       | NetCDF export requested but `xarray` is not installed.       |
 
 ---
 
@@ -102,11 +102,11 @@ class ModelResult:
 
 **Status values:**
 
-| Status    | Meaning                                          |
-| --------- | ------------------------------------------------ |
-| `"ok"`    | All points succeeded.                            |
+| Status      | Meaning                                                              |
+| ----------- | -------------------------------------------------------------------- |
+| `"ok"`      | All points succeeded.                                                |
 | `"partial"` | Some points succeeded; failed points are NaN-filled in `embeddings`. |
-| `"failed"` | All points failed; `embeddings` is `None`.      |
+| `"failed"`  | All points failed; `embeddings` is `None`.                           |
 
 ---
 
@@ -190,5 +190,5 @@ emb = result.embedding("remoteclip")   # shape (1, dim)
 ```
 
 !!! tip "Simple rule"
-    Pass a file path for combined exports, a directory path for per-item exports.
-    Everything else is automatic.
+Pass a file path for combined exports, a directory path for per-item exports.
+Everything else is automatic.
