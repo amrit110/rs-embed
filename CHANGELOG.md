@@ -8,6 +8,10 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-03
+
+This release rolls up upstream-alignment work and correctness fixes that may change default embedding behavior for some model adapters compared with `0.1.1`. Users who need strict reproducibility across versions should review the model-specific changes below and pin explicit options where needed.
+
 ### Changed
 
 - Standardised NumPy docstrings across all public functions and classes in `export.py`, `inspect.py`, `writers.py`, and the `tools/` and `providers/` layers. No behaviour changes.
@@ -65,6 +69,7 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 - Support for on-the-fly model adapters including `satmae`, `satmaepp`, `satmaepp_s2_10b`, `prithvi`, `scalemae`, `remoteclip`, `dofa`, `satvision`, `anysat`, `galileo`, `wildsat`, `fomo`, `terramind`, `terrafm`, `thor`, and `agrifm`.
 - Documentation site covering quickstart, model behavior, API contracts, and extension guidance.
 
-[Unreleased]: https://github.com/cybergis/rs-embed/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/cybergis/rs-embed/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/cybergis/rs-embed/releases/tag/v0.1.2
 [0.1.1]: https://github.com/cybergis/rs-embed/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cybergis/rs-embed/releases/tag/v0.1.0
