@@ -89,6 +89,7 @@ nav:
       - Specs & Data Structures: api_specs.md
       - Embedding API: api_embedding.md
       - Export API: api_export.md
+      - Load API: api_load.md
       - Inspect API: api_inspect.md
   - Extending:
       - Overview: extending.md

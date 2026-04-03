@@ -12,7 +12,6 @@ import pytest
 
 from rs_embed.embedders.runtime_utils import resolve_device_auto_torch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -121,9 +120,7 @@ class TestLiveDevice:
             pytest.skip("No GPU/MPS available on this machine")
 
         result = resolve_device_auto_torch("auto")
-        assert result != "cpu", (
-            f"Expected cuda or mps on accelerated hardware, got {result!r}"
-        )
+        assert result != "cpu", f"Expected cuda or mps on accelerated hardware, got {result!r}"
 
     def test_auto_returns_mps_on_apple_silicon(self):
         """On Apple Silicon with MPS available, 'auto' must return 'mps' (not 'cpu')."""

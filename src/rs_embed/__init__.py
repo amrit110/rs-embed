@@ -34,6 +34,7 @@ from .core.types import (
 )
 from .export import export_npz
 from .inspect import inspect_gee_patch, inspect_provider_patch
+from .load import ExportResult, ModelResult, load_export
 from .model import Model
 from .pipelines.exporter import BatchExporter
 
@@ -64,6 +65,10 @@ __all__ = [
     # Export API
     "export_batch",
     "export_npz",
+    # Load API
+    "load_export",
+    "ExportResult",
+    "ModelResult",
     # Inspection
     "inspect_provider_patch",
     # Backward-compatible alias for inspect_provider_patch
