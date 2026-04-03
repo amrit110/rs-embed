@@ -7,7 +7,7 @@ If you want installation and first-run examples, start with [Quickstart](quickst
 
 ## Core Entry Points
 
-Most users only need four public entry points: `get_embedding(...)`, `get_embeddings_batch(...)`, `export_batch(...)`, and `inspect_provider_patch(...)`.
+Most users only need five public entry points: `get_embedding(...)`, `get_embeddings_batch(...)`, `export_batch(...)`, `load_export(...)`, and `inspect_provider_patch(...)`.
 
 ---
 
@@ -18,6 +18,7 @@ Most users only need four public entry points: `get_embedding(...)`, `get_embedd
 | understand spatial/temporal/output specs      | [API: Specs and Data Structures](api_specs.md) |
 | get one embedding or batch embeddings         | [API: Embedding](api_embedding.md)             |
 | build export pipelines and datasets           | [API: Export](api_export.md)                   |
+| read back a saved export                      | [API: Load](api_load.md)                       |
 | inspect raw provider patches before inference | [API: Inspect](api_inspect.md)                 |
 
 ---
