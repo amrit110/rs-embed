@@ -326,7 +326,9 @@ def _scalemae_forward_tokens_or_vec_batch(
     ensure_torch()
     import torch
 
-    xb = _scalemae_preprocess_tensor_batch(rgb_u8_batch, image_size=image_size).to(device)  # [B,3,H,W]
+    xb = _scalemae_preprocess_tensor_batch(rgb_u8_batch, image_size=image_size).to(
+        device
+    )  # [B,3,H,W]
     if np.isscalar(input_res_m):
         input_res_values = [float(input_res_m)] * len(rgb_u8_batch)
     else:

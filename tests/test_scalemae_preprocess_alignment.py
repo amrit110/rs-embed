@@ -5,10 +5,10 @@ from rs_embed.core.errors import ModelError
 from rs_embed.core.specs import OutputSpec, PointBuffer, TemporalSpec
 from rs_embed.embedders.onthefly_scalemae import (
     ScaleMAERGBEmbedder,
+    _resolve_scalemae_forward_features,
     _scalemae_effective_input_res_m,
     _scalemae_forward_tokens_or_vec,
     _scalemae_resize_short_side,
-    _resolve_scalemae_forward_features,
 )
 
 
