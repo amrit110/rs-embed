@@ -689,7 +689,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             except Exception as _e:
                 chunk_outs = []
                 chunk_extra = {}
-                for rgb_u8, input_res_m in zip(chunk_rgb, chunk_res):
+                for rgb_u8, input_res_m in zip(chunk_rgb, chunk_res, strict=True):
                     o1, e1 = _scalemae_forward_tokens_or_vec(
                         model,
                         rgb_u8,
