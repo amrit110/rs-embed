@@ -31,6 +31,27 @@ def sensor_fetch_group_key(
 
 
 def select_prefetched_channels(x_chw: np.ndarray, idx: tuple[int, ...]) -> np.ndarray:
+    """Select a channel subset from a prefetched CHW or TCHW array.
+
+    Parameters
+    ----------
+    x_chw : np.ndarray
+        Input array with shape ``(C, H, W)`` or ``(T, C, H, W)``.
+    idx : tuple[int, ...]
+        Channel indices to select, in the desired output order.
+
+    Returns
+    -------
+    np.ndarray
+        Float32 array with the selected channels. Returns the input
+        unchanged (same object) when *idx* is already the identity
+        permutation.
+
+    Raises
+    ------
+    ValueError
+        If the input array is not 3-D or 4-D.
+    """
     x = np.asarray(x_chw, dtype=np.float32)
     if x.ndim == 3:
         if len(idx) == x.shape[0] and all(i == j for j, i in enumerate(idx)):

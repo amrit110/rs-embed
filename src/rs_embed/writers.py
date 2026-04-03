@@ -48,9 +48,33 @@ def write_arrays(
     manifest: dict[str, Any],
     save_manifest: bool,
 ) -> dict[str, Any]:
-    """Persist *arrays* + *manifest* in the requested format.
+    """Persist *arrays* and *manifest* in the requested format.
 
-    Returns an updated copy of *manifest* with format-specific path keys.
+    Parameters
+    ----------
+    fmt : str
+        Output format — ``"npz"`` or ``"netcdf"``.
+    out_path : str
+        Destination file path (without extension; the correct extension is
+        appended automatically).
+    arrays : dict[str, np.ndarray]
+        Named arrays to persist (inputs and embeddings).
+    manifest : dict[str, Any]
+        JSON-serializable metadata to embed alongside the arrays.
+    save_manifest : bool
+        Whether to write a sidecar ``.json`` manifest file.
+
+    Returns
+    -------
+    dict[str, Any]
+        Updated copy of *manifest* with format-specific path keys
+        (e.g. ``npz_path``, ``npz_keys`` for NPZ; ``nc_path``,
+        ``nc_variables`` for NetCDF).
+
+    Raises
+    ------
+    ValueError
+        If *fmt* is not a supported format.
     """
     if fmt == "npz":
         return _write_npz(out_path, arrays, manifest, save_manifest)

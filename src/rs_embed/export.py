@@ -28,11 +28,46 @@ def export_npz(
     per_model_fetches: dict[str, FetchSpec] | None = None,
     config: ExportConfig = ExportConfig(),
 ) -> dict[str, Any]:
-    """Export inputs + embeddings for one spatial query to a single `.npz`.
+    """Export inputs and embeddings for one spatial query to a single ``.npz``.
 
-    The output format is always ``"npz"`` regardless of any ``config.format``
-    value passed in; ``config`` controls all other runtime settings (workers,
-    resume, show_progress, input_prep, etc.).
+    Convenience wrapper around :func:`rs_embed.export_batch` for single-ROI
+    exports. The output format is always ``"npz"`` regardless of any
+    ``config.format`` value; ``config`` controls all other runtime settings
+    (workers, resume, show_progress, input_prep, etc.).
+
+    Parameters
+    ----------
+    spatial : SpatialSpec
+        Single spatial location to export.
+    temporal : TemporalSpec or None
+        Optional temporal filter.
+    models : list[str]
+        Model identifiers to run.
+    out_path : str
+        Destination ``.npz`` path. The ``.npz`` extension is appended if
+        absent; parent directories are created automatically.
+    backend : str
+        Backend/provider selector (default ``"auto"``).
+    device : str
+        Target inference device (default ``"auto"``).
+    output : OutputSpec
+        Embedding output representation policy.
+    sensor : SensorSpec or None
+        Optional sensor override applied to all models.
+    fetch : FetchSpec or None
+        Optional fetch-policy override. Cannot be combined with ``sensor``.
+    per_model_sensors : dict[str, SensorSpec] or None
+        Per-model sensor overrides keyed by model name.
+    per_model_fetches : dict[str, FetchSpec] or None
+        Per-model fetch-policy overrides keyed by model name.
+    config : ExportConfig
+        Runtime configuration. ``config.format`` is ignored; format is
+        always ``"npz"``.
+
+    Returns
+    -------
+    dict[str, Any]
+        Export manifest returned by :func:`export_batch`.
     """
     from .api import export_batch as _api_export_batch
 

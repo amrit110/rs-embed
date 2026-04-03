@@ -45,6 +45,25 @@ class SimpleProgress:
 
 
 def create_progress(*, enabled: bool, total: int, desc: str, unit: str = "item") -> Any:
+    """Create a progress bar, falling back gracefully when tqdm is unavailable.
+
+    Parameters
+    ----------
+    enabled : bool
+        Whether to show progress at all. Returns a no-op object when ``False``.
+    total : int
+        Total number of steps.
+    desc : str
+        Label displayed next to the progress bar.
+    unit : str
+        Unit label per step (default ``"item"``).
+
+    Returns
+    -------
+    Any
+        A tqdm progress bar, a :class:`SimpleProgress` fallback, or a
+        :class:`NoOpProgress` when disabled or ``total <= 0``.
+    """
     if (not enabled) or int(total) <= 0:
         return NoOpProgress()
 

@@ -21,6 +21,25 @@ from .runtime import require_model_config_support
 
 
 def normalize_export_format(format_name: str) -> tuple[str, str]:
+    """Validate and normalize an export format name.
+
+    Parameters
+    ----------
+    format_name : str
+        Raw format string (e.g. ``"npz"``, ``"netcdf"``).
+
+    Returns
+    -------
+    tuple[str, str]
+        ``(fmt, ext)`` where *fmt* is the canonical lowercase format name
+        and *ext* is the corresponding file extension including the dot
+        (e.g. ``(".npz", ".nc")``).
+
+    Raises
+    ------
+    ModelError
+        If *format_name* is not a supported export format.
+    """
     fmt = str(format_name).strip().lower()
     from ..writers import SUPPORTED_FORMATS, get_extension
 
@@ -37,6 +56,33 @@ def normalize_export_target(
     ext: str,
     target: ExportTarget,
 ) -> ExportTarget:
+    """Validate and normalize an :class:`ExportTarget`.
+
+    Appends the correct file extension to combined targets and generates
+    default per-item point names when none are provided.
+
+    Parameters
+    ----------
+    n_spatials : int
+        Number of spatial points in the export request.
+    ext : str
+        File extension including the dot (e.g. ``".npz"``), used to
+        suffix combined export paths.
+    target : ExportTarget
+        Raw export target to validate and normalize.
+
+    Returns
+    -------
+    ExportTarget
+        Validated and normalized export target.
+
+    Raises
+    ------
+    ModelError
+        If the target is not an :class:`ExportTarget` instance, required
+        fields are missing, or ``target.names`` length mismatches
+        ``n_spatials``.
+    """
     if not isinstance(target, ExportTarget):
         raise ModelError("target must be an ExportTarget instance.")
     if target.layout == ExportLayout.COMBINED:
@@ -69,6 +115,47 @@ def resolve_export_model_configs(
     per_model_fetches: dict[str, FetchSpec] | None,
     per_model_modalities: dict[str, str] | None,
 ) -> tuple[list[ModelConfig], dict[str, str]]:
+    """Resolve per-model configurations for a batch export.
+
+    Validates each requested model, resolves its effective backend and
+    sensor, and returns ready-to-use :class:`ModelConfig` instances.
+
+    Parameters
+    ----------
+    models : list[str | ExportModelRequest]
+        Model identifiers or pre-configured request objects.
+    backend_n : str
+        Normalized global backend name.
+    temporal : TemporalSpec or None
+        Temporal filter applied to all models.
+    output : OutputSpec
+        Output representation policy applied to all models.
+    sensor : SensorSpec or None
+        Global sensor override (applied when no per-model override exists).
+    fetch : FetchSpec or None
+        Global fetch-policy override.
+    modality : str or None
+        Global modality selector.
+    per_model_sensors : dict[str, SensorSpec] or None
+        Per-model sensor overrides keyed by model name.
+    per_model_fetches : dict[str, FetchSpec] or None
+        Per-model fetch-policy overrides keyed by model name.
+    per_model_modalities : dict[str, str] or None
+        Per-model modality overrides keyed by model name.
+
+    Returns
+    -------
+    tuple[list[ModelConfig], dict[str, str]]
+        ``(model_configs, resolved_backend)`` where *model_configs* is an
+        ordered list of resolved :class:`ModelConfig` instances and
+        *resolved_backend* maps each model name to its effective backend.
+
+    Raises
+    ------
+    ModelError
+        If *models* is empty, contains invalid types, or any model fails
+        validation (unsupported backend, output mode, or model config).
+    """
     if not isinstance(models, list) or len(models) == 0:
         raise ModelError("models must be a non-empty list[str] or list[ExportModelRequest].")
 
@@ -148,6 +235,34 @@ def maybe_return_completed_combined_resume(
     backend: str,
     device: str,
 ) -> dict[str, object] | None:
+    """Return a completed resume manifest if the export is already finished.
+
+    Short-circuits the export pipeline when a combined export file already
+    exists and its manifest shows completion, avoiding redundant work.
+
+    Parameters
+    ----------
+    target : ExportTarget
+        Export target specifying the output file location.
+    config : ExportConfig
+        Export configuration; only checked when ``config.resume`` is ``True``.
+    spatials : list[SpatialSpec]
+        Spatial points from the current export request.
+    temporal : TemporalSpec or None
+        Temporal filter from the current export request.
+    output : OutputSpec
+        Output representation policy from the current export request.
+    backend : str
+        Normalized backend name.
+    device : str
+        Normalized device name.
+
+    Returns
+    -------
+    dict[str, object] or None
+        Completed resume manifest dict if the export is already done,
+        or ``None`` if the export should proceed normally.
+    """
     if target.layout != ExportLayout.COMBINED or not config.resume or not target.out_file:
         return None
     if not os.path.exists(target.out_file):

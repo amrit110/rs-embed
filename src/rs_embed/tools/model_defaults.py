@@ -55,6 +55,24 @@ def _mk_sensor(
 
 
 def apply_fetch_to_sensor(sensor: SensorSpec, fetch: FetchSpec | None) -> SensorSpec:
+    """Apply a :class:`FetchSpec` override to a :class:`SensorSpec`.
+
+    Only fields explicitly set on *fetch* (non-``None``) are applied; all
+    other sensor fields are preserved unchanged.
+
+    Parameters
+    ----------
+    sensor : SensorSpec
+        Base sensor configuration to update.
+    fetch : FetchSpec or None
+        Lightweight fetch-policy override. Returns *sensor* unchanged when
+        ``None``.
+
+    Returns
+    -------
+    SensorSpec
+        Updated sensor with fetch-policy fields applied.
+    """
     if fetch is None:
         return sensor
 
@@ -102,6 +120,20 @@ def _fetch_override_sensor_for_model(model_id: str) -> SensorSpec | None:
 
 
 def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:
+    """Return the named sensor profiles for each modality exposed by a model.
+
+    Parameters
+    ----------
+    model_id : str
+        Canonical model identifier.
+
+    Returns
+    -------
+    dict[str, SensorSpec]
+        Mapping from normalized modality name (e.g. ``"s2"``, ``"s1"``) to
+        the corresponding default :class:`SensorSpec`. Returns an empty dict
+        for precomputed models or models with no explicit modality profiles.
+    """
     desc = _probe_model_desc(model_id)
 
     typ = str(desc.get("type", "")).lower()
@@ -165,6 +197,21 @@ def modality_profiles_for_model(model_id: str) -> dict[str, SensorSpec]:
 
 
 def supports_modality_for_model(model_id: str, modality: str) -> bool:
+    """Return whether a model supports a given modality name.
+
+    Parameters
+    ----------
+    model_id : str
+        Canonical model identifier.
+    modality : str
+        Modality name to check (e.g. ``"s1"``, ``"s2"``).
+
+    Returns
+    -------
+    bool
+        ``True`` if the model exposes the modality as a named profile or as
+        its default modality.
+    """
     modality_n = _normalize_modality_name(modality)
     if modality_n is None:
         return False
@@ -177,6 +224,22 @@ def supports_modality_for_model(model_id: str, modality: str) -> bool:
 
 
 def default_sensor_for_model(model_id: str, modality: str | None = None) -> SensorSpec | None:
+    """Return the default :class:`SensorSpec` for a model and optional modality.
+
+    Parameters
+    ----------
+    model_id : str
+        Canonical model identifier.
+    modality : str or None
+        Optional modality name. When provided, returns the sensor profile for
+        that specific modality rather than the overall default.
+
+    Returns
+    -------
+    SensorSpec or None
+        Default sensor configuration, or ``None`` for precomputed models or
+        models that do not declare input collection/band metadata.
+    """
     desc = _probe_model_desc(model_id)
     cls = get_embedder_cls(model_id)
 
@@ -260,6 +323,38 @@ def resolve_sensor_for_model(
     modality: str | None = None,
     default_when_missing: bool = False,
 ) -> SensorSpec | None:
+    """Resolve the effective :class:`SensorSpec` for a model call.
+
+    Combines explicit ``sensor`` / ``fetch`` overrides with per-model
+    defaults and modality profiles, applying validation along the way.
+
+    Parameters
+    ----------
+    model_id : str
+        Canonical model identifier.
+    sensor : SensorSpec or None
+        Explicit sensor override. Mutually exclusive with *fetch*.
+    fetch : FetchSpec or None
+        Lightweight fetch-policy override applied on top of the model
+        default. Mutually exclusive with *sensor*.
+    modality : str or None
+        Optional modality selector (e.g. ``"s1"``, ``"s2"``).
+    default_when_missing : bool
+        When ``True`` and no explicit sensor is provided, fall back to the
+        model's default sensor instead of returning ``None``.
+
+    Returns
+    -------
+    SensorSpec or None
+        Resolved sensor configuration, or ``None`` when no sensor is
+        applicable (e.g. precomputed models without a provider backend).
+
+    Raises
+    ------
+    ModelError
+        If *sensor* and *fetch* are both provided, or if the requested
+        modality is unsupported or ambiguous.
+    """
     if sensor is not None and fetch is not None:
         raise ModelError("Use either sensor=... or fetch=..., not both.")
 
