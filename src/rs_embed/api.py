@@ -71,12 +71,6 @@ from .tools.model_defaults import (
     resolve_sensor_for_model as _resolve_sensor_for_model,
 )
 from .tools.normalization import (
-    # Re-exported so `from rs_embed.api import ...` in tests/downstream still works.
-    _default_provider_backend_for_api,  # noqa: F401
-    _probe_model_describe,  # noqa: F401
-    _resolve_embedding_api_backend,  # noqa: F401
-)
-from .tools.normalization import (
     normalize_backend_name as _normalize_backend_name,
 )
 from .tools.normalization import (

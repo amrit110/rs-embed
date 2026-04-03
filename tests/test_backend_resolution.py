@@ -8,7 +8,7 @@ precomputed models.
 
 from unittest.mock import patch
 
-from rs_embed.api import (
+from rs_embed.tools.normalization import (
     _default_provider_backend_for_api,
     _resolve_embedding_api_backend,
 )

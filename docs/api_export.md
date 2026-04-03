@@ -2,7 +2,7 @@
 
 This page covers dataset export APIs.
 
-Related pages: [API: Specs and Data Structures](api_specs.md), [API: Embedding](api_embedding.md), and [API: Inspect](api_inspect.md).
+Related pages: [API: Specs and Data Structures](api_specs.md), [API: Embedding](api_embedding.md), [API: Load](api_load.md), and [API: Inspect](api_inspect.md).
 
 ---
 
