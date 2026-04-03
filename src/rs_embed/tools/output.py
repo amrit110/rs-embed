@@ -65,7 +65,26 @@ def _flip_data_y(data: Any) -> tuple[Any, bool, str]:
 
 
 def normalize_embedding_output(*, emb: Embedding, output: OutputSpec) -> Embedding:
-    """Normalize embedding outputs according to OutputSpec-level conventions."""
+    """Normalize embedding outputs according to OutputSpec-level conventions.
+
+    For ``output.mode == "grid"``, applies the ``grid_orientation`` policy
+    (``"north_up"`` or ``"native"``), flipping the y-axis of grid embeddings
+    when needed to ensure consistent north-up orientation.
+
+    Parameters
+    ----------
+    emb : Embedding
+        Raw embedding returned by an embedder.
+    output : OutputSpec
+        Output policy controlling orientation normalization.
+
+    Returns
+    -------
+    Embedding
+        Embedding with updated ``meta`` reflecting the orientation policy
+        applied. Data is flipped only when ``output.mode == "grid"`` and
+        the native orientation is south-to-north.
+    """
     if output.mode != "grid":
         return emb
 

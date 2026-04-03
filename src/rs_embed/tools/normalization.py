@@ -11,14 +11,51 @@ from ..providers import has_provider
 
 
 def normalize_model_name(model: str) -> str:
+    """Resolve a model name or alias to its canonical model identifier.
+
+    Parameters
+    ----------
+    model : str
+        Model name or registered alias.
+
+    Returns
+    -------
+    str
+        Canonical model identifier as registered in the catalog.
+    """
     return canonical_model_id(model)
 
 
 def normalize_backend_name(backend: str) -> str:
+    """Normalize a backend name to lowercase stripped form.
+
+    Parameters
+    ----------
+    backend : str
+        Raw backend name (e.g. ``"GEE"``, ``" auto "``).
+
+    Returns
+    -------
+    str
+        Lowercase, whitespace-stripped backend name.
+    """
     return str(backend).strip().lower()
 
 
 def normalize_device_name(device: str | None) -> str:
+    """Normalize a device string, defaulting to ``"auto"`` when absent.
+
+    Parameters
+    ----------
+    device : str or None
+        Raw device string (e.g. ``"CUDA"``, ``"mps"``, ``None``).
+
+    Returns
+    -------
+    str
+        Lowercase, whitespace-stripped device name, or ``"auto"`` when
+        *device* is ``None`` or empty.
+    """
     if device is None:
         return "auto"
     dev = str(device).strip().lower()
@@ -31,6 +68,27 @@ def normalize_input_chw(
     expected_channels: int | None = None,
     name: str = "input_chw",
 ) -> np.ndarray:
+    """Validate and cast a CHW input array to float32.
+
+    Parameters
+    ----------
+    x_chw : np.ndarray
+        Input array expected to have shape ``(C, H, W)``.
+    expected_channels : int or None
+        If provided, raises if the channel dimension does not match.
+    name : str
+        Label used in error messages (default ``"input_chw"``).
+
+    Returns
+    -------
+    np.ndarray
+        Float32 array with shape ``(C, H, W)``.
+
+    Raises
+    ------
+    ModelError
+        If the array is not 3-D or has the wrong number of channels.
+    """
     x = np.asarray(x_chw, dtype=np.float32)
     if x.ndim != 3:
         raise ModelError(f"{name} must be CHW with ndim=3, got shape={getattr(x, 'shape', None)}")
@@ -47,6 +105,28 @@ def normalize_input_array(
     expected_channels: int | None = None,
     name: str = "input",
 ) -> np.ndarray:
+    """Validate and cast a CHW or TCHW input array to float32.
+
+    Parameters
+    ----------
+    x_input : np.ndarray
+        Input array expected to have shape ``(C, H, W)`` or
+        ``(T, C, H, W)``.
+    expected_channels : int or None
+        If provided, raises if the channel dimension does not match.
+    name : str
+        Label used in error messages (default ``"input"``).
+
+    Returns
+    -------
+    np.ndarray
+        Float32 array with shape ``(C, H, W)`` or ``(T, C, H, W)``.
+
+    Raises
+    ------
+    ModelError
+        If the array is not 3-D or 4-D, or has the wrong number of channels.
+    """
     x = np.asarray(x_input, dtype=np.float32)
     if x.ndim == 3:
         c = int(x.shape[0])

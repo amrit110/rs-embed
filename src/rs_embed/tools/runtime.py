@@ -106,6 +106,18 @@ def reset_runtime() -> dict[str, int]:
 
 
 def sensor_key(sensor: SensorSpec | None) -> tuple:
+    """Build a hashable cache key from a :class:`SensorSpec`.
+
+    Parameters
+    ----------
+    sensor : SensorSpec or None
+        Sensor to hash. Returns a sentinel tuple when ``None``.
+
+    Returns
+    -------
+    tuple
+        Hashable key representing all sensor fields relevant to caching.
+    """
     if sensor is None:
         return ("__none__",)
     return (

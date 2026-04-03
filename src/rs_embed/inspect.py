@@ -24,13 +24,40 @@ def inspect_provider_patch(
 ) -> dict[str, Any]:
     """Download a patch from a provider and return an input inspection report.
 
-    This does **not** run any embedding model.
+    Does **not** run any embedding model. Useful for verifying that a spatial
+    location and sensor configuration produce valid imagery before committing
+    to a full export.
+
+    Parameters
+    ----------
+    spatial : SpatialSpec
+        Spatial location to inspect.
+    temporal : TemporalSpec or None
+        Optional temporal filter.
+    sensor : SensorSpec
+        Sensor/collection configuration used for the download.
+    backend : str
+        Provider backend name (default ``"gee"``).
+    name : str
+        Label used in the report and quicklook filename (default
+        ``"gee_patch"``).
+    value_range : tuple[float, float] or None
+        Optional ``(min, max)`` range for value-range checks in the report.
+    return_array : bool
+        If ``True``, attach the raw ``np.ndarray`` as ``array_chw`` in the
+        returned dict (not JSON-serializable).
 
     Returns
     -------
-    dict
-        A JSON-serializable report. If `return_array=True`, the report also
-        includes a non-serializable `array_chw` entry with the numpy array.
+    dict[str, Any]
+        JSON-serializable inspection report with keys ``ok``, ``report``,
+        ``sensor``, ``temporal``, ``backend``, and ``artifacts``.
+        When ``return_array=True``, also includes ``array_chw``.
+
+    Raises
+    ------
+    ProviderError
+        If the backend name is empty or the provider fails to initialize.
     """
 
     backend_name = str(backend).strip().lower()
