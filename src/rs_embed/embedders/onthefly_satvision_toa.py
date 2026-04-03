@@ -48,6 +48,9 @@ _DEFAULT_MODEL_ID = "nasa-cisto-data-science-group/satvision-toa-giant-patch8-wi
 _DEFAULT_IN_CHANS = 14
 _DEFAULT_IMAGE_SIZE = 128
 _DEFAULT_PATCH_SIZE = 4
+_DEFAULT_DROP_PATH_RATE = 0.1
+_DEFAULT_PRETRAINED_WINDOW_SIZES = (0, 0, 0, 0)
+_DEFAULT_NORM_PERIOD = 6
 _DEFAULT_MODIS_COLLECTION = "MODIS/061/MOD021KM"
 _DEFAULT_MODIS_BANDS = (
     "1",
@@ -120,6 +123,16 @@ def _normalize_indices(indices: Sequence[int], n_channels: int) -> tuple[int, ..
         if 0 <= ii < n_channels and ii not in out:
             out.append(ii)
     return tuple(out)
+
+
+def _env_or_default_int_list(name: str, default: Sequence[int]) -> tuple[int, ...]:
+    raw = os.environ.get(name)
+    if raw is None:
+        return tuple(int(v) for v in default)
+    vals = _parse_int_list(raw)
+    if not vals:
+        raise ModelError(f"{name} must contain at least one integer.")
+    return vals
 
 
 def _as_bool_env(name: str, default: bool) -> bool:
@@ -260,11 +273,42 @@ def _pick_first_tensor(obj: Any):
     return None
 
 
-def _decode_features_to_batch_arrays(
-    out: Any, batch_size: int
+def _pick_last_tensor(obj: Any):
+    """Best-effort pick last tensor-like value from nested output."""
+    try:
+        import torch
+    except Exception as _e:
+        torch = None  # type: ignore
+
+    if torch is not None and torch.is_tensor(obj):
+        return obj
+    if isinstance(obj, (tuple, list)):
+        for it in reversed(obj):
+            t = _pick_last_tensor(it)
+            if t is not None:
+                return t
+        return None
+    if isinstance(obj, dict):
+        for k in ("out", "last_hidden_state", "features", "x"):
+            if k in obj:
+                t = _pick_last_tensor(obj[k])
+                if t is not None:
+                    return t
+        for _, v in reversed(list(obj.items())):
+            t = _pick_last_tensor(v)
+            if t is not None:
+                return t
+    return None
+
+
+def _decode_tensor_to_batch_arrays(
+    t: Any,
+    batch_size: int,
+    *,
+    picked_from: str,
 ) -> tuple[list[np.ndarray], dict[str, Any]]:
     """
-    Convert model.forward_features output to per-item arrays.
+    Convert a tensor-like model output to per-item arrays.
 
     Returns arrays where each item is either:
       - tokens: [N, D]
@@ -273,7 +317,6 @@ def _decode_features_to_batch_arrays(
     ensure_torch()
     import torch
 
-    t = _pick_first_tensor(out)
     if t is None or (not torch.is_tensor(t)):
         raise ModelError("SatVision-TOA forward_features returned unsupported output type.")
 
@@ -288,28 +331,31 @@ def _decode_features_to_batch_arrays(
         return [arr[i] for i in range(arr.shape[0])], {
             "tokens_kind": "tokens",
             "tensor_shape": tuple(arr.shape),
+            "tensor_pick": picked_from,
         }
 
     # [B, H, W, D] or [B, D, H, W]
     if t.ndim == 4:
         s = tuple(int(v) for v in t.shape)
-        # BHWC: spatial dims small, channel dim large
-        if s[1] <= 64 and s[2] <= 64 and s[3] > 64:
+        # BHWC: last dim behaves like channels.
+        if s[3] >= s[1] and s[3] >= s[2]:
             toks = t.reshape(s[0], s[1] * s[2], s[3])
             arr = toks.detach().float().cpu().numpy().astype(np.float32)
             return [arr[i] for i in range(arr.shape[0])], {
                 "tokens_kind": "tokens_feature_map_bhwc",
                 "feature_map_hw": (s[1], s[2]),
                 "tensor_shape": s,
+                "tensor_pick": picked_from,
             }
-        # BCHW: channel dim large, spatial dims small
-        if s[1] > 64 and s[2] <= 64 and s[3] <= 64:
+        # BCHW: second dim behaves like channels.
+        if s[1] >= s[2] and s[1] >= s[3]:
             toks = t.permute(0, 2, 3, 1).reshape(s[0], s[2] * s[3], s[1])
             arr = toks.detach().float().cpu().numpy().astype(np.float32)
             return [arr[i] for i in range(arr.shape[0])], {
                 "tokens_kind": "tokens_feature_map_bchw",
                 "feature_map_hw": (s[2], s[3]),
                 "tensor_shape": s,
+                "tensor_pick": picked_from,
             }
 
     # [B, D] pooled vector
@@ -318,11 +364,27 @@ def _decode_features_to_batch_arrays(
         return [arr[i] for i in range(arr.shape[0])], {
             "tokens_kind": "pooled",
             "tensor_shape": tuple(arr.shape),
+            "tensor_pick": picked_from,
         }
 
     raise ModelError(
         f"SatVision-TOA forward_features shape unsupported: {tuple(int(v) for v in t.shape)}"
     )
+
+
+def _decode_features_to_batch_arrays(
+    out: Any,
+    batch_size: int,
+    *,
+    pick: str = "first",
+) -> tuple[list[np.ndarray], dict[str, Any]]:
+    if pick == "first":
+        t = _pick_first_tensor(out)
+    elif pick == "last":
+        t = _pick_last_tensor(out)
+    else:
+        raise ModelError(f"Unsupported tensor pick mode: {pick}")
+    return _decode_tensor_to_batch_arrays(t, batch_size, picked_from=pick)
 
 
 def _extract_state_dict(obj: Any) -> dict[str, Any]:
@@ -507,56 +569,67 @@ def _resolve_ckpt(
     return ckpt_file, f"hf://{model_id}"
 
 
+def _build_satvision_official_compatible_model(
+    *,
+    in_chans: int,
+    drop_path_rate: float,
+    pretrained_window_sizes: Sequence[int],
+    extra_norm_period: int,
+    extra_norm_stage: bool,
+):
+    from ._vendor.satvision_caney import SwinTransformerV2ForSimMIM
+
+    return SwinTransformerV2ForSimMIM(
+        img_size=_DEFAULT_IMAGE_SIZE,
+        patch_size=_DEFAULT_PATCH_SIZE,
+        in_chans=int(in_chans),
+        num_classes=0,
+        embed_dim=512,
+        depths=(2, 2, 42, 2),
+        num_heads=(16, 32, 64, 128),
+        window_size=8,
+        mlp_ratio=4.0,
+        qkv_bias=True,
+        drop_rate=0.0,
+        drop_path_rate=float(drop_path_rate),
+        ape=False,
+        patch_norm=True,
+        use_checkpoint=False,
+        pretrained_window_sizes=tuple(int(v) for v in pretrained_window_sizes),
+        extra_norm_period=int(extra_norm_period),
+        extra_norm_stage=bool(extra_norm_stage),
+    )
+
+
 @lru_cache(maxsize=8)
 def _load_satvision_toa_cached(
     *,
     ckpt_file: str,
     dev: str,
     in_chans: int,
+    drop_path_rate: float,
+    pretrained_window_sizes: tuple[int, ...],
+    extra_norm_period: int,
+    extra_norm_stage: bool,
 ) -> tuple[Any, dict[str, Any]]:
     ensure_torch()
     import torch
 
-    try:
-        from timm.models.swin_transformer_v2 import SwinTransformerV2
-    except Exception as e:
-        raise ModelError("SatVision-TOA requires timm. Install: pip install timm") from e
+    if len(pretrained_window_sizes) != 4:
+        raise ModelError(
+            "RS_EMBED_SATVISION_TOA_PRETRAINED_WINDOW_SIZES must contain exactly 4 integers."
+        )
 
-    # Build architecture from SatVision published config.
     try:
-        model = SwinTransformerV2(
-            img_size=_DEFAULT_IMAGE_SIZE,
-            patch_size=_DEFAULT_PATCH_SIZE,
+        model = _build_satvision_official_compatible_model(
             in_chans=int(in_chans),
-            num_classes=0,
-            embed_dim=512,
-            depths=(2, 2, 42, 2),
-            num_heads=(16, 32, 64, 128),
-            window_size=8,
-            mlp_ratio=4.0,
-            qkv_bias=True,
-            drop_path_rate=0.2,
-            ape=False,
-            patch_norm=True,
-            pretrained_window_sizes=(12, 12, 12, 6),
+            drop_path_rate=float(drop_path_rate),
+            pretrained_window_sizes=pretrained_window_sizes,
+            extra_norm_period=int(extra_norm_period),
+            extra_norm_stage=bool(extra_norm_stage),
         )
-    except TypeError:
-        # Older timm versions may not accept pretrained_window_sizes.
-        model = SwinTransformerV2(
-            img_size=_DEFAULT_IMAGE_SIZE,
-            patch_size=_DEFAULT_PATCH_SIZE,
-            in_chans=int(in_chans),
-            num_classes=0,
-            embed_dim=512,
-            depths=(2, 2, 42, 2),
-            num_heads=(16, 32, 64, 128),
-            window_size=8,
-            mlp_ratio=4.0,
-            qkv_bias=True,
-            drop_path_rate=0.2,
-            ape=False,
-            patch_norm=True,
-        )
+    except Exception as e:
+        raise ModelError("SatVision-TOA vendored official runtime failed to initialize.") from e
 
     obj = torch.load(ckpt_file, map_location="cpu", weights_only=False)
     state = _extract_state_dict(obj)
@@ -592,6 +665,11 @@ def _load_satvision_toa_cached(
         "param_mean": float(p0f.mean().cpu()),
         "param_std": float(p0f.std().cpu()),
         "param_absmax": float(p0f.abs().max().cpu()),
+        "model_impl": "vendored_official",
+        "drop_path_rate": float(drop_path_rate),
+        "pretrained_window_sizes": tuple(int(v) for v in pretrained_window_sizes),
+        "extra_norm_period": int(extra_norm_period),
+        "extra_norm_stage": bool(extra_norm_stage),
     }
     return model, meta
 
@@ -607,125 +685,147 @@ def _load_satvision_toa(
     ckpt_file, source = _resolve_ckpt(
         model_id=model_id, local_ckpt=local_ckpt, auto_download=auto_download
     )
+    drop_path_rate = float(
+        os.environ.get("RS_EMBED_SATVISION_TOA_DROP_PATH_RATE", str(_DEFAULT_DROP_PATH_RATE))
+    )
+    pretrained_window_sizes = _env_or_default_int_list(
+        "RS_EMBED_SATVISION_TOA_PRETRAINED_WINDOW_SIZES",
+        _DEFAULT_PRETRAINED_WINDOW_SIZES,
+    )
+    extra_norm_period = int(
+        os.environ.get("RS_EMBED_SATVISION_TOA_NORM_PERIOD", str(_DEFAULT_NORM_PERIOD))
+    )
+    extra_norm_stage = _as_bool_env("RS_EMBED_SATVISION_TOA_NORM_STAGE", False)
     loaded, dev = _load_cached_with_device(
         _load_satvision_toa_cached,
         device=device,
         ckpt_file=ckpt_file,
         in_chans=int(in_chans),
+        drop_path_rate=float(drop_path_rate),
+        pretrained_window_sizes=tuple(int(v) for v in pretrained_window_sizes),
+        extra_norm_period=int(extra_norm_period),
+        extra_norm_stage=bool(extra_norm_stage),
     )
     model, meta = loaded
     return model, {**meta, "checkpoint_source": source, "model_id": model_id}
 
 
-def _fetch_toa_raw_chw_from_gee(
+def _is_default_modis_sensor(sensor: SensorSpec) -> bool:
+    return (
+        str(sensor.collection) == _DEFAULT_MODIS_COLLECTION
+        and tuple(str(b) for b in sensor.bands) == _DEFAULT_MODIS_BANDS
+    )
+
+
+def _scale_mod21_lst_to_kelvin(x: np.ndarray) -> np.ndarray:
+    arr = np.asarray(x, dtype=np.float32)
+    finite = arr[np.isfinite(arr)]
+    if finite.size and float(np.nanmax(np.abs(finite))) > 1000.0:
+        arr = arr * np.float32(0.02)
+    return arr.astype(np.float32, copy=False)
+
+
+def _fetch_toa_proxy_chw_from_gee(
     provider: ProviderBase,
     spatial: SpatialSpec,
     temporal: TemporalSpec,
     sensor: SensorSpec,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Fetch generic CHW patch from provider according to SensorSpec.
+    # Approximate official SatVision preprocessing using already-calibrated
+    # collections available in Earth Engine. Reflectance comes from MOD09GA;
+    # thermal channels use a shared LST proxy because band-specific MODIS BT
+    # channels are not exposed in EE in the same way as the original L1B files.
+    ref_sensor = SensorSpec(
+        collection=_FALLBACK_MOD09_COLLECTION,
+        bands=(
+            "sur_refl_b01",
+            "sur_refl_b02",
+            "sur_refl_b03",
+            "sur_refl_b04",
+            "sur_refl_b06",
+            "sur_refl_b07",
+        ),
+        scale_m=int(sensor.scale_m),
+        cloudy_pct=None,  # type: ignore[arg-type]
+        fill_value=float(sensor.fill_value),
+        composite=str(sensor.composite),
+    )
+    th_sensor = SensorSpec(
+        collection=_FALLBACK_MOD21_COLLECTION,
+        bands=("LST_1KM",),
+        scale_m=int(sensor.scale_m),
+        cloudy_pct=None,  # type: ignore[arg-type]
+        fill_value=float(sensor.fill_value),
+        composite=str(sensor.composite),
+    )
+    ref = _fetch_sensor_patch_chw(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        sensor=ref_sensor,
+        to_float_image=True,
+    )
+    th = _fetch_sensor_patch_chw(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        sensor=th_sensor,
+        to_float_image=True,
+    )
 
-    When MOD021KM is unavailable in the current EE project, automatically
-    fallback to a surrogate built from MOD09GA (reflectance) + MOD21A1D (thermal).
-    """
-    try:
-        arr = _fetch_sensor_patch_chw(
-            provider,
-            spatial=spatial,
-            temporal=temporal,
-            sensor=sensor,
-        )
-        return arr, {
-            "source_collection": str(sensor.collection),
-            "fallback_used": False,
-            "already_unit_scaled": False,
-        }
-    except Exception as e:
-        if str(sensor.collection) != _DEFAULT_MODIS_COLLECTION:
-            raise
-        # Fallback path for environments where MOD021KM is not exposed in EE.
-        # Build a 14-channel surrogate:
-        #  - Reflectance proxies from MOD09GA
-        #  - Thermal/emissive proxies from MOD21A1D
-        # Output is already normalized to [0,1].
-        ref_sensor = SensorSpec(
-            collection=_FALLBACK_MOD09_COLLECTION,
-            bands=(
-                "sur_refl_b01",
-                "sur_refl_b02",
-                "sur_refl_b03",
-                "sur_refl_b04",
-                "sur_refl_b06",
-                "sur_refl_b07",
-            ),
-            scale_m=int(sensor.scale_m),
-            cloudy_pct=None,  # type: ignore[arg-type]
-            fill_value=float(sensor.fill_value),
-            composite=str(sensor.composite),
-        )
-        th_sensor = SensorSpec(
-            collection=_FALLBACK_MOD21_COLLECTION,
-            bands=("LST_1KM", "Emis_29", "Emis_31", "Emis_32"),
-            scale_m=int(sensor.scale_m),
-            cloudy_pct=None,  # type: ignore[arg-type]
-            fill_value=float(sensor.fill_value),
-            composite=str(sensor.composite),
-        )
-        ref = _fetch_sensor_patch_chw(
-            provider,
-            spatial=spatial,
-            temporal=temporal,
-            sensor=ref_sensor,
-            to_float_image=True,
-        )
-        th = _fetch_sensor_patch_chw(
-            provider,
-            spatial=spatial,
-            temporal=temporal,
-            sensor=th_sensor,
-            to_float_image=True,
-        )
+    r01, r02, r03, r04, r06, r07 = [np.clip(ch / 10000.0, 0.0, 1.0) for ch in ref]
+    lst_k = _scale_mod21_lst_to_kelvin(th[0])
+    thermal_scaled = [
+        np.clip((lst_k - float(lo)) / (float(hi) - float(lo)), 0.0, 1.0)
+        for lo, hi in zip(_DEFAULT_EMISSIVE_MINS, _DEFAULT_EMISSIVE_MAXS, strict=True)
+    ]
 
-        # Normalize proxies to [0,1].
-        r01, r02, r03, r04, r06, r07 = [np.clip(ch / 10000.0, 0.0, 1.0) for ch in ref]
-        lst = np.clip(
-            (th[0] - 200.0) / 130.0, 0.0, 1.0
-        )  # LST_1KM in Kelvin (already scaled in MOD21A1D)
-        e29 = np.clip((th[1] - 0.8) / 0.2, 0.0, 1.0)  # emissivity ~[0.8,1.0]
-        e31 = np.clip((th[2] - 0.8) / 0.2, 0.0, 1.0)
-        e32 = np.clip((th[3] - 0.8) / 0.2, 0.0, 1.0)
+    assembled = np.stack(
+        [
+            r01,  # 1
+            r02,  # 2
+            r03,  # 3
+            r04,  # 26 proxy
+            r06,  # 6
+            thermal_scaled[0],  # 20 proxy
+            r07,  # 7
+            thermal_scaled[1],  # 27 proxy
+            thermal_scaled[2],  # 28 proxy
+            thermal_scaled[3],  # 29 proxy
+            thermal_scaled[4],  # 31 proxy
+            thermal_scaled[5],  # 32 proxy
+            thermal_scaled[6],  # 33 proxy
+            thermal_scaled[7],  # 34 proxy
+        ],
+        axis=0,
+    ).astype(np.float32)
+    return assembled, {
+        "source_collection": str(sensor.collection),
+        "source_collections_effective": (
+            _FALLBACK_MOD09_COLLECTION,
+            _FALLBACK_MOD21_COLLECTION,
+        ),
+        "fallback_used": False,
+        "already_unit_scaled": True,
+        "gee_fetch_mode": "proxy",
+        "official_preprocess_alignment": "proxy_reflectance_lst",
+        "proxy_band_order": tuple(_DEFAULT_MODIS_BANDS),
+    }
 
-        # SatVision order: 1,2,3,26,6,20,7,27,28,29,31,32,33,34
-        assembled = np.stack(
-            [
-                r01,  # 1
-                r02,  # 2
-                r03,  # 3
-                r04,  # 26 proxy
-                r06,  # 6
-                lst,  # 20 proxy
-                r07,  # 7
-                lst,  # 27 proxy
-                lst,  # 28 proxy
-                e29,  # 29
-                e31,  # 31
-                e32,  # 32
-                lst,  # 33 proxy
-                lst,  # 34 proxy
-            ],
-            axis=0,
-        ).astype(np.float32)
-        return assembled, {
-            "source_collection": str(sensor.collection),
-            "fallback_used": True,
-            "fallback_reason": repr(e),
-            "fallback_collections": (
-                _FALLBACK_MOD09_COLLECTION,
-                _FALLBACK_MOD21_COLLECTION,
-            ),
-            "already_unit_scaled": True,
-            "proxy_band_order": tuple(_DEFAULT_MODIS_BANDS),
-        }
+
+def _fetch_toa_chw_from_gee(
+    provider: ProviderBase,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    sensor: SensorSpec,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Fetch SatVision inputs from GEE using the only supported proxy path."""
+    if not _is_default_modis_sensor(sensor):
+        raise ModelError(
+            "satvision_toa GEE fetching only supports the default MODIS SatVision sensor. "
+            "For custom collections or precomputed TOA inputs, pass calibrated `input_chw`."
+        )
+    return _fetch_toa_proxy_chw_from_gee(provider, spatial, temporal, sensor)
 
 
 def _coerce_fetch_result(res: Any) -> tuple[np.ndarray, dict[str, Any]]:
@@ -746,6 +846,7 @@ def _satvision_forward_batch(
     x_chw_batch: list[np.ndarray],
     *,
     device: str,
+    output_mode: str,
 ) -> tuple[list[np.ndarray], dict[str, Any]]:
     if not x_chw_batch:
         return [], {"tokens_kind": "empty"}
@@ -758,15 +859,61 @@ def _satvision_forward_batch(
         np.stack([x.astype(np.float32, copy=False) for x in x_chw_batch], axis=0)
     ).to(dev)
 
-    ff = getattr(model, "forward_features", None)
-    if not callable(ff):
-        raise ModelError("SatVision-TOA model does not expose forward_features().")
-
     with torch.no_grad():
+        if str(output_mode) == "grid":
+            ef = getattr(model, "extra_features", None)
+            if callable(ef):
+                out = ef(xb)
+                arrs, meta = _decode_features_to_batch_arrays(out, len(x_chw_batch), pick="last")
+                return arrs, {**meta, "forward_path": "extra_features"}
+
+            if all(hasattr(model, name) for name in ("patch_embed", "layers")):
+                x = model.patch_embed(xb)
+                if bool(getattr(model, "ape", False)) and hasattr(model, "absolute_pos_embed"):
+                    x = x + model.absolute_pos_embed
+                pos_drop = getattr(model, "pos_drop", None)
+                if callable(pos_drop):
+                    x = pos_drop(x)
+                for layer in model.layers:
+                    x = layer(x)
+                norm = getattr(model, "norm", None)
+                if callable(norm):
+                    x = norm(x)
+
+                if getattr(x, "ndim", None) == 3:
+                    b, n, c = (int(v) for v in x.shape)
+                    hw = int(round(n**0.5))
+                    if hw * hw != n:
+                        raise ModelError(
+                            f"SatVision grid fallback expected square token lattice, got N={n}."
+                        )
+                    x = x.reshape(b, hw, hw, c).permute(0, 3, 1, 2).contiguous()
+                elif getattr(x, "ndim", None) != 4:
+                    raise ModelError(
+                        "SatVision grid fallback expected 3D tokens or 4D feature map, "
+                        f"got shape={getattr(x, 'shape', None)}."
+                    )
+
+                arrs, meta = _decode_tensor_to_batch_arrays(
+                    x,
+                    len(x_chw_batch),
+                    picked_from="manual_last_stage",
+                )
+                return arrs, {**meta, "forward_path": "manual_last_stage"}
+
+            fwd = getattr(model, "forward", None)
+            if callable(fwd):
+                out = fwd(xb)
+                arrs, meta = _decode_features_to_batch_arrays(out, len(x_chw_batch), pick="first")
+                return arrs, {**meta, "forward_path": "forward"}
+
+        ff = getattr(model, "forward_features", None)
+        if not callable(ff):
+            raise ModelError("SatVision-TOA model does not expose forward_features().")
         out = ff(xb)
 
-    arrs, meta = _decode_features_to_batch_arrays(out, len(x_chw_batch))
-    return arrs, meta
+    arrs, meta = _decode_features_to_batch_arrays(out, len(x_chw_batch), pick="first")
+    return arrs, {**meta, "forward_path": "forward_features"}
 
 
 @register("satvision")
@@ -819,7 +966,8 @@ class SatVisionTOAEmbedder(EmbedderBase):
             "notes": [
                 "If sensor is omitted, rs-embed uses MODIS SatVision default band order.",
                 "Use RS_EMBED_SATVISION_TOA_CKPT for local checkpoints, or HF token for gated repos.",
-                "If MODIS L1B is unavailable in your Google Earth Engine project, set a custom SensorSpec collection.",
+                "GEE fetching only supports the default MODIS SatVision sensor and uses a MOD09GA + MOD21A1D proxy path.",
+                "For custom collections or precomputed TOA inputs, pass calibrated input_chw directly.",
             ],
         }
 
@@ -963,11 +1111,13 @@ class SatVisionTOAEmbedder(EmbedderBase):
         temporal: TemporalSpec | None,
         sensor: SensorSpec,
     ) -> FetchResult | None:
-        """Fetch raw MODIS TOA input with fallback to surrogate collections.
+        """Fetch SatVision input from GEE using the fixed MODIS proxy path.
 
-        When MOD021KM is unavailable, automatically falls back to a
-        14-channel surrogate built from MOD09GA (reflectance) + MOD21A1D
-        (thermal).  Fallback provenance is recorded in metadata.
+        The provider path is intentionally narrow: it only supports the
+        default SatVision MODIS sensor and always builds the 14-channel
+        surrogate from MOD09GA (reflectance) + MOD21A1D (thermal proxy).
+        For custom inputs, callers should supply calibrated `input_chw`
+        directly to `get_embedding`.
 
         Parameters
         ----------
@@ -983,10 +1133,10 @@ class SatVisionTOAEmbedder(EmbedderBase):
         Returns
         -------
         FetchResult
-            Raw CHW array and fetch-time metadata including fallback info.
+            Raw CHW array and fetch-time proxy provenance metadata.
         """
         t = temporal_to_range(temporal)
-        raw, meta = _coerce_fetch_result(_fetch_toa_raw_chw_from_gee(provider, spatial, t, sensor))
+        raw, meta = _coerce_fetch_result(_fetch_toa_chw_from_gee(provider, spatial, t, sensor))
         return FetchResult(data=raw, meta=meta)
 
     def get_embedding(
@@ -1044,7 +1194,12 @@ class SatVisionTOAEmbedder(EmbedderBase):
             emissive_maxs=rt["emissive_maxs"],
         )
 
-        arrs, fmeta = _satvision_forward_batch(rt["model"], [x], device=rt["device"])
+        arrs, fmeta = _satvision_forward_batch(
+            rt["model"],
+            [x],
+            device=rt["device"],
+            output_mode=output.mode,
+        )
         out_arr = arrs[0]
 
         meta = base_meta(
@@ -1101,7 +1256,11 @@ class SatVisionTOAEmbedder(EmbedderBase):
             meta.update(
                 {
                     "grid_hw": (h, w),
-                    "grid_kind": "patch_tokens",
+                    "grid_kind": (
+                        "last_stage_feature_map"
+                        if str(meta.get("tokens_kind", "")).startswith("tokens_feature_map")
+                        else "patch_tokens"
+                    ),
                     "cls_removed": bool(cls_removed),
                 }
             )
@@ -1151,7 +1310,7 @@ class SatVisionTOAEmbedder(EmbedderBase):
 
         def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray, dict[str, Any]]:
             raw, fetch_meta = _coerce_fetch_result(
-                _fetch_toa_raw_chw_from_gee(self._get_provider(backend), sp, t, sensor)
+                _fetch_toa_chw_from_gee(self._get_provider(backend), sp, t, sensor)
             )
             return i, raw, fetch_meta
 
@@ -1206,7 +1365,12 @@ class SatVisionTOAEmbedder(EmbedderBase):
                 )
                 norm_modes_eff.append(norm_mode_eff)
 
-            arrs, fmeta = _satvision_forward_batch(rt["model"], x_batch, device=rt["device"])
+            arrs, fmeta = _satvision_forward_batch(
+                rt["model"],
+                x_batch,
+                device=rt["device"],
+                output_mode=output.mode,
+            )
 
             for j, arr in enumerate(arrs):
                 i = s0 + j
@@ -1274,7 +1438,11 @@ class SatVisionTOAEmbedder(EmbedderBase):
                     meta.update(
                         {
                             "grid_hw": (h, w),
-                            "grid_kind": "patch_tokens",
+                            "grid_kind": (
+                                "last_stage_feature_map"
+                                if str(meta.get("tokens_kind", "")).startswith("tokens_feature_map")
+                                else "patch_tokens"
+                            ),
                             "cls_removed": bool(cls_removed),
                         }
                     )

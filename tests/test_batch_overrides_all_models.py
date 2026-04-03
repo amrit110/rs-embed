@@ -614,7 +614,7 @@ def test_satvision_toa_batch_prefetch_passes_raw_input(monkeypatch):
     )
     monkeypatch.setattr(
         sv,
-        "_fetch_toa_raw_chw_from_gee",
+        "_fetch_toa_chw_from_gee",
         lambda provider, spatial, temporal, sensor: np.full(
             (14, 8, 8), 2000.0 + spatial.lon, dtype=np.float32
         ),
