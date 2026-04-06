@@ -1,40 +1,22 @@
 ## Summary
 
-What problem does this PR solve? Keep it to a few sentences.
+What changed, and why?
 
-## Related Links
+## Related Issue
 
-Please include the written context reviewers need:
+Link the issue this PR addresses, if any.
 
-- Issue:
-- Docs page:
-- Paper / model card:
-- Upstream repo or implementation:
+Closes #
 
-## Change Scope
+## Testing
 
-- Main files or modules touched:
-- User-facing behavior changed:
-- Non-goals:
-
-## Example Or Verification Snippet
-
-Paste the smallest code snippet, command sequence, or test invocation that demonstrates the change.
-
-```bash
-# example
-python -m pytest -v tests/...
-```
-
-## Validation
+How did you verify the change?
 
 - [ ] I ran the relevant tests locally.
-- [ ] I ran lint or formatting checks for touched code.
 - [ ] I updated docs for user-facing behavior changes.
 - [ ] I updated `CHANGELOG.md` for user-facing API, model, semantic, or installation changes.
-- [ ] This PR does not need a changelog entry because it is docs/tests/CI/internal-only, or it is explicitly labeled `skip-changelog`.
-- [ ] I included links and plain-text snippets instead of screenshots.
+- [ ] This PR does not need a changelog entry.
 
-## Reviewer Notes
+## Notes
 
-Anything non-obvious about defaults, assumptions, compatibility, or follow-up work.
+Anything reviewers should know about scope, tradeoffs, or follow-up work.

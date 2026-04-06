@@ -1,42 +1,22 @@
 name: Bug report
-description: Report a reproducible bug with enough context to debug it without a long comment thread.
+description: Report a reproducible bug with the key details needed to investigate it.
 title: "[Bug]: "
 labels:
   - bug
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Please include plain-text code and direct links. Avoid screenshots of code or stack traces.
   - type: textarea
     id: summary
     attributes:
       label: Summary
-      description: What were you trying to do, and what happened instead?
+      description: What did you try, and what went wrong?
       placeholder: I expected..., but instead...
     validations:
       required: true
-  - type: input
-    id: model_id
-    attributes:
-      label: Model ID
-      description: "Example: prithvi, tessera, remoteclip"
-      placeholder: prithvi
-    validations:
-      required: true
-  - type: input
-    id: backend
-    attributes:
-      label: Backend
-      description: "Example: auto, gee, provider"
-      placeholder: auto
-    validations:
-      required: true
   - type: textarea
-    id: code
+    id: reproduction
     attributes:
-      label: Minimal reproduction code
-      description: Paste the smallest snippet that still reproduces the problem.
+      label: Reproduction
+      description: Paste the smallest code snippet or list the steps needed to reproduce the bug.
       render: python
       placeholder: |
         from rs_embed import ...
@@ -45,57 +25,39 @@ body:
     validations:
       required: true
   - type: textarea
-    id: error_output
+    id: expected_actual
     attributes:
-      label: Error or incorrect output
-      description: Paste the traceback, assertion failure, or exact incorrect result.
+      label: Expected vs actual
+      description: Include the traceback, incorrect output, or a short description of the mismatch.
       render: text
-    validations:
-      required: true
-  - type: textarea
-    id: config
-    attributes:
-      label: Spatial / temporal / output configuration
-      description: Include the exact ROI, temporal spec, output spec, and any fetch or sensor overrides that matter.
-      render: python
-      placeholder: |
-        spatial = ...
-        temporal = ...
-        output = ...
-        fetch = ...
-    validations:
-      required: true
-  - type: textarea
-    id: links
-    attributes:
-      label: Relevant links
-      description: Link the docs page, model paper, upstream repo, prior issue, notebook, or script that defines the expected behavior.
-      placeholder: |
-        Docs:
-        Paper:
-        Upstream repo:
-        Related issue:
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Include Python version, install method, OS, device, and any optional dependency versions if relevant.
+      description: Include versions and setup details that might matter.
       render: text
       placeholder: |
+        rs-embed:
         Python:
         OS:
-        Device:
-        rs-embed install:
-        torch:
-        earthengine-api:
+        Backend / model:
     validations:
       required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add links, notebooks, scripts, screenshots, or anything else helpful.
+      placeholder: |
+        Related docs:
+        Related issue:
+        Notebook or script:
   - type: checkboxes
     id: checks
     attributes:
       label: Checks
       options:
-        - label: I included direct links and a plain-text reproduction snippet.
+        - label: I included a plain-text reproduction or clear steps to reproduce.
           required: true

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from typing import Any
 
@@ -185,14 +186,22 @@ def _sample_image_bands_raw_chw(
 class GEEProvider(ProviderBase):
     name = "gee"
 
-    def __init__(self, auto_auth: bool = True):
+    def __init__(self, auto_auth: bool = True, project: str | None = None):
         self.auto_auth = auto_auth
+        self.project = project or os.environ.get("EE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
 
     def ensure_ready(self) -> None:
+        if not self.project:
+            raise ProviderError(
+                "A Google Cloud project is required for Earth Engine. "
+                "Set the EE_PROJECT environment variable or pass "
+                "project='your-gcp-project-id' to GEEProvider(). "
+                "See https://developers.google.com/earth-engine/guides/access#a-]role-in-a-cloud-project for details."
+            )
         try:
             import ee
 
-            ee.Initialize()
+            ee.Initialize(project=self.project)
         except Exception as _e:
             if not self.auto_auth:
                 raise ProviderError(
@@ -201,7 +210,7 @@ class GEEProvider(ProviderBase):
             try:
                 import geemap
 
-                geemap.ee_initialize()
+                geemap.ee_initialize(project=self.project)
             except Exception as e:
                 raise ProviderError(f"Failed to initialize GEE: {e!r}") from e
 

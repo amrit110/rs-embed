@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new capability, model integration, or API improvement with enough written context to evaluate scope.
+description: Propose a new capability, model integration, or API improvement.
 title: "[Feature]: "
 labels:
   - enhancement
@@ -7,7 +7,7 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: Problem statement
+      label: Problem
       description: What user problem does this solve?
       placeholder: Today it is difficult to...
     validations:
@@ -15,16 +15,16 @@ body:
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed change
-      description: Describe the proposed API, workflow, model integration, or behavior.
+      label: Proposed solution
+      description: Describe the API, workflow, model integration, or behavior you want.
       placeholder: I propose adding...
     validations:
       required: true
   - type: textarea
-    id: use_case
+    id: example
     attributes:
-      label: Concrete example
-      description: Show a small code snippet or command sequence for how the feature would be used.
+      label: Example or context
+      description: Show a small example, link prior art, or explain why this matters.
       render: python
       placeholder: |
         from rs_embed import ...
@@ -33,34 +33,18 @@ body:
     validations:
       required: true
   - type: textarea
-    id: links
+    id: notes
     attributes:
-      label: Relevant links
-      description: Link papers, model cards, upstream repos, docs pages, benchmarks, or related issues.
+      label: Notes
+      description: Add tradeoffs, constraints, related issues, or anything else reviewers should know.
       placeholder: |
-        Docs:
-        Paper or model card:
-        Upstream repo:
-        Related issue or PR:
-    validations:
-      required: true
-  - type: textarea
-    id: scope
-    attributes:
-      label: Scope and tradeoffs
-      description: Note expected defaults, constraints, compatibility concerns, or reasons not to do this.
-      placeholder: |
-        Expected defaults:
-        Compatibility concerns:
-        Non-goals:
-    validations:
-      required: true
+        Related issue:
+        Related docs or repo:
+        Tradeoffs:
   - type: checkboxes
     id: checks
     attributes:
       label: Checks
       options:
-        - label: I searched existing issues, pull requests, and docs before opening this request.
-          required: true
-        - label: I included direct links and at least one concrete usage example.
+        - label: I searched existing issues and pull requests before opening this request.
           required: true

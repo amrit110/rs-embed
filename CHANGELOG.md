@@ -8,6 +8,10 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed
+
+- `GEEProvider` now requires an explicit Google Cloud project. Users must either set the `EE_PROJECT` (or `GOOGLE_CLOUD_PROJECT`) environment variable, or pass `project='...'` to `GEEProvider()`. Previously, `ee.Initialize()` was called without a `project` argument, causing the GEE SDK to fall back to the quota project of geemap's default OAuth Client ID — a project that external users have no permission to use, resulting in `EEException: Caller does not have required permission to use project 517222506229`.
+
 ### Fixed
 
 - `BBox.validate()` now enforces geographic bounds: longitudes must be in `[-180, 180]` and latitudes in `[-90, 90]`. Out-of-range coordinates previously passed validation and caused confusing downstream errors from the GEE provider.
