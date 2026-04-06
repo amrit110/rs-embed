@@ -188,7 +188,9 @@ class GEEProvider(ProviderBase):
 
     def __init__(self, auto_auth: bool = True, project: str | None = None):
         self.auto_auth = auto_auth
-        self.project = project or os.environ.get("EE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        self.project = (
+            project or os.environ.get("EE_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        )
 
     def ensure_ready(self) -> None:
         if not self.project:
