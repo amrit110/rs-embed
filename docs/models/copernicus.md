@@ -34,7 +34,7 @@ Copernicus Embed is a good fit for precomputed embedding workflows via local Geo
 The adapter accepts `BBox` directly and `PointBuffer`, which it converts to an EPSG:4326 bbox. Internally it slices the local GeoTIFF with bbox indexing via `ds[minlon:maxlon, minlat:maxlat]`.
 
 !!! warning
-Copernicus keeps the product's fixed `EPSG:4326` grid with 0.25 degree pixels. That differs from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
+    Copernicus keeps the product's fixed `EPSG:4326` grid with 0.25 degree pixels. That differs from the more common provider-backed EPSG:3857 sampling default used elsewhere in `rs-embed`, even though the public spatial input is still `EPSG:4326`.
 
 ### Temporal
 

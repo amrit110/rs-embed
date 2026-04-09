@@ -42,8 +42,8 @@ Model loading is lazy:
 - The class is inserted into the runtime registry.
 
 !!! tip
-Put your embedder in `rs_embed/embedders/` and add it to `src/rs_embed/embedders/catalog.py`.
-If it's not in `MODEL_SPECS`, string-based lookup (`get_embedding("...")`) will not find it.
+    Put your embedder in `rs_embed/embedders/` and add it to `src/rs_embed/embedders/catalog.py`.
+    If it's not in `MODEL_SPECS`, string-based lookup (`get_embedding("...")`) will not find it.
 
 ---
 
@@ -116,7 +116,7 @@ The stable extension points are:
 ```
 
 !!! note
-`describe()` must stay fast. It should not trigger checkpoint downloads, provider setup, or heavy model loading.
+    `describe()` must stay fast. It should not trigger checkpoint downloads, provider setup, or heavy model loading.
 
 Important fields currently consumed by rs-embed:
 
@@ -223,7 +223,7 @@ You can follow existing implementations in:
 - `rs_embed/embedders/onthefly_*.py`
 
 !!! tip
-Keep provider IO separate from model inference whenever possible. That makes batching, caching, and export reuse simpler.
+    Keep provider IO separate from model inference whenever possible. That makes batching, caching, and export reuse simpler.
 
 ---
 
@@ -273,7 +273,7 @@ if input_chw is None:
 ```
 
 !!! important
-This is the key to avoiding “download twice” when `save_inputs=True` and `save_embeddings=True`.
+    This is the key to avoiding “download twice” when `save_inputs=True` and `save_embeddings=True`.
 
 ---
 

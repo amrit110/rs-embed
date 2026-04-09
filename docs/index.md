@@ -14,7 +14,7 @@ Yet, using them in practice remains surprisingly painful. Model interfaces vary 
 RS-Embed aims to fix this.
 
 !!! success "Goal"
-Provide a **minimal**, **unified**, and **stable API** that turns diverse RS foundation models into a simple `ROI → embedding service` — so researchers can focus on **downstream tasks**, **benchmarking**, and **analysis**, not glue code.
+    Provide a **minimal**, **unified**, and **stable API** that turns diverse RS foundation models into a simple `ROI → embedding service` — so researchers can focus on **downstream tasks**, **benchmarking**, and **analysis**, not glue code.
 
 ---
 
@@ -25,6 +25,7 @@ Use the documentation the same way you would approach a mature library: start wi
 | Start here if you want to...  | Page                                                                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
 | get something running quickly | [Quickstart](quickstart.md): install the package, run a first example, and learn the three core APIs |
+| understand settings first     | [Before You Start](choosing_settings.md): learn which settings change embedding quality, semantics, and runtime before you tune anything |
 | choose a model                | [Models](models.md): shortlist model IDs by task, input type, and temporal behavior                  |
 | check exact signatures        | [API](api.md): exact signatures for specs, embedding, export, and inspection                         |
 | add support for a new model   | [Extending](extending.md): add a new model adapter or integrate with the registry/export flow        |
@@ -53,7 +54,7 @@ Most workflows revolve around three functions: `get_embedding(...)` for one ROI,
 
 ## Advanced Reading
 
-Once the basic flow is familiar, read [Concepts](concepts.md) for the semantics behind `TemporalSpec`, `OutputSpec`, and backends, then use [Workflows](workflows.md) for task-oriented recipes. [Advanced Model Reference](models_reference.md) goes deeper on preprocessing and temporal assumptions, while [Limitations](limitations.md) collects current constraints and edge cases.
+Once the basic flow is familiar, read [Before You Start](choosing_settings.md) before changing model defaults for speed or quality. Then use [Concepts](concepts.md) for the semantics behind `TemporalSpec`, `OutputSpec`, and backends, [Workflows](workflows.md) for task-oriented recipes, and [Advanced Model Reference](models_reference.md) for deeper preprocessing and temporal comparison details. [Limitations](limitations.md) collects current constraints and edge cases.
 
 ## Citation
 

@@ -329,7 +329,7 @@ Model scheduling is serial, so one model runs at a time. Batch inference is used
 If provider-backed export is used and both `save_inputs=True` and `save_embeddings=True`, rs-embed reuses the fetched input patch for both writing and embedding inference instead of downloading it twice.
 
 !!! tip "Simple rule"
-Start with `ExportTarget.combined(...)` + `ExportConfig()`.
-Add `ExportModelRequest.configure(...)` only for the few models that need per-model sensor, fetch, modality, or variant overrides.
+    Start with `ExportTarget.combined(...)` + `ExportConfig()`.
+    Add `ExportModelRequest.configure(...)` only for the few models that need per-model sensor, fetch, modality, or variant overrides.
 
 ---

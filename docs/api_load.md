@@ -190,5 +190,5 @@ emb = result.embedding("remoteclip")   # shape (1, dim)
 ```
 
 !!! tip "Simple rule"
-Pass a file path for combined exports, a directory path for per-item exports.
-Everything else is automatic.
+    Pass a file path for combined exports, a directory path for per-item exports.
+    Everything else is automatic.

@@ -1,2 +1,7 @@
 src/rs_embed/embedders/_vendor/
 examples/
+
+# MkDocs docs use extension syntax like `!!!` and `===` that Prettier's
+# Markdown parser does not preserve reliably.
+docs/*.md
+docs/**/*.md

@@ -445,6 +445,48 @@ def test_thor_batch_prefetch_passes_raw_input(monkeypatch):
     assert seen[0][1] >= 5678.0
 
 
+def test_thor_batch_prefetch_passes_s1_raw_input(monkeypatch):
+    import rs_embed.embedders.onthefly_thor as thor
+
+    emb = THORBaseEmbedder()
+    monkeypatch.setenv("RS_EMBED_THOR_FETCH_WORKERS", "1")
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
+    monkeypatch.setattr(
+        thor,
+        "_fetch_s1_vvvh_raw_chw_with_meta",
+        lambda *args, **kwargs: (
+            np.full((2, 8, 8), 12.0, dtype=np.float32),
+            {"s1_iw_applied": True},
+        ),
+    )
+
+    seen = []
+
+    def _fake_get_embedding(**kw):
+        arr = kw["input_chw"]
+        seen.append((arr.shape[0], float(arr.max()), kw["sensor"].modality))
+        return Embedding(data=np.array([kw["spatial"].lon], dtype=np.float32), meta={})
+
+    monkeypatch.setattr(emb, "get_embedding", _fake_get_embedding)
+
+    out = emb.get_embeddings_batch(
+        spatials=_spatials(2),
+        temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
+        sensor=SensorSpec(
+            collection="COPERNICUS/S1_GRD_FLOAT",
+            bands=("VV", "VH"),
+            modality="s1",
+        ),
+        output=OutputSpec.pooled(),
+        backend="auto",
+    )
+
+    assert len(out) == 2
+    assert seen[0][0] == 2
+    assert seen[0][1] >= 12.0
+    assert seen[0][2] == "s1"
+
+
 def test_anysat_batch_prefetch_passes_raw_input(monkeypatch):
     import rs_embed.embedders.onthefly_anysat as anysat
 

@@ -67,6 +67,7 @@ nav:
   - Home:
       - Overview: index.md
       - Quickstart: quickstart.md
+      - Before You Start: choosing_settings.md
   - Models:
       - Overview: models.md
       - Advanced Reference: models_reference.md

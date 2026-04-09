@@ -46,8 +46,8 @@ For most on-the-fly GEE-backed models, this means:
 It usually does **not** mean "pick a single image acquired exactly on this date."
 
 !!! tip
-If you want a near single-day query, use a one-day window such as
-`TemporalSpec.range("2022-06-01", "2022-06-02")`.
+    If you want a near single-day query, use a one-day window such as
+    `TemporalSpec.range("2022-06-01", "2022-06-02")`.
 
 See detailed model-specific temporal behavior in [Supported Models](models.md).
 
@@ -61,7 +61,7 @@ Returns one vector `(D,)` for the whole ROI.
 
 Use `pooled` for classification, retrieval, clustering, and most cross-model benchmarking work.
 
-Conceptually, this is one ROI in and one embedding vector out. It is also the easiest format to compare across different model families.
+Conceptually, this is one ROI in and one embedding vector out. It is also the easiest format to compare across different model families. The main advantage is semantic simplicity and small output size, not a guarantee of much lower inference cost.
 
 ### `OutputSpec.grid()`
 
@@ -70,9 +70,9 @@ Returns a spatial feature grid `(D, H, W)`.
 Use `grid` for visualization, patch-wise analysis, and spatial structure inspection.
 
 !!! note
-For ViT-like models, `grid` is often a token/patch grid, not guaranteed georeferenced raster pixels.
+    For ViT-like models, `grid` is often a token/patch grid, not guaranteed georeferenced raster pixels.
 
-Conceptually, this is one ROI in and one spatial embedding field out. It is useful when spatial layout matters more than a single pooled descriptor.
+Conceptually, this is one ROI in and one spatial embedding field out. It is useful when spatial layout matters more than a single pooled descriptor. For many ViT-like models, `grid` is not much more expensive at forward time than `pooled`; the extra cost mostly comes from reconstruction, larger outputs, and downstream processing.
 
 ---
 

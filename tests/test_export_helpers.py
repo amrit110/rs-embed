@@ -285,6 +285,14 @@ def test_default_sensor_for_model_requested_modality():
     assert sensor.bands == ("VV", "VH")
 
 
+def test_default_sensor_for_real_thor_s1_modality():
+    sensor = _default_sensor_for_model("thor", modality="s1")
+    assert sensor is not None
+    assert sensor.modality == "s1"
+    assert sensor.collection == "COPERNICUS/S1_GRD_FLOAT"
+    assert sensor.bands == ("VV", "VH")
+
+
 def test_resolve_sensor_for_model_merges_modality():
     @registry.register("multi_modal_resolve")
     class DummyMulti:

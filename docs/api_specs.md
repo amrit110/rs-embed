@@ -14,7 +14,7 @@ For task-oriented usage, see [Common Workflows](workflows.md). For exact embeddi
 
 === ":material-grid: Output"
 
-    Use `OutputSpec.pooled()` first unless you specifically need spatial structure (`grid`).
+    Use `OutputSpec.pooled()` first unless you specifically need spatial structure (`grid`) or a model-specific spatial field.
 
 ---
 
@@ -58,7 +58,7 @@ TemporalSpec.range("2022-06-01", "2022-09-01")
 ```
 
 !!! warning "Temporal range is a window"
-`TemporalSpec.range(start, end)` is treated as a half-open interval `[start, end)`, so `end` is excluded.
+    `TemporalSpec.range(start, end)` is treated as a half-open interval `[start, end)`, so `end` is excluded.
 
 Temporal semantics in provider and on-the-fly paths: `TemporalSpec.range(start, end)` is interpreted as a half-open window `[start, end)`, so `end` is excluded. In GEE-backed fetch paths, that window is used to filter an image collection and then apply a compositing reducer such as `median` or `mosaic`. The fetched input is therefore usually a composite over the whole window rather than an automatically selected single-day scene. If you want to approximate a single-day query, use a one-day window such as `TemporalSpec.range("2022-06-01", "2022-06-02")`.
 
@@ -103,11 +103,11 @@ SensorSpec(
 | `check_*`              | Optional input checks and quicklook saving; see [API: Inspect](api_inspect.md#inspect_gee_patch).     |
 
 !!! note
-For **precomputed** models (e.g., directly reading offline embedding products), `sensor` is usually ignored or set to `None`.
+    For **precomputed** models (e.g., directly reading offline embedding products), `sensor` is usually ignored or set to `None`.
 
 !!! note
-Public embedding/export APIs also accept a top-level `modality=...` convenience argument.
-When provided, rs-embed resolves it into the model's sensor/input contract and validates that the model explicitly supports that modality.
+    Public embedding/export APIs also accept a top-level `modality=...` convenience argument.
+    When provided, rs-embed resolves it into the model's sensor/input contract and validates that the model explicitly supports that modality.
 
 ### FetchSpec
 
@@ -185,7 +185,7 @@ Use `fetch=FetchSpec(scale_m=...)` for resolution overrides.
 
 `pooled` represents one whole ROI (Region of Interest) using a single vector `(D,)`.
 
-Best suited for classification, retrieval, clustering, and most cross-model comparison work. The out put shape is:
+Best suited for classification, retrieval, clustering, and most cross-model comparison work. It is usually recommended because it is easier to compare across models and much smaller to store and pass downstream, not because it is always dramatically faster than `grid`. The out put shape is:
 
 ```python
 Embedding.data.shape == (D,)
@@ -215,14 +215,14 @@ $$
 
 `grid` returns a spatial embedding field `(D, H, W)`, where each spatial location maps to a vector.
 
-Best suited for spatial visualization, pixel-wise or patch-wise tasks, and intra-ROI structure analysis. The output shape is:
+Best suited for spatial visualization, pixel-wise or patch-wise tasks, and intra-ROI structure analysis. For many token-based models, the backbone forward cost is similar to `pooled`, and the main difference is output reconstruction, memory footprint, and downstream handling. The output shape is:
 
 ```python
 Embedding.data.shape == (D, H, W)
 ```
 
 !!! note
-`data` can be returned as `xarray.DataArray`, with metadata in `meta` or `attrs`. For precomputed geospatial products, that metadata may include CRS and crop context. For ViT token grids, it usually describes patch-grid structure rather than georeferenced pixel coordinates.
+    `data` can be returned as `xarray.DataArray`, with metadata in `meta` or `attrs`. For precomputed geospatial products, that metadata may include CRS and crop context. For ViT token grids, it usually describes patch-grid structure rather than georeferenced pixel coordinates.
 
 How `grid` is produced:
 

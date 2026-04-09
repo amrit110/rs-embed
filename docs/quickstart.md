@@ -143,4 +143,4 @@ If the model output looks wrong, inspect the fetched patch before changing model
 
 ## What To Read Next
 
-From here, use [Models](models.md) to choose the right model and verify its input assumptions, [API](api.md) for exact signatures and edge cases, [Concepts](concepts.md) for temporal and output semantics, and [Workflows](workflows.md) for extra recipes around tiling, inspection, and fair comparison.
+From here, use [Before You Start](choosing_settings.md) before you start changing `input_prep`, model size, patch size, frame count, or fetch resolution for speed or quality tradeoffs. Then use [Models](models.md) to choose the right model and verify its input assumptions, [API](api.md) for exact signatures and edge cases, [Concepts](concepts.md) for temporal and output semantics, and [Workflows](workflows.md) for extra recipes around tiling, inspection, and fair comparison.

@@ -3,6 +3,8 @@ import types
 import numpy as np
 import torch
 
+from rs_embed.core.specs import OutputSpec, PointBuffer, SensorSpec, TemporalSpec
+
 
 class _FakeTHORModel(torch.nn.Module):
     def __init__(self):
@@ -95,6 +97,7 @@ def test_prepare_thor_raw_chw_native_snap_crops_small_projection_mismatch():
         raw,
         scale_m=10,
         patch_size=8,
+        band_gsds=(10, 20),
         image_size=288,
         resize_mode="native_snap",
         shape_adjust="crop",
@@ -120,6 +123,7 @@ def test_prepare_thor_raw_chw_native_snap_snaps_square_side_to_valid_grid():
         raw,
         scale_m=10,
         patch_size=8,
+        band_gsds=(10, 20),
         image_size=288,
         resize_mode="native_snap",
         shape_adjust="crop",
@@ -145,6 +149,7 @@ def test_prepare_thor_raw_chw_tile_mode_forces_fixed_resize():
         raw,
         scale_m=10,
         patch_size=8,
+        band_gsds=(10, 20),
         image_size=288,
         resize_mode="native_snap",
         shape_adjust="crop",
@@ -169,6 +174,7 @@ def test_prepare_thor_raw_chw_large_square_falls_back_to_fixed_resize():
         raw,
         scale_m=10,
         patch_size=8,
+        band_gsds=(10, 20),
         image_size=288,
         resize_mode="native_snap",
         shape_adjust="crop",
@@ -183,6 +189,75 @@ def test_prepare_thor_raw_chw_large_square_falls_back_to_fixed_resize():
     assert meta["preprocess_strategy"] == "fixed_resize"
     assert meta["preprocess_reason"] == "native_side_limit"
     assert meta["effective_image_size"] == 288
+
+
+def test_thor_describe_exposes_s1_modality():
+    import rs_embed.embedders.onthefly_thor as thor
+
+    desc = thor.THORBaseEmbedder().describe()
+
+    assert desc["defaults"]["modality"] == "s2"
+    assert desc["modalities"]["s1"]["collection"] == "COPERNICUS/S1_GRD_FLOAT"
+    assert tuple(desc["modalities"]["s1"]["bands"]) == ("VV", "VH")
+
+
+def test_thor_get_embedding_s1_uses_vvvh_model_bands(monkeypatch):
+    import rs_embed.embedders.onthefly_thor as thor
+
+    class _FakeTHORS1Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.groups = {
+                "group0": ["S1:IW-VH", "S1:IW-VV"],
+            }
+            self.out_channels = [8]
+            self.norm = torch.nn.LayerNorm(8)
+
+        def forward(self, x):
+            batch = x.shape[0]
+            channel_params = {
+                "S1:IW-VV": {"num_patch": 6},
+                "S1:IW-VH": {"num_patch": 6},
+            }
+            features = [torch.arange(batch * 36 * 8, dtype=torch.float32).reshape(batch, 36, 8)]
+            return features, channel_params
+
+    emb = thor.THORBaseEmbedder()
+    monkeypatch.setattr(emb, "_get_provider", lambda _backend: object())
+    monkeypatch.setattr(
+        thor,
+        "_fetch_s1_vvvh_raw_chw_with_meta",
+        lambda *args, **kwargs: (
+            np.full((2, 288, 288), 2.0, dtype=np.float32),
+            {"s1_iw_applied": True},
+        ),
+    )
+
+    seen: dict[str, object] = {}
+
+    def _fake_load_thor(**kwargs):
+        seen["model_bands"] = kwargs["model_bands"]
+        return _FakeTHORS1Model(), {"embed_dim": 8}, "cpu"
+
+    monkeypatch.setattr(thor, "_load_thor", _fake_load_thor)
+
+    out = emb.get_embedding(
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=TemporalSpec.range("2020-06-01", "2020-08-31"),
+        sensor=SensorSpec(
+            collection="COPERNICUS/S1_GRD_FLOAT",
+            bands=("VV", "VH"),
+            modality="s1",
+        ),
+        output=OutputSpec.pooled(),
+        backend="auto",
+    )
+
+    assert seen["model_bands"] == ("VV", "VH")
+    assert out.data.shape == (8,)
+    assert out.meta["modality"] == "s1"
+    assert out.meta["sensor"]["bands"] == ("VV", "VH")
+    assert out.meta["sensor"]["bands_thor"] == ("VV", "VH")
 
 
 def test_enable_alibi_for_timm_patches_block_and_attention():

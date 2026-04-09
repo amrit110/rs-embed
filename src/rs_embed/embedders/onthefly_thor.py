@@ -21,6 +21,7 @@ from ..core.specs import (
     SpatialSpec,
     TemporalSpec,
 )
+from ..core.types import FetchResult
 from ..providers import ProviderBase
 from ._vit_mae_utils import ensure_torch, pool_from_tokens, tokens_to_grid_dhw
 from .base import EmbedderBase
@@ -30,16 +31,23 @@ from .runtime_utils import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
 from .runtime_utils import (
+    fetch_s1_vvvh_raw_chw_with_meta as _fetch_s1_vvvh_raw_chw_with_meta,
+)
+from .runtime_utils import (
     is_provider_backend,
 )
 from .runtime_utils import (
     load_cached_with_device as _load_cached_with_device,
 )
 from .runtime_utils import (
+    normalize_s1_vvvh_chw as _normalize_s1_vvvh_chw,
+)
+from .runtime_utils import (
     resolve_device_auto_torch as _resolve_device,
 )
 
 _S2_SR_10_BANDS = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
+_S1_VVVH_BANDS = ["VV", "VH"]
 _THOR_MODEL_BANDS = [
     "BLUE",
     "GREEN",
@@ -52,6 +60,19 @@ _THOR_MODEL_BANDS = [
     "SWIR_1",
     "SWIR_2",
 ]
+_THOR_S1_MODEL_BANDS = ["VV", "VH"]
+_THOR_MODALITY_GSDS = {
+    "s2": (10, 20),
+    "s1": (10,),
+}
+_THOR_MODALITY_SENSOR_BANDS = {
+    "s2": tuple(_S2_SR_10_BANDS),
+    "s1": tuple(_S1_VVVH_BANDS),
+}
+_THOR_MODALITY_MODEL_BANDS = {
+    "s2": tuple(_THOR_MODEL_BANDS),
+    "s1": tuple(_THOR_S1_MODEL_BANDS),
+}
 
 _THOR_S2_MEAN = np.array(
     [
@@ -235,14 +256,41 @@ def _resize_chw(x_chw: np.ndarray, *, out_hw: int) -> np.ndarray:
     return y[0].detach().cpu().numpy().astype(np.float32)
 
 
-def _thor_s2_valid_side_unit(*, scale_m: int, patch_size: int) -> int:
+def _normalize_thor_modality(modality: Any) -> str:
+    raw = str(modality or "s2").strip().lower().replace("-", "_")
+    aliases = {
+        "sentinel1": "s1",
+        "sentinel_1": "s1",
+        "sentinel2": "s2",
+        "sentinel_2": "s2",
+    }
+    resolved = aliases.get(raw, raw)
+    if resolved not in {"s1", "s2"}:
+        raise ModelError(f"Unknown THOR modality='{modality}' (expected 's2' or 's1').")
+    return resolved
+
+
+def _thor_band_gsds_for_modality(modality: Any) -> tuple[int, ...]:
+    return tuple(int(v) for v in _THOR_MODALITY_GSDS[_normalize_thor_modality(modality)])
+
+
+def _thor_valid_side_unit(
+    *,
+    scale_m: int,
+    patch_size: int,
+    band_gsds: tuple[int, ...],
+) -> int:
     if scale_m <= 0:
         raise ModelError(f"THOR scale_m must be > 0, got {scale_m}.")
     if patch_size <= 0:
         raise ModelError(f"THOR patch_size must be > 0, got {patch_size}.")
+    if not band_gsds:
+        raise ModelError("THOR band_gsds must be non-empty.")
 
     units = []
-    for gsd in (10, 20):
+    for gsd in tuple(sorted(set(int(v) for v in band_gsds))):
+        if gsd <= 0:
+            raise ModelError(f"THOR band GSD must be > 0, got {gsd}.")
         ground_unit = int(patch_size) * int(gsd)
         units.append(ground_unit // math.gcd(int(scale_m), ground_unit))
     return int(math.lcm(*units))
@@ -253,12 +301,13 @@ def _thor_estimated_patch_tokens(
     side: int,
     scale_m: int,
     patch_size: int,
+    band_gsds: tuple[int, ...],
 ) -> int | None:
     if side <= 0:
         return None
     ground_cover = int(side) * int(scale_m)
     total = 0
-    for gsd in (10, 20):
+    for gsd in tuple(sorted(set(int(v) for v in band_gsds))):
         denom = int(patch_size) * int(gsd)
         if ground_cover % denom != 0:
             return None
@@ -321,8 +370,13 @@ def _thor_snap_side_to_valid(
     *,
     scale_m: int,
     patch_size: int,
+    band_gsds: tuple[int, ...],
 ) -> int:
-    unit = _thor_s2_valid_side_unit(scale_m=scale_m, patch_size=patch_size)
+    unit = _thor_valid_side_unit(
+        scale_m=scale_m,
+        patch_size=patch_size,
+        band_gsds=tuple(band_gsds),
+    )
     lower = max(unit, (int(side) // unit) * unit)
     upper = max(unit, ((int(side) + unit - 1) // unit) * unit)
     if abs(int(side) - lower) <= abs(upper - int(side)):
@@ -335,6 +389,7 @@ def _prepare_thor_raw_chw(
     *,
     scale_m: int,
     patch_size: int,
+    band_gsds: tuple[int, ...],
     image_size: int,
     resize_mode: str,
     shape_adjust: str,
@@ -392,6 +447,7 @@ def _prepare_thor_raw_chw(
             side=int(image_size),
             scale_m=int(scale_m),
             patch_size=int(patch_size),
+            band_gsds=tuple(band_gsds),
         )
         return x, meta
 
@@ -405,16 +461,22 @@ def _prepare_thor_raw_chw(
             meta["shape_adjust_applied"] = "pad_to_square"
 
     square_side = int(x_sq.shape[-1])
-    side_unit = _thor_s2_valid_side_unit(scale_m=int(scale_m), patch_size=int(patch_size))
+    side_unit = _thor_valid_side_unit(
+        scale_m=int(scale_m),
+        patch_size=int(patch_size),
+        band_gsds=tuple(band_gsds),
+    )
     snapped_side = _thor_snap_side_to_valid(
         square_side,
         scale_m=int(scale_m),
         patch_size=int(patch_size),
+        band_gsds=tuple(band_gsds),
     )
     est_tokens = _thor_estimated_patch_tokens(
         side=int(snapped_side),
         scale_m=int(scale_m),
         patch_size=int(patch_size),
+        band_gsds=tuple(band_gsds),
     )
 
     meta["square_side"] = int(square_side)
@@ -432,6 +494,7 @@ def _prepare_thor_raw_chw(
             side=int(image_size),
             scale_m=int(scale_m),
             patch_size=int(patch_size),
+            band_gsds=tuple(band_gsds),
         )
         return x, meta
 
@@ -445,6 +508,7 @@ def _prepare_thor_raw_chw(
             side=int(image_size),
             scale_m=int(scale_m),
             patch_size=int(patch_size),
+            band_gsds=tuple(band_gsds),
         )
         return x, meta
 
@@ -491,6 +555,33 @@ def _normalize_s2_for_thor(raw_chw: np.ndarray, *, mode: str) -> np.ndarray:
 
     raise ModelError(
         f"Unknown THOR normalization mode '{mode}'. Use one of: thor_stats, unit_scale, none."
+    )
+
+
+def _normalize_s1_for_thor(raw_chw: np.ndarray, *, mode: str) -> np.ndarray:
+    if raw_chw.ndim != 3 or int(raw_chw.shape[0]) != len(_S1_VVVH_BANDS):
+        raise ModelError(f"Expected CHW with 2 S1 bands, got {getattr(raw_chw, 'shape', None)}")
+
+    x = np.asarray(raw_chw, dtype=np.float32)
+    x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+
+    m = str(mode).lower().strip()
+    if m in {"raw", "none", "off"}:
+        return x.astype(np.float32)
+    if m in {
+        "thor_stats",
+        "default",
+        "auto",
+        "s1_log_normalize",
+        "log_normalize",
+        "log1p",
+        "log1p_p99",
+    }:
+        return _normalize_s1_vvvh_chw(x)
+
+    raise ModelError(
+        "Unknown THOR S1 normalization mode "
+        f"'{mode}'. Use one of: thor_stats, s1_log_normalize, none."
     )
 
 
@@ -855,11 +946,33 @@ class THORBaseEmbedder(EmbedderBase):
             "type": "on_the_fly",
             "backend": ["provider"],
             "inputs": {
-                "collection": self.input_spec.collection,
-                "bands": list(self.input_spec.bands),
+                "s2_sr": {
+                    "collection": self.input_spec.collection,
+                    "bands": list(self.input_spec.bands),
+                },
+                "s1": {
+                    "collection": "COPERNICUS/S1_GRD_FLOAT (default) or COPERNICUS/S1_GRD",
+                    "bands": list(_S1_VVVH_BANDS),
+                },
+            },
+            "modalities": {
+                "s2": {
+                    "collection": "COPERNICUS/S2_SR_HARMONIZED",
+                    "bands": tuple(_S2_SR_10_BANDS),
+                },
+                "s1": {
+                    "collection": "COPERNICUS/S1_GRD_FLOAT",
+                    "bands": tuple(_S1_VVVH_BANDS),
+                    "defaults": {
+                        "use_float_linear": True,
+                        "s1_require_iw": True,
+                        "s1_relax_iw_on_empty": True,
+                    },
+                },
             },
             "output": ["pooled", "grid"],
             "defaults": {
+                "modality": "s2",
                 "model_key": self.DEFAULT_MODEL_KEY,
                 "variant": _thor_variant_from_model_key(self.DEFAULT_MODEL_KEY),
                 "image_size": self.DEFAULT_IMAGE_SIZE,
@@ -874,6 +987,9 @@ class THORBaseEmbedder(EmbedderBase):
                 "cloudy_pct": self.input_spec.cloudy_pct,
                 "composite": self.input_spec.composite,
                 "group_merge": "mean",
+                "use_float_linear": True,
+                "s1_require_iw": True,
+                "s1_relax_iw_on_empty": True,
             },
             "model_config": {
                 "variant": {
@@ -885,6 +1001,7 @@ class THORBaseEmbedder(EmbedderBase):
             "notes": [
                 "Loads THOR through a fully vendored local runtime.",
                 "Default weights come from Hugging Face FM4CS/THOR-1.0-base when pretrained=true.",
+                "modality='s1' uses a VV/VH Sentinel-1 branch with shared S1 log-style normalization.",
             ],
         }
 
@@ -899,8 +1016,66 @@ class THORBaseEmbedder(EmbedderBase):
         return max(1, min(int(n_items), v))
 
     @staticmethod
-    def _default_sensor() -> SensorSpec:
-        return THORBaseEmbedder.input_spec.to_sensor_spec()
+    def _default_sensor(modality: str | None = None) -> SensorSpec:
+        modality_l = _normalize_thor_modality(modality)
+        if modality_l == "s1":
+            return SensorSpec(
+                collection="COPERNICUS/S1_GRD_FLOAT",
+                bands=tuple(_S1_VVVH_BANDS),
+                scale_m=10,
+                cloudy_pct=30,
+                composite="median",
+                fill_value=0.0,
+                modality="s1",
+                use_float_linear=True,
+                s1_require_iw=True,
+                s1_relax_iw_on_empty=True,
+            )
+        return SensorSpec(
+            collection=THORBaseEmbedder.input_spec.collection,
+            bands=tuple(_S2_SR_10_BANDS),
+            scale_m=THORBaseEmbedder.input_spec.scale_m,
+            cloudy_pct=THORBaseEmbedder.input_spec.cloudy_pct,
+            composite=THORBaseEmbedder.input_spec.composite,
+            fill_value=THORBaseEmbedder.input_spec.fill_value,
+            modality="s2",
+        )
+
+    def fetch_input(
+        self,
+        provider: ProviderBase,
+        *,
+        spatial: SpatialSpec,
+        temporal: TemporalSpec | None,
+        sensor: SensorSpec,
+    ) -> FetchResult | None:
+        t = temporal_to_range(temporal)
+        modality = _normalize_thor_modality(getattr(sensor, "modality", "s2"))
+        if modality == "s1":
+            raw, meta = _fetch_s1_vvvh_raw_chw_with_meta(
+                provider,
+                spatial=spatial,
+                temporal=t,
+                scale_m=int(getattr(sensor, "scale_m", 10)),
+                orbit=getattr(sensor, "orbit", None),
+                use_float_linear=bool(getattr(sensor, "use_float_linear", True)),
+                composite=str(getattr(sensor, "composite", "median")),
+                fill_value=float(getattr(sensor, "fill_value", 0.0)),
+                require_iw=bool(getattr(sensor, "s1_require_iw", True)),
+                relax_iw_on_empty=bool(getattr(sensor, "s1_relax_iw_on_empty", True)),
+            )
+            return FetchResult(data=raw, meta=meta)
+
+        raw = _fetch_s2_sr_10_raw_chw(
+            provider,
+            spatial,
+            t,
+            scale_m=int(getattr(sensor, "scale_m", 10)),
+            cloudy_pct=int(getattr(sensor, "cloudy_pct", 30)),
+            composite=str(getattr(sensor, "composite", "median")),
+            fill_value=float(getattr(sensor, "fill_value", 0.0)),
+        )
+        return FetchResult(data=raw, meta={})
 
     def get_embedding(
         self,
@@ -919,6 +1094,7 @@ class THORBaseEmbedder(EmbedderBase):
 
         ss = sensor or self._default_sensor()
         t = temporal_to_range(temporal)
+        modality = _normalize_thor_modality(getattr(ss, "modality", "s2"))
         runtime_cfg = _resolve_thor_runtime_config(
             model_config=model_config,
             default_model_key=self.DEFAULT_MODEL_KEY,
@@ -943,39 +1119,59 @@ class THORBaseEmbedder(EmbedderBase):
         cloudy_pct = int(getattr(ss, "cloudy_pct", 30))
         composite = str(getattr(ss, "composite", "median"))
         fill_value = float(getattr(ss, "fill_value", 0.0))
+        use_float_linear = bool(getattr(ss, "use_float_linear", True))
+        s1_require_iw = bool(getattr(ss, "s1_require_iw", True))
+        s1_relax_iw_on_empty = bool(getattr(ss, "s1_relax_iw_on_empty", True))
+        orbit = getattr(ss, "orbit", None)
+        band_gsds = _thor_band_gsds_for_modality(modality)
+        sensor_bands = _THOR_MODALITY_SENSOR_BANDS[modality]
+        model_bands = _THOR_MODALITY_MODEL_BANDS[modality]
 
+        fetch_meta: dict[str, Any] = {}
         if input_chw is None:
-            raw_chw = _fetch_s2_sr_10_raw_chw(
+            result = self.fetch_input(
                 self._get_provider(backend),
-                spatial,
-                t,
-                scale_m=scale_m,
-                cloudy_pct=cloudy_pct,
-                composite=composite,
-                fill_value=fill_value,
+                spatial=spatial,
+                temporal=t,
+                sensor=ss,
             )
+            assert result is not None
+            raw_chw = result.data
+            fetch_meta = result.meta
         else:
-            if input_chw.ndim != 3 or int(input_chw.shape[0]) != len(_S2_SR_10_BANDS):
+            if input_chw.ndim != 3 or int(input_chw.shape[0]) != len(sensor_bands):
                 raise ModelError(
-                    f"input_chw must be CHW with 10 bands for THOR, got {getattr(input_chw, 'shape', None)}"
+                    "input_chw must be CHW with "
+                    f"{len(sensor_bands)} bands for THOR {modality.upper()}, "
+                    f"got {getattr(input_chw, 'shape', None)}"
                 )
             raw_chw = np.asarray(input_chw, dtype=np.float32)
-            raw_chw = np.clip(
-                np.nan_to_num(raw_chw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
-            ).astype(np.float32)
+            raw_chw = np.nan_to_num(raw_chw, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+            if modality == "s2":
+                raw_chw = np.clip(raw_chw, 0.0, 10000.0).astype(np.float32)
 
         from ..tools.inspection import checks_should_raise, maybe_inspect_chw
 
         check_meta: dict[str, Any] = {}
-        report = maybe_inspect_chw(
-            raw_chw,
-            sensor=ss,
-            name="provider_s2_sr_10_raw_chw",
-            expected_channels=len(_S2_SR_10_BANDS),
-            value_range=(0.0, 10000.0),
-            fill_value=fill_value,
-            meta=check_meta,
-        )
+        if modality == "s2":
+            report = maybe_inspect_chw(
+                raw_chw,
+                sensor=ss,
+                name="provider_s2_sr_10_raw_chw",
+                expected_channels=len(_S2_SR_10_BANDS),
+                value_range=(0.0, 10000.0),
+                fill_value=fill_value,
+                meta=check_meta,
+            )
+        else:
+            report = maybe_inspect_chw(
+                raw_chw,
+                sensor=ss,
+                name="provider_s1_vvvh_raw_chw",
+                expected_channels=len(_S1_VVVH_BANDS),
+                fill_value=fill_value,
+                meta=check_meta,
+            )
         if report is not None and (not report.get("ok", True)) and checks_should_raise(ss):
             raise ModelError(
                 "Provider input inspection failed: " + "; ".join(report.get("issues", []))
@@ -985,6 +1181,7 @@ class THORBaseEmbedder(EmbedderBase):
             raw_chw,
             scale_m=scale_m,
             patch_size=patch_size,
+            band_gsds=tuple(band_gsds),
             image_size=image_size,
             resize_mode=resize_mode,
             shape_adjust=shape_adjust,
@@ -995,7 +1192,10 @@ class THORBaseEmbedder(EmbedderBase):
             fill_value=fill_value,
         )
 
-        x_chw = _normalize_s2_for_thor(raw_prepped, mode=normalize_mode)
+        if modality == "s1":
+            x_chw = _normalize_s1_for_thor(raw_prepped, mode=normalize_mode)
+        else:
+            x_chw = _normalize_s2_for_thor(raw_prepped, mode=normalize_mode)
         effective_image_size = int(prep_meta["effective_image_size"])
         ground_cover = int(prep_meta["ground_cover_m"])
         if prep_meta["preprocess_strategy"] == "fixed_resize" and (
@@ -1005,7 +1205,7 @@ class THORBaseEmbedder(EmbedderBase):
 
         model, wmeta, dev = _load_thor(
             model_key=model_key,
-            model_bands=tuple(_THOR_MODEL_BANDS),
+            model_bands=tuple(model_bands),
             pretrained=pretrained,
             ckpt_path=ckpt_path,
             ground_cover=ground_cover,
@@ -1026,18 +1226,24 @@ class THORBaseEmbedder(EmbedderBase):
             source=source,
             sensor={
                 "collection": source,
-                "bands": tuple(_S2_SR_10_BANDS),
-                "bands_thor": tuple(_THOR_MODEL_BANDS),
+                "bands": tuple(sensor_bands),
+                "bands_thor": tuple(model_bands),
                 "scale_m": scale_m,
                 "cloudy_pct": cloudy_pct,
                 "composite": composite,
                 "fill_value": fill_value,
+                "modality": modality,
+                "orbit": orbit if modality == "s1" else None,
+                "use_float_linear": use_float_linear if modality == "s1" else None,
+                "s1_require_iw": s1_require_iw if modality == "s1" else None,
+                "s1_relax_iw_on_empty": s1_relax_iw_on_empty if modality == "s1" else None,
             },
             temporal=t,
             image_size=effective_image_size,
             extra={
                 "hf_id": runtime_cfg["hf_id"],
                 "model_source": "vendored_rs_embed_runtime",
+                "modality": modality,
                 "variant": str(runtime_cfg["variant"]),
                 "normalization": normalize_mode,
                 "group_merge": group_merge,
@@ -1049,6 +1255,11 @@ class THORBaseEmbedder(EmbedderBase):
                 "max_native_tokens": max_native_tokens,
                 "ground_cover_m": ground_cover,
                 "patch_size": patch_size,
+                "use_float_linear": use_float_linear if modality == "s1" else None,
+                "s1_require_iw": s1_require_iw if modality == "s1" else None,
+                "s1_relax_iw_on_empty": s1_relax_iw_on_empty if modality == "s1" else None,
+                "orbit": orbit if modality == "s1" else None,
+                **fetch_meta,
                 **check_meta,
                 **prep_meta,
                 **wmeta,
@@ -1114,26 +1325,45 @@ class THORBaseEmbedder(EmbedderBase):
 
         t = temporal_to_range(temporal)
         ss = sensor or self._default_sensor()
+        modality = _normalize_thor_modality(getattr(ss, "modality", "s2"))
         provider = self._get_provider(backend_l)
 
         scale_m = int(getattr(ss, "scale_m", 10))
         cloudy_pct = int(getattr(ss, "cloudy_pct", 30))
         composite = str(getattr(ss, "composite", "median"))
         fill_value = float(getattr(ss, "fill_value", 0.0))
+        use_float_linear = bool(getattr(ss, "use_float_linear", True))
+        s1_require_iw = bool(getattr(ss, "s1_require_iw", True))
+        s1_relax_iw_on_empty = bool(getattr(ss, "s1_relax_iw_on_empty", True))
+        orbit = getattr(ss, "orbit", None)
 
         n = len(spatials)
         prefetched_raw: list[np.ndarray | None] = [None] * n
 
         def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray]:
-            raw = _fetch_s2_sr_10_raw_chw(
-                provider,
-                sp,
-                t,
-                scale_m=scale_m,
-                cloudy_pct=cloudy_pct,
-                composite=composite,
-                fill_value=fill_value,
-            )
+            if modality == "s1":
+                raw, _meta = _fetch_s1_vvvh_raw_chw_with_meta(
+                    provider,
+                    spatial=sp,
+                    temporal=t,
+                    scale_m=scale_m,
+                    orbit=orbit,
+                    use_float_linear=use_float_linear,
+                    composite=composite,
+                    fill_value=fill_value,
+                    require_iw=s1_require_iw,
+                    relax_iw_on_empty=s1_relax_iw_on_empty,
+                )
+            else:
+                raw = _fetch_s2_sr_10_raw_chw(
+                    provider,
+                    sp,
+                    t,
+                    scale_m=scale_m,
+                    cloudy_pct=cloudy_pct,
+                    composite=composite,
+                    fill_value=fill_value,
+                )
             return i, raw
 
         mw = self._resolve_fetch_workers(n)
@@ -1152,7 +1382,7 @@ class THORBaseEmbedder(EmbedderBase):
         for i, sp in enumerate(spatials):
             raw = prefetched_raw[i]
             if raw is None:
-                raise ModelError(f"Missing prefetched input at index={i} for thor_1_0_base.")
+                raise ModelError(f"Missing prefetched input at index={i} for thor.")
             out.append(
                 self.get_embedding(
                     spatial=sp,
