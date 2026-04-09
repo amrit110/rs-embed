@@ -18,7 +18,7 @@
 | Training alignment (adapter path) | High when `thor_stats` normalization and default S2 SR setup are preserved                        |
 
 !!! success "THOR In 30 Seconds"
-    THOR is a Sentinel-2 SR 10-band model that works well when you want either a pooled embedding or a grid-like token output while preserving THOR's channel-group structure.
+THOR is a Sentinel-2 SR 10-band model that works well when you want either a pooled embedding or a grid-like token output while preserving THOR's channel-group structure.
 
     In `rs-embed`, its most important characteristics are:
 
@@ -39,7 +39,6 @@ The two THOR choices that most affect representation semantics are:
 
 ## Quick Decision Guide
 
-
 === "Near-Square Input"
 
     Use `input_prep="resize"` with the default `RS_EMBED_THOR_RESIZE_MODE=native_snap`.
@@ -59,7 +58,7 @@ The two THOR choices that most affect representation semantics are:
     This keeps aligned group maps separate in the channel dimension instead of collapsing them into one shared grid.
 
 !!! warning "What Usually Goes Wrong"
-    Most THOR confusion comes from three places: changing `patch_size` without checking that `image_size` still divides cleanly, assuming `native_snap` should also apply inside tiled inference, and interpreting `concat` grids as directly comparable to `mean` grids. Treat those as different representation settings, not just cosmetic options.
+Most THOR confusion comes from three places: changing `patch_size` without checking that `image_size` still divides cleanly, assuming `native_snap` should also apply inside tiled inference, and interpreting `concat` grids as directly comparable to `mean` grids. Treat those as different representation settings, not just cosmetic options.
 
 ---
 
@@ -107,21 +106,21 @@ Default `SensorSpec` if omitted: The default sensor is `COPERNICUS/S2_SR_HARMONI
 
 ## Environment Variables / Tuning Knobs
 
-| Env var                       | Default        | Effect                                               |
-| ----------------------------- | -------------- | ---------------------------------------------------- |
-| `RS_EMBED_THOR_MODEL_KEY`     | `thor_v1_base` | THOR backbone key for the vendored runtime           |
-| `RS_EMBED_THOR_CKPT`          | unset          | Local checkpoint path override                       |
-| `RS_EMBED_THOR_PRETRAINED`    | `1`            | Use pretrained weights (HF default path)             |
-| `RS_EMBED_THOR_IMG`           | `288`          | Resize target image size                             |
-| `RS_EMBED_THOR_RESIZE_MODE`   | `native_snap`  | `native_snap` keeps bounded snapped native sides; `fixed` always resizes to `RS_EMBED_THOR_IMG` |
-| `RS_EMBED_THOR_NORMALIZE`     | `thor_stats`   | `thor_stats`, `unit_scale`, or `none`                |
-| `RS_EMBED_THOR_GROUP_MERGE`   | `mean`         | THOR group-grid aggregation: `mean`, `sum`, `concat` |
-| `RS_EMBED_THOR_PATCH_SIZE`    | `8`            | THOR flexi patch size parameter                      |
-| `RS_EMBED_THOR_SHAPE_ADJUST`  | `crop`         | How `native_snap` resolves small non-square inputs: `crop` or `pad` |
-| `RS_EMBED_THOR_SHAPE_TOL_PX`  | `8`            | Maximum `abs(H-W)` tolerated before `native_snap` falls back to fixed resize |
-| `RS_EMBED_THOR_MAX_NATIVE_SIDE` | `384`        | Largest snapped native side allowed before falling back to fixed resize |
-| `RS_EMBED_THOR_MAX_NATIVE_TOKENS` | `3000`     | Largest estimated THOR patch-token count allowed for `native_snap` |
-| `RS_EMBED_THOR_FETCH_WORKERS` | `8`            | Provider prefetch workers for batch APIs             |
+| Env var                           | Default        | Effect                                                                                          |
+| --------------------------------- | -------------- | ----------------------------------------------------------------------------------------------- |
+| `RS_EMBED_THOR_MODEL_KEY`         | `thor_v1_base` | THOR backbone key for the vendored runtime                                                      |
+| `RS_EMBED_THOR_CKPT`              | unset          | Local checkpoint path override                                                                  |
+| `RS_EMBED_THOR_PRETRAINED`        | `1`            | Use pretrained weights (HF default path)                                                        |
+| `RS_EMBED_THOR_IMG`               | `288`          | Resize target image size                                                                        |
+| `RS_EMBED_THOR_RESIZE_MODE`       | `native_snap`  | `native_snap` keeps bounded snapped native sides; `fixed` always resizes to `RS_EMBED_THOR_IMG` |
+| `RS_EMBED_THOR_NORMALIZE`         | `thor_stats`   | `thor_stats`, `unit_scale`, or `none`                                                           |
+| `RS_EMBED_THOR_GROUP_MERGE`       | `mean`         | THOR group-grid aggregation: `mean`, `sum`, `concat`                                            |
+| `RS_EMBED_THOR_PATCH_SIZE`        | `8`            | THOR flexi patch size parameter                                                                 |
+| `RS_EMBED_THOR_SHAPE_ADJUST`      | `crop`         | How `native_snap` resolves small non-square inputs: `crop` or `pad`                             |
+| `RS_EMBED_THOR_SHAPE_TOL_PX`      | `8`            | Maximum `abs(H-W)` tolerated before `native_snap` falls back to fixed resize                    |
+| `RS_EMBED_THOR_MAX_NATIVE_SIDE`   | `384`          | Largest snapped native side allowed before falling back to fixed resize                         |
+| `RS_EMBED_THOR_MAX_NATIVE_TOKENS` | `3000`         | Largest estimated THOR patch-token count allowed for `native_snap`                              |
+| `RS_EMBED_THOR_FETCH_WORKERS`     | `8`            | Provider prefetch workers for batch APIs                                                        |
 
 === "Patch Size"
 
@@ -141,21 +140,19 @@ Default `SensorSpec` if omitted: The default sensor is `COPERNICUS/S2_SR_HARMONI
 
     For the current default S2 10m/20m path with `patch_size=8`, `side=384` corresponds to about `2880` patch tokens, which is why `384` is the default ceiling.
 
-
-
 ## Model-specific Settings
 
 `variant` selects the THOR backbone size. In `rs-embed`, pass it as `variant="tiny" | "small" | "base" | "large"`.
 
-| Variant | Vendored model key | Parameters | Output channels | Transformer blocks | Attention heads | Notes |
-| ------- | ------------------ | ---------- | --------------- | ------------------ | --------------- | ----- |
-| `tiny`  | `thor_v1_tiny`     | 7.6M   | 192  | 12 | 3  | Smallest and fastest option. |
-| `small` | `thor_v1_small`    | 25.8M  | 384  | 12 | 6  | Middle ground when `tiny` is too limited. |
-| `base`  | `thor_v1_base`     | 94.1M  | 768  | 12 | 12 | Current default. |
-| `large` | `thor_v1_large`    | 314.4M | 1024 | 24 | 16 | Highest capacity and heaviest runtime. |
+| Variant | Vendored model key | Parameters | Output channels | Transformer blocks | Attention heads | Notes                                     |
+| ------- | ------------------ | ---------- | --------------- | ------------------ | --------------- | ----------------------------------------- |
+| `tiny`  | `thor_v1_tiny`     | 7.6M       | 192             | 12                 | 3               | Smallest and fastest option.              |
+| `small` | `thor_v1_small`    | 25.8M      | 384             | 12                 | 6               | Middle ground when `tiny` is too limited. |
+| `base`  | `thor_v1_base`     | 94.1M      | 768             | 12                 | 12              | Current default.                          |
+| `large` | `thor_v1_large`    | 314.4M     | 1024            | 24                 | 16              | Highest capacity and heaviest runtime.    |
 
 !!! info "How To Read Output Channels"
-    `Output channels` here means the default THOR embedding width for `pooled` output and for `grid` output when group aggregation keeps one shared channel space, such as `RS_EMBED_THOR_GROUP_MERGE=mean` or `sum`.
+`Output channels` here means the default THOR embedding width for `pooled` output and for `grid` output when group aggregation keeps one shared channel space, such as `RS_EMBED_THOR_GROUP_MERGE=mean` or `sum`.
 
     If you use `RS_EMBED_THOR_GROUP_MERGE=concat`, the final `grid` channel count becomes `embedding_width x number_of_THOR_groups`, so it is larger than the values listed above.
 

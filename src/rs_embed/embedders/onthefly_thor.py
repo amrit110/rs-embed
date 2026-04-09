@@ -187,26 +187,22 @@ def _resolve_thor_runtime_config(
     shape_tol_px = int(os.environ.get("RS_EMBED_THOR_SHAPE_TOL_PX", "8"))
     max_native_side = int(os.environ.get("RS_EMBED_THOR_MAX_NATIVE_SIDE", "384"))
     max_native_tokens = int(os.environ.get("RS_EMBED_THOR_MAX_NATIVE_TOKENS", "3000"))
-    input_prep_mode = str(model_config_value(model_config, "_input_prep_mode") or "").strip().lower()
+    input_prep_mode = (
+        str(model_config_value(model_config, "_input_prep_mode") or "").strip().lower()
+    )
 
     if resize_mode not in {"fixed", "native_snap"}:
         raise ModelError(
             f"Unknown THOR resize mode '{resize_mode}'. Use one of: fixed, native_snap."
         )
     if shape_adjust not in {"crop", "pad"}:
-        raise ModelError(
-            f"Unknown THOR shape adjust mode '{shape_adjust}'. Use one of: crop, pad."
-        )
+        raise ModelError(f"Unknown THOR shape adjust mode '{shape_adjust}'. Use one of: crop, pad.")
     if shape_tol_px < 0:
         raise ModelError(f"RS_EMBED_THOR_SHAPE_TOL_PX must be >= 0, got {shape_tol_px}.")
     if max_native_side <= 0:
-        raise ModelError(
-            f"RS_EMBED_THOR_MAX_NATIVE_SIDE must be > 0, got {max_native_side}."
-        )
+        raise ModelError(f"RS_EMBED_THOR_MAX_NATIVE_SIDE must be > 0, got {max_native_side}.")
     if max_native_tokens <= 0:
-        raise ModelError(
-            f"RS_EMBED_THOR_MAX_NATIVE_TOKENS must be > 0, got {max_native_tokens}."
-        )
+        raise ModelError(f"RS_EMBED_THOR_MAX_NATIVE_TOKENS must be > 0, got {max_native_tokens}.")
 
     return {
         "model_key": model_key,
