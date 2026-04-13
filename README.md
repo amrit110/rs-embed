@@ -31,12 +31,13 @@ emb = get_embedding("prithvi", spatial=..., temporal=..., output=...)
 ## Install
 
 ```bash
-# base install
-pip install rs-embed
+# base install (always use the latest version for best experience)
+pip install --upgrade rs-embed
 
 # add [terratorch] only if you use terramind
-pip install "rs-embed[terratorch]"
+pip install --upgrade "rs-embed[terratorch]"
 ```
+
 
 For local development:
 
@@ -51,6 +52,8 @@ If this is your first time using Google Earth Engine, authenticate once:
 ```bash
 earthengine authenticate
 ```
+
+
 
 ## Quick Example
 
@@ -71,6 +74,8 @@ emb = get_embedding(
 )
 
 ```
+
+> **Tip:** Default settings are designed as a trade-off between compute cost and embedding quality. If you have sufficient compute resources, check [Choosing Settings](https://cybergis.github.io/rs-embed/0.1.3/choosing_settings/) and individual [model pages](https://cybergis.github.io/rs-embed/0.1.3/models/) to get the best results.
 
 See the visualization helper and end-to-end notebook in the repository:
 
