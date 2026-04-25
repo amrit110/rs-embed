@@ -1,3 +1,6 @@
+# Copyright (c) 2024 RolnickLab. All rights reserved.
+# Licensed under the MIT License.
+
 Vendored FoMo MultiSpectralViT runtime
 Source: https://github.com/RolnickLab/FoMo-Bench/blob/main/model_zoo/multimodal_mae.py
 

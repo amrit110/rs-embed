@@ -1,3 +1,6 @@
+# Copyright (c) 2024 Presto Authors. All rights reserved.
+# Licensed under the MIT License.
+
 Vendored Galileo encoder runtime
 Source: https://github.com/nasaharvest/galileo/blob/main/single_file_galileo.py
 

@@ -1,3 +1,7 @@
+# Original work Copyright (c) 2024 Stanford Machine Learning Group. All rights reserved.
+# Modified work Copyright (c) 2025 Norwegian Computing Center. All rights reserved.
+# Licensed under the MIT License.
+
 MIT License
 
 Original work Copyright (c) 2024 Stanford Machine Learning Group
