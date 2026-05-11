@@ -1,8 +1,7 @@
 import numpy as np
 
 from rs_embed.core.specs import OutputSpec, PointBuffer, TemporalSpec
-from rs_embed.embedders._vit_mae_utils import fetch_s2_rgb_u8_from_provider
-from rs_embed.embedders.onthefly_satmaepp import SatMAEPPEmbedder
+from rs_embed.embedders.onthefly_satmaepp import SatMAEPPEmbedder, fetch_s2_rgb_u8_from_provider
 
 
 def test_fetch_s2_rgb_u8_from_provider_allows_unresized_output(monkeypatch):
@@ -10,28 +9,12 @@ def test_fetch_s2_rgb_u8_from_provider_allows_unresized_output(monkeypatch):
         def ensure_ready(self):
             return None
 
-    def _fake_fetch_collection_patch_chw(
-        provider,
-        *,
-        spatial,
-        temporal,
-        collection,
-        bands,
-        scale_m,
-        cloudy_pct,
-        composite,
-        fill_value,
-    ):
-        return np.full((3, 11, 13), 5000.0, dtype=np.float32)
+    def _fake_fetch_s2_rgb_chw(provider, *, spatial, temporal, scale_m, cloudy_pct, composite):
+        return np.full((3, 11, 13), 0.5, dtype=np.float32)
 
     monkeypatch.setattr(
-        "rs_embed.embedders._vit_mae_utils.fetch_collection_patch_chw",
-        _fake_fetch_collection_patch_chw,
-    )
-    monkeypatch.setattr(
-        "rs_embed.embedders._vit_mae_utils.maybe_inspect_chw",
-        lambda *args, **kwargs: None,
-        raising=False,
+        "rs_embed.providers.fetch.fetch_s2_rgb_chw",
+        _fake_fetch_s2_rgb_chw,
     )
 
     sensor = SatMAEPPEmbedder.input_spec.to_sensor_spec()
@@ -39,11 +22,11 @@ def test_fetch_s2_rgb_u8_from_provider_allows_unresized_output(monkeypatch):
     temporal = TemporalSpec.year(2020)
 
     rgb_u8 = fetch_s2_rgb_u8_from_provider(
+        _P(),
         spatial=spatial,
         temporal=temporal,
         sensor=sensor,
         out_size=None,
-        provider=_P(),
     )
 
     assert rgb_u8.shape == (11, 13, 3)

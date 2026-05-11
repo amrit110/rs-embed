@@ -24,17 +24,15 @@ from ..core.specs import (
 from ..providers import ProviderBase
 from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
 from .base import EmbedderBase
-from .meta_utils import build_meta
-from .runtime_utils import (
-    coerce_single_input_chw,
-)
-from .runtime_utils import (
+from .meta import build_meta
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
-from .runtime_utils import (
-    load_cached_with_device as _load_cached_with_device,
+from ..tools.normalization import (
+    coerce_single_input_chw,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
+    load_cached_with_device as _load_cached_with_device,
     resolve_device_auto_torch as _resolve_device_auto,
 )
 

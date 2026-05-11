@@ -14,11 +14,11 @@ from ..core.registry import register
 from ..core.specs import BBox, OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..tools.tiling import _tile_subspatial, _tile_yx_starts
 from .base import EmbedderBase
-from .meta_utils import build_meta
-from .runtime_utils import (
+from .meta import build_meta
+from ..providers.fetch import (
     fetch_collection_patch_all_bands_chw as _fetch_collection_patch_all_bands_chw,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
 

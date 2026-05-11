@@ -26,14 +26,20 @@ from ..providers import ProviderBase
 # -----------------------------
 # Provider: Fetch S2 RGB
 # -----------------------------
-from ._vit_mae_utils import _s2_rgb_u8_from_chw
+
+def _s2_rgb_u8_from_chw(s2_chw):
+    x = np.clip(np.asarray(s2_chw, dtype=np.float32), 0.0, 1.0)
+    return (x.transpose(1, 2, 0) * 255.0).astype(np.uint8)
+
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_to_range
-from .runtime_utils import (
+from .meta import build_meta, temporal_to_range
+from ..providers.fetch import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw_shared,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
+)
+from ..tools.runtime import (
     resolve_device_auto_torch,
 )
 

@@ -22,17 +22,19 @@ from ..core.specs import (
     SpatialSpec,
     TemporalSpec,
 )
-from ._vit_mae_utils import ensure_torch
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
 from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_to_range
+from .meta import build_meta, temporal_to_range
 from .onthefly_terramind import _fetch_s2_sr_12_raw_chw
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
-)
-from .runtime_utils import (
     resolve_device_auto_torch as _resolve_device,
 )
 

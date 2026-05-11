@@ -1,6 +1,6 @@
 import numpy as np
 
-import rs_embed.embedders.runtime_utils as ru
+import rs_embed.providers.fetch as ru
 from rs_embed.core.specs import BBox, SensorSpec, TemporalSpec
 
 

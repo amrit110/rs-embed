@@ -39,7 +39,7 @@ class EmbedderBase:
         self._providers: dict[str, ProviderBase] = {}
 
     def _get_provider(self, backend: str) -> ProviderBase:
-        from .runtime_utils import get_cached_provider
+        from ..providers.resolution import get_cached_provider
 
         return get_cached_provider(
             self._providers, backend=backend, allow_auto=self._allow_auto_backend
@@ -115,7 +115,7 @@ class EmbedderBase:
         # input prep uses the same fetch overrides as the direct embedder path.
         fetch_sensor = sensor or spec.to_sensor_spec()
 
-        from .runtime_utils import (
+        from ..providers.fetch import (
             fetch_collection_patch_chw,
             fetch_s2_multiframe_raw_tchw,
         )

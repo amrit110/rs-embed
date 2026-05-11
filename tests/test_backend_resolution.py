@@ -107,7 +107,7 @@ class TestProviderFactory:
     def test_auto_delegates_to_default_provider(self):
         """auto → uses default_provider_backend_name, not hard-coded gee."""
         with patch(
-            "rs_embed.embedders.runtime_utils.default_provider_backend_name", return_value="gee"
+            "rs_embed.tools.runtime.default_provider_backend_name", return_value="gee"
         ):
             with patch("rs_embed.tools.runtime.has_provider", return_value=True):
                 factory = provider_factory_for_backend("auto")
@@ -116,7 +116,7 @@ class TestProviderFactory:
     def test_auto_uses_non_gee_default(self):
         """auto → picks the first available provider when gee is absent."""
         with patch(
-            "rs_embed.embedders.runtime_utils.default_provider_backend_name",
+            "rs_embed.tools.runtime.default_provider_backend_name",
             return_value="planetary_computer",
         ):
             with patch("rs_embed.tools.runtime.has_provider", return_value=True):
@@ -141,24 +141,24 @@ class TestDefaultProviderBackend:
     """Tests for _default_provider_backend_for_api.
 
     _default_provider_backend_for_api delegates to
-    embedders.runtime_utils.default_provider_backend_name(), so patch there.
+    providers.resolution.default_provider_backend_name, so patch there.
     """
 
     def test_gee_available(self):
         with patch(
-            "rs_embed.embedders.runtime_utils.default_provider_backend_name", return_value="gee"
+            "rs_embed.providers.resolution.default_provider_backend_name", return_value="gee"
         ):
             assert _default_provider_backend_for_api() == "gee"
 
     def test_other_provider(self):
         with patch(
-            "rs_embed.embedders.runtime_utils.default_provider_backend_name",
+            "rs_embed.providers.resolution.default_provider_backend_name",
             return_value="planetary_computer",
         ):
             assert _default_provider_backend_for_api() == "planetary_computer"
 
     def test_no_providers_defaults_gee(self):
         with patch(
-            "rs_embed.embedders.runtime_utils.default_provider_backend_name", return_value=None
+            "rs_embed.providers.resolution.default_provider_backend_name", return_value=None
         ):
             assert _default_provider_backend_for_api() == "gee"

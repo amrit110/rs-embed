@@ -67,7 +67,7 @@ def test_base_fetch_input_honors_sensor_overrides(monkeypatch):
         return np.ones((2, 4, 4), dtype=np.float32)
 
     monkeypatch.setattr(
-        "rs_embed.embedders.runtime_utils.fetch_collection_patch_chw",
+        "rs_embed.providers.fetch.fetch_collection_patch_chw",
         _fake_fetch_collection_patch_chw,
     )
 
@@ -171,7 +171,7 @@ def test_tile_input_prep_honors_fetch_scale_override(monkeypatch):
         lambda: DummyProvider(),
     )
     monkeypatch.setattr(
-        "rs_embed.embedders.runtime_utils.fetch_collection_patch_chw",
+        "rs_embed.providers.fetch.fetch_collection_patch_chw",
         _fake_fetch_collection_patch_chw,
     )
 

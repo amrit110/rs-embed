@@ -4,7 +4,7 @@ import numpy as np
 import xarray as xr
 
 from rs_embed.core.embedding import Embedding
-from rs_embed.embedders.meta_utils import META_REQUIRED_KEYS, build_meta
+from rs_embed.embedders.meta import META_REQUIRED_KEYS, build_meta
 
 
 def test_embedding_numpy():

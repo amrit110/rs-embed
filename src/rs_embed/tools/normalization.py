@@ -153,7 +153,7 @@ def _probe_model_describe(model_n: str) -> dict[str, Any]:
 
 
 def _default_provider_backend_for_api() -> str:
-    from ..embedders.runtime_utils import default_provider_backend_name
+    from ..providers.resolution import default_provider_backend_name
 
     return default_provider_backend_name() or "gee"
 
@@ -190,3 +190,80 @@ def _resolve_embedding_api_backend(model_n: str, backend_n: str) -> str:
             return _default_provider_backend_for_api()
 
     return backend_n
+
+
+def coerce_input_to_tchw(
+    input_chw: np.ndarray,
+    *,
+    expected_channels: int,
+    n_frames: int,
+    model_name: str,
+) -> np.ndarray:
+    """Normalize user-provided CHW/TCHW into clipped float32 [T,C,H,W]."""
+    raw = np.asarray(input_chw, dtype=np.float32)
+    t = max(1, int(n_frames))
+
+    if raw.ndim == 3:
+        if int(raw.shape[0]) != int(expected_channels):
+            raise ModelError(
+                f"input_chw must be CHW with C={int(expected_channels)} for {model_name}, "
+                f"got {tuple(int(v) for v in raw.shape)}"
+            )
+        raw_tchw = np.repeat(raw[None, ...], repeats=t, axis=0).astype(np.float32)
+    elif raw.ndim == 4:
+        if int(raw.shape[1]) != int(expected_channels):
+            raise ModelError(
+                f"input_chw must be TCHW with C={int(expected_channels)} for {model_name}, "
+                f"got {tuple(int(v) for v in raw.shape)}"
+            )
+        raw_tchw = raw.astype(np.float32, copy=False)
+        if raw_tchw.shape[0] < t:
+            raw_tchw = np.concatenate(
+                [raw_tchw] + [raw_tchw[-1:]] * (t - raw_tchw.shape[0]),
+                axis=0,
+            )
+        elif raw_tchw.shape[0] > t:
+            raw_tchw = raw_tchw[:t]
+    else:
+        raise ModelError(
+            f"input_chw must be CHW (C,H,W) or TCHW (T,C,H,W) for {model_name}, "
+            f"got {tuple(int(v) for v in raw.shape)}"
+        )
+
+    raw_tchw = np.nan_to_num(raw_tchw, nan=0.0, posinf=0.0, neginf=0.0)
+    return np.clip(raw_tchw, 0.0, 10000.0).astype(np.float32)
+
+
+def coerce_single_input_chw(
+    input_chw: Any,
+    *,
+    expected_channels: int | None,
+    model_name: str,
+) -> np.ndarray:
+    """Normalize one user-provided tensor input into float32 CHW."""
+    raw = input_chw
+    try:
+        import torch
+
+        if torch.is_tensor(raw):
+            raw = raw.detach().cpu().numpy()
+    except Exception as _e:
+        pass
+
+    arr = np.asarray(raw, dtype=np.float32)
+    if arr.ndim == 4:
+        raise ModelError(
+            f"{model_name} expects single-sample input_chw as CHW (C,H,W), "
+            f"got {tuple(int(v) for v in arr.shape)}. "
+            "Use get_embeddings_batch_from_inputs(...) for batches."
+        )
+    if arr.ndim != 3:
+        raise ModelError(
+            f"{model_name} expects input_chw as CHW (C,H,W), got {tuple(int(v) for v in arr.shape)}"
+        )
+    if expected_channels is not None and int(arr.shape[0]) != int(expected_channels):
+        raise ModelError(
+            f"input_chw must be CHW with C={int(expected_channels)} for {model_name}, "
+            f"got {tuple(int(v) for v in arr.shape)}"
+        )
+    return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)

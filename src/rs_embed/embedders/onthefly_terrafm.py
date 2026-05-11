@@ -24,23 +24,17 @@ from ..core.specs import (
 from ..core.types import FetchResult
 from ..providers import ProviderBase
 from .base import EmbedderBase
-from .meta_utils import build_meta
-from .runtime_utils import (
-    coerce_single_input_chw,
-)
-from .runtime_utils import (
+from .meta import build_meta
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
-)
-from .runtime_utils import (
     fetch_s1_vvvh_raw_chw as _fetch_s1_vvvh_raw_chw_shared,
-)
-from .runtime_utils import (
     fetch_s1_vvvh_raw_chw_with_meta as _fetch_s1_vvvh_raw_chw_with_meta_shared,
-)
-from .runtime_utils import (
     normalize_s1_vvvh_chw as _normalize_s1_vvvh_chw,
 )
-from .runtime_utils import (
+from ..tools.normalization import (
+    coerce_single_input_chw,
+)
+from ..tools.runtime import (
     resolve_device_auto_torch as _auto_device,
 )
 
