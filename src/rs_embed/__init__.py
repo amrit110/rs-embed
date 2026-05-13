@@ -13,6 +13,8 @@ from .api import (
     export_batch,
     get_embedding,
     get_embeddings_batch,
+    inspect_gee_patch,
+    inspect_provider_patch,
     list_models,
     reset_runtime,
 )
@@ -32,8 +34,6 @@ from .core.types import (
     ExportTarget,
     ModelConfig,
 )
-from .export import export_npz
-from .inspect import inspect_gee_patch, inspect_provider_patch
 from .load import ExportResult, ModelResult, load_export
 from .model import Model
 from .pipelines.exporter import BatchExporter
@@ -64,7 +64,6 @@ __all__ = [
     "reset_runtime",
     # Export API
     "export_batch",
-    "export_npz",
     # Load API
     "load_export",
     "ExportResult",

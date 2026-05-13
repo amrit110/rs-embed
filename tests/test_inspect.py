@@ -1,6 +1,6 @@
 import numpy as np
-
 import rs_embed.inspect as inspect_mod
+
 from rs_embed.core.specs import BBox, SensorSpec
 
 
