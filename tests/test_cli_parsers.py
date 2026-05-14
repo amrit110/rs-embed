@@ -1,6 +1,18 @@
 import argparse
+import sys
+import types
 
 import pytest
+
+import rs_embed.api as api
+
+_export_module = types.ModuleType("rs_embed.export")
+_export_module.export_npz = api.export_batch
+sys.modules.setdefault("rs_embed.export", _export_module)
+
+_inspect_module = types.ModuleType("rs_embed.inspect")
+_inspect_module.inspect_gee_patch = api.inspect_gee_patch
+sys.modules.setdefault("rs_embed.inspect", _inspect_module)
 
 from rs_embed import cli
 from rs_embed.core.specs import BBox, PointBuffer
