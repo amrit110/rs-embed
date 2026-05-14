@@ -13,25 +13,59 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
 from ..providers.base import ProviderBase
-from ._vit_mae_utils import base_meta, ensure_torch, temporal_to_range
-from .base import EmbedderBase
-from .config_utils import model_config_value
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
+from .base import EmbedderBase
+from .config import model_config_value
+from .meta import build_meta, temporal_to_range
+
+
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
+
+
+def base_meta(
+    *,
+    model_name,
+    hf_id,
+    backend,
+    image_size,
+    sensor,
+    temporal=None,
+    source=None,
+    embed_type="on_the_fly",
+    extra=None,
+):
+    m = build_meta(
+        model=model_name,
+        kind=embed_type,
+        backend=backend,
+        source=source or getattr(sensor, "collection", None),
+        sensor=sensor,
+        temporal=temporal,
+        image_size=image_size,
+    )
+    m["hf_id"] = hf_id
+    if extra:
+        m.update(extra)
+    return m
+
 
 # SatMAE++ Sentinel branch in source repo drops [B1, B9, B10] and uses 10 channels.
 # GEE S2 SR does not expose B10, so we directly fetch the final 10-channel subset.
@@ -545,7 +579,6 @@ class SatMAEPPSentinel10Embedder(EmbedderBase):
         bands=tuple(_S2_SR_10_BANDS),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="none"),
         image_size=96,
         expected_channels=10,
     )

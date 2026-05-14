@@ -1,0 +1,271 @@
+"""Provider fetch helpers and satellite-data normalization."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+import numpy as np
+
+from ..core.errors import ModelError, ProviderError
+from ..core.specs import SensorSpec, SpatialSpec, TemporalSpec
+from .base import ProviderBase
+
+
+def fetch_sensor_patch_chw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec | None,
+    sensor: SensorSpec,
+    to_float_image: bool = False,
+) -> np.ndarray:
+    """Fetch a CHW patch from a concrete SensorSpec, re-raising ProviderError as ModelError."""
+    try:
+        return provider.fetch_sensor_patch_chw(
+            spatial=spatial,
+            temporal=temporal,
+            sensor=sensor,
+            to_float_image=to_float_image,
+        )
+    except ProviderError as exc:
+        raise ModelError(str(exc)) from exc
+
+
+def fetch_collection_patch_chw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec | None,
+    collection: str,
+    bands: tuple[str, ...],
+    scale_m: int = 10,
+    cloudy_pct: int | None = 30,
+    composite: str = "median",
+    fill_value: float = 0.0,
+) -> np.ndarray:
+    """Fetch a provider patch as CHW float32 using shared SensorSpec logic."""
+    sensor = SensorSpec(
+        collection=str(collection),
+        bands=tuple(str(b) for b in bands),
+        scale_m=int(scale_m),
+        cloudy_pct=(int(cloudy_pct) if cloudy_pct is not None else None),  # type: ignore[arg-type]
+        fill_value=float(fill_value),
+        composite=str(composite),
+    )
+    return fetch_sensor_patch_chw(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        sensor=sensor,
+    )
+
+
+def fetch_collection_patch_all_bands_chw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec | None,
+    collection: str,
+    scale_m: int = 10,
+    fill_value: float = 0.0,
+    composite: str = "median",
+) -> tuple[np.ndarray, tuple[str, ...]]:
+    """Fetch all bands for a collection as CHW float32."""
+    try:
+        arr, names = provider.fetch_collection_patch_all_bands_chw(
+            spatial=spatial,
+            temporal=temporal,
+            collection=str(collection),
+            scale_m=int(scale_m),
+            fill_value=float(fill_value),
+            composite=str(composite),
+        )
+        return np.asarray(arr, dtype=np.float32), tuple(str(b) for b in names)
+    except ProviderError as exc:
+        raise ModelError(str(exc)) from exc
+
+
+def fetch_s2_rgb_chw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    scale_m: int = 10,
+    cloudy_pct: int = 30,
+    composite: str = "median",
+) -> np.ndarray:
+    """Fetch Sentinel-2 RGB (B4/B3/B2) as float32 CHW in raw DN [0, 10000].
+
+    Normalization to model input range is the caller's responsibility.
+    """
+    return fetch_collection_patch_chw(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        collection="COPERNICUS/S2_SR_HARMONIZED",
+        bands=("B4", "B3", "B2"),
+        scale_m=int(scale_m),
+        cloudy_pct=int(cloudy_pct),
+        composite=str(composite),
+        fill_value=0.0,
+    )
+
+
+def _require_s1_support(provider: ProviderBase, method: str) -> None:
+    if not hasattr(provider, method):
+        raise ModelError(
+            f"Provider '{getattr(provider, 'name', type(provider).__name__)}' does not support "
+            "Sentinel-1 VV/VH fetch. Use fetch_sensor_patch_chw with an S1 SensorSpec instead."
+        )
+
+
+def fetch_s1_vvvh_raw_chw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    scale_m: int = 10,
+    orbit: str | None = None,
+    use_float_linear: bool = True,
+    composite: str = "median",
+    fill_value: float = 0.0,
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
+) -> np.ndarray:
+    """Fetch Sentinel-1 VV/VH as raw float32 CHW."""
+    _require_s1_support(provider, "fetch_s1_vvvh_raw_chw")
+    try:
+        arr = provider.fetch_s1_vvvh_raw_chw(  # type: ignore[attr-defined]
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=int(scale_m),
+            orbit=orbit,
+            use_float_linear=bool(use_float_linear),
+            composite=str(composite),
+            fill_value=float(fill_value),
+            require_iw=bool(require_iw),
+            relax_iw_on_empty=bool(relax_iw_on_empty),
+        )
+    except ProviderError as exc:
+        raise ModelError(str(exc)) from exc
+    arr = np.asarray(arr, dtype=np.float32)
+    if arr.ndim != 3 or int(arr.shape[0]) != 2:
+        raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
+    return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+
+
+def fetch_s1_vvvh_raw_chw_with_meta(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    scale_m: int = 10,
+    orbit: str | None = None,
+    use_float_linear: bool = True,
+    composite: str = "median",
+    fill_value: float = 0.0,
+    require_iw: bool = True,
+    relax_iw_on_empty: bool = True,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Fetch Sentinel-1 VV/VH as raw float32 CHW together with fetch metadata."""
+    _require_s1_support(provider, "fetch_s1_vvvh_raw_chw_with_meta")
+    try:
+        arr, meta = provider.fetch_s1_vvvh_raw_chw_with_meta(  # type: ignore[attr-defined]
+            spatial=spatial,
+            temporal=temporal,
+            scale_m=int(scale_m),
+            orbit=orbit,
+            use_float_linear=bool(use_float_linear),
+            composite=str(composite),
+            fill_value=float(fill_value),
+            require_iw=bool(require_iw),
+            relax_iw_on_empty=bool(relax_iw_on_empty),
+        )
+    except ProviderError as exc:
+        raise ModelError(str(exc)) from exc
+    arr = np.asarray(arr, dtype=np.float32)
+    if arr.ndim != 3 or int(arr.shape[0]) != 2:
+        raise ModelError(f"Expected S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}")
+    return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32), dict(meta or {})
+
+
+def fetch_s2_multiframe_raw_tchw(
+    provider: ProviderBase,
+    *,
+    spatial: SpatialSpec,
+    temporal: TemporalSpec,
+    bands: Sequence[str],
+    n_frames: int = 8,
+    collection: str = "COPERNICUS/S2_SR_HARMONIZED",
+    scale_m: int = 10,
+    cloudy_pct: int | None = 30,
+    composite: str = "median",
+    fill_value: float = 0.0,
+) -> np.ndarray:
+    """Fetch an S2 time series as raw float32 [T,C,H,W] in [0,10000]."""
+    try:
+        arr = provider.fetch_multiframe_collection_raw_tchw(
+            spatial=spatial,
+            temporal=temporal,
+            collection=str(collection),
+            bands=tuple(str(b) for b in bands),
+            n_frames=int(n_frames),
+            scale_m=int(scale_m),
+            cloudy_pct=(int(cloudy_pct) if cloudy_pct is not None else None),
+            composite=str(composite),
+            fill_value=float(fill_value),
+            # fetch_fn=_fetch,
+        )
+    except ProviderError as exc:
+        raise ModelError(str(exc)) from exc
+    arr = np.asarray(arr, dtype=np.float32)
+    if arr.ndim != 4:
+        raise ModelError(f"Expected TCHW array, got shape={getattr(arr, 'shape', None)}")
+    if int(arr.shape[1]) != len(tuple(bands)):
+        raise ModelError(
+            f"Time series channel mismatch: got C={int(arr.shape[1])}, expected C={len(tuple(bands))}"
+        )
+    return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
+
+
+def normalize_s1_vvvh_chw(raw_chw: np.ndarray) -> np.ndarray:
+    """Convert raw S1 VV/VH to numerically stable [0,1] CHW."""
+    arr = np.asarray(raw_chw, dtype=np.float32)
+    if arr.ndim != 3 or int(arr.shape[0]) != 2:
+        raise ModelError(
+            f"Expected raw S1 VV/VH CHW with C=2, got shape={getattr(arr, 'shape', None)}"
+        )
+    x = np.log1p(np.maximum(arr, 0.0))
+    denom = np.percentile(x, 99) if np.isfinite(x).all() else 1.0
+    denom = float(denom) if float(denom) > 0 else 1.0
+    return np.clip(x / denom, 0.0, 1.0).astype(np.float32)
+
+
+def inspect_fetch_result(
+    x_chw: np.ndarray,
+    *,
+    sensor: SensorSpec,
+    name: str,
+) -> dict[str, Any]:
+    """Inspect a prefetched CHW (or TCHW) array and return a structured quality report."""
+    from ..tools.inspection import inspect_chw
+    from ..tools.normalization import normalize_input_array
+    from ..tools.serialization import jsonable as _jsonable
+
+    x = normalize_input_array(x_chw, expected_channels=len(sensor.bands), name=name)
+    x_inspect = x[0] if x.ndim == 4 else x
+    rep = inspect_chw(
+        x_inspect,
+        name=name,
+        expected_channels=len(sensor.bands),
+        value_range=None,
+        fill_value=float(sensor.fill_value),
+    )
+    return {
+        "ok": bool(rep.get("ok", False)),
+        "report": rep,
+        "sensor": _jsonable(sensor),
+        "input_ndim": int(x.ndim),
+        "n_frames": (int(x.shape[0]) if x.ndim == 4 else None),
+    }

@@ -15,7 +15,6 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
@@ -26,16 +25,22 @@ from ..providers import ProviderBase
 # -----------------------------
 # Provider: Fetch S2 RGB
 # -----------------------------
-from ._vit_mae_utils import _s2_rgb_u8_from_chw
-from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_to_range
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw_shared,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
+)
+from ..tools.runtime import (
     resolve_device_auto_torch,
 )
+from .base import EmbedderBase
+from .meta import build_meta, temporal_to_range
+
+
+def _s2_rgb_u8_from_chw(s2_chw):
+    x = np.clip(np.asarray(s2_chw, dtype=np.float32) / 10000.0, 0.0, 1.0)
+    return (x.transpose(1, 2, 0) * 255.0).astype(np.uint8)
 
 
 def _fetch_s2_rgb_chw(
@@ -530,7 +535,6 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
         bands=("B4", "B3", "B2"),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_clip"),
         image_size=224,
         expected_channels=3,
     )
@@ -833,8 +837,7 @@ class RemoteCLIPS2RGBEmbedder(EmbedderBase):
                 cloudy_pct=cloudy_pct,
                 composite=composite,
             )
-            # get_embedding(input_chw=...) expects raw SR in [0..10000]
-            raw = np.clip(s2_rgb_chw * 10000.0, 0.0, 10000.0).astype(np.float32)
+            raw = np.clip(s2_rgb_chw, 0.0, 10000.0).astype(np.float32)
             return i, raw
 
         mw = self._resolve_fetch_workers(n)

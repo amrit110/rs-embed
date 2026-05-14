@@ -12,27 +12,100 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
-from ._vit_mae_utils import (
-    base_meta,
-    ensure_torch,
-    fetch_s2_rgb_u8_from_provider,
-    pool_from_tokens,
-    temporal_to_range,
-    tokens_to_grid_dhw,
-)
-from .base import EmbedderBase
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
+from .base import EmbedderBase
+from .meta import build_meta, temporal_to_range
+
+
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
+
+
+def fetch_s2_rgb_u8_from_provider(provider, *, spatial, temporal, sensor, out_size):
+    from ..providers.fetch import fetch_s2_rgb_chw
+
+    s2_chw = fetch_s2_rgb_chw(
+        provider,
+        spatial=spatial,
+        temporal=temporal,
+        scale_m=sensor.scale_m,
+        cloudy_pct=sensor.cloudy_pct,
+        composite=sensor.composite,
+    )
+    rgb_u8 = (np.clip(s2_chw / 10000.0, 0.0, 1.0).transpose(1, 2, 0) * 255.0).astype(np.uint8)
+    if out_size is None:
+        return rgb_u8
+    from PIL import Image
+
+    im = Image.fromarray(rgb_u8, mode="RGB")
+    return np.array(im.resize((out_size, out_size), resample=Image.BICUBIC), dtype=np.uint8)
+
+
+def base_meta(
+    *,
+    model_name,
+    hf_id,
+    backend,
+    image_size,
+    sensor,
+    temporal=None,
+    source=None,
+    embed_type="on_the_fly",
+    extra=None,
+):
+    m = build_meta(
+        model=model_name,
+        kind=embed_type,
+        backend=backend,
+        source=source or getattr(sensor, "collection", None),
+        sensor=sensor,
+        temporal=temporal,
+        image_size=image_size,
+    )
+    m["hf_id"] = hf_id
+    if extra:
+        m.update(extra)
+    return m
+
+
+def pool_from_tokens(tokens, pooling):
+    n = len(tokens)
+    h2 = int((n - 1) ** 0.5)
+    has_cls = n > 1 and h2 * h2 == n - 1
+    patch = tokens[1:] if has_cls else tokens
+    if len(patch) == 0:
+        return tokens[0].astype("float32"), has_cls
+    if pooling == "mean":
+        return patch.mean(axis=0).astype("float32"), has_cls
+    if pooling == "max":
+        return patch.max(axis=0).astype("float32"), has_cls
+    raise ModelError(f"Unknown pooling={pooling!r} (expected 'mean' or 'max').")
+
+
+def tokens_to_grid_dhw(tokens):
+    n = len(tokens)
+    h2 = int((n - 1) ** 0.5)
+    has_cls = n > 1 and h2 * h2 == n - 1
+    patch = tokens[1:] if has_cls else tokens
+    p, d = patch.shape
+    hw = int(p**0.5)
+    if hw * hw != p:
+        raise ModelError(f"Patch token count {p} is not a perfect square.")
+    return patch.reshape(hw, hw, d).transpose(2, 0, 1).astype("float32"), (hw, hw), has_cls
+
 
 _SCALEMAE_IMAGENET_MEAN = (0.485, 0.456, 0.406)
 _SCALEMAE_IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -397,7 +470,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
     """
     ScaleMAE on-the-fly embedding from Sentinel-2 RGB patch (provider backend).
 
-    Strategy aligned via _vit_mae_utils:
+    Strategy aligned:
       - pooled: pool patch tokens by OutputSpec.pooling (exclude CLS if present)
       - grid: patch token grid (exclude CLS if present)
       - scale: derives effective input_res_m after preprocessing from sensor.scale_m
@@ -414,7 +487,6 @@ class ScaleMAERGBEmbedder(EmbedderBase):
         bands=("B4", "B3", "B2"),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_raw"),
         image_size=224,
         expected_channels=3,
     )
@@ -428,8 +500,7 @@ class ScaleMAERGBEmbedder(EmbedderBase):
             "inputs": {
                 "collection": self.input_spec.collection,
                 "bands": list(self.input_spec.bands),
-                "raw_normalization": self.input_spec.normalization.mode,
-                "model_preprocess": "imagenet_eval",
+                "model_preprocess": "s2_sr_raw_then_imagenet_eval",
             },
             "temporal": {"mode": "range"},
             "output": ["pooled", "grid"],

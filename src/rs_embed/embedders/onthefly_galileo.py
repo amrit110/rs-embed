@@ -16,32 +16,38 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
 from ..providers import ProviderBase
-from ..tools.temporal import temporal_frame_midpoints
-from ._vit_mae_utils import ensure_torch
-from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_to_range
-from .runtime_utils import (
-    coerce_input_to_tchw as _coerce_input_to_tchw,
-)
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_s2_multiframe_raw_tchw as _fetch_s2_multiframe_raw_tchw,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.normalization import (
+    coerce_input_to_tchw as _coerce_input_to_tchw,
+)
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     resolve_device_auto_torch as _resolve_device,
 )
+from ..tools.temporal import temporal_frame_midpoints
+from .base import EmbedderBase
+from .meta import build_meta, temporal_to_range
+
+
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
+
 
 _S2_10_BANDS = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8A", "B11", "B12"]
 _GALILEO_PRETRAIN_STATS = {
@@ -673,9 +679,6 @@ class GalileoEmbedder(EmbedderBase):
         cloudy_pct=30,
         temporal_mode="multi",
         n_frames=8,
-        normalization=NormalizationSpec(
-            mode="s2_sr_raw"
-        ),  # adapter keeps raw SR; model-side prep is configurable
         image_size=64,
         expected_channels=10,
     )

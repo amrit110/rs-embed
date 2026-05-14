@@ -16,25 +16,31 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
-from ._vit_mae_utils import ensure_torch
-from .base import EmbedderBase
-from .meta_utils import build_meta, temporal_to_range
-from .onthefly_terramind import _fetch_s2_sr_12_raw_chw
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     resolve_device_auto_torch as _resolve_device,
 )
+from .base import EmbedderBase
+from .meta import build_meta, temporal_to_range
+from .onthefly_terramind import _fetch_s2_sr_12_raw_chw
+
+
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
+
 
 _S2_SR_12_BANDS = [
     "B1",
@@ -493,7 +499,6 @@ class FoMoEmbedder(EmbedderBase):
         bands=tuple(_S2_SR_12_BANDS),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="none"),  # FoMo uses unit_scale internally
         image_size=64,
         expected_channels=12,
     )

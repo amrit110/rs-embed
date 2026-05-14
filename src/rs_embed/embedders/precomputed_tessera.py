@@ -20,7 +20,7 @@ from ..core.specs import (
     TemporalSpec,
 )
 from .base import EmbedderBase
-from .meta_utils import build_meta
+from .meta import build_meta
 
 _EMBED_DIMS = (64, 128, 256, 512, 768, 1024)
 _TESSERA_PROJECTION_WARNED = False

@@ -8,6 +8,19 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed
+
+- **Normalization responsibility moved entirely to embedders.** `NormalizationSpec` has been removed from `ModelInputSpec` and from `rs_embed.core.specs`. The `apply_normalization()` helper in `rs_embed.providers.fetch` has been removed. `fetch_input()` and all fetch helpers (`fetch_collection_patch_chw`, `fetch_s2_rgb_chw`, `fetch_s2_multiframe_raw_tchw`, `fetch_s1_vvvh_raw_chw`) now consistently return raw provider values (S2 DN in [0, 10000], S1 linear float, etc.); each embedder applies its own normalization inside `get_embedding()`. This eliminates a misleading contract where `ModelInputSpec.normalization` was declared but never automatically applied, and removes a normalize→denormalize round-trip that existed in some batch paths (remoteclip, wildsat).
+
+- **Internal refactor: provider and embedder layer separation.** The `embedders/runtime_utils.py` grab-bag module has been removed and its contents redistributed by responsibility:
+  - Provider selection and lifecycle management → `providers/resolution.py` (`default_provider_backend_name`, `resolve_provider_backend_name`, `is_provider_backend`, `get_cached_provider`, `create_provider_for_backend`)
+  - Provider fetch helpers and satellite normalization → `providers/fetch.py` (`fetch_sensor_patch_chw`, `fetch_collection_patch_chw`, `fetch_s2_rgb_chw`, `fetch_s1_vvvh_raw_chw`, `fetch_s2_multiframe_raw_tchw`, `normalize_s1_vvvh_chw`, `apply_normalization`, etc.)
+  - Device resolution and embedder instance loading → `tools/runtime.py` (`resolve_device_auto_torch`, `load_cached_with_device`)
+  - Input coercion → `tools/normalization.py` (`coerce_input_to_tchw`, `coerce_single_input_chw`)
+  - This fixes an inverted dependency where `tools/` was importing from `embedders/`.
+- **Internal refactor: embedder utility modules.** `embedders/_vit_mae_utils.py`, `embedders/image_utils.py`, and `embedders/token_utils.py` have been removed. Image preprocessing (`ensure_torch`, `resize_rgb_u8`, `fetch_s2_rgb_u8_from_provider`, CLIP norm, etc.) and ViT token operations (`pool_from_tokens`, `tokens_to_grid_dhw`) are now defined locally in each embedder that needs them. This makes each embedder file self-contained and eliminates hidden shared state between model implementations.
+- **Internal rename:** `embedders/meta_utils.py` → `embedders/meta.py`, `embedders/config_utils.py` → `embedders/config.py`. No functional change; the `_utils` suffix was removed to match the naming convention of other modules in the package.
+
 ### Added
 
 - `gse` now automatically tiles large spatial requests. If the estimated pixel footprint of a `BBox` at the requested `scale_m` exceeds the GEE `sampleRectangle` limit (default 512×512, overridable via `RS_EMBED_GSE_MAX_PIXELS`), the region is split into a sub-BBox grid, each tile is fetched from `GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`, and the embedding arrays are concatenated before pooling or grid output is applied. This removes the previous hard cap on request size and makes the result equivalent to a single large fetch.

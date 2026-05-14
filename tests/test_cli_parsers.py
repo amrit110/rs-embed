@@ -396,11 +396,11 @@ def test_export_npz_custom_backend_device():
 def test_cli_main_export_npz_maps_args(monkeypatch, capsys):
     captured = {}
 
-    def _fake_export_npz(**kwargs):
+    def _fake_export_batch(**kwargs):
         captured.update(kwargs)
         return {"ok": True}
 
-    monkeypatch.setattr(cli, "export_npz", _fake_export_npz)
+    monkeypatch.setattr(cli, "export_batch", _fake_export_batch)
 
     cli.main(
         [
@@ -424,8 +424,8 @@ def test_cli_main_export_npz_maps_args(monkeypatch, capsys):
     )
 
     assert captured["models"] == ["tessera"]
-    assert captured["save_manifest"] is False
-    assert captured["fail_on_bad_input"] is True
+    assert captured["config"].save_manifest is False
+    assert captured["config"].fail_on_bad_input is True
     assert captured["sensor"] is not None
     assert captured["sensor"].collection == "COPERNICUS/S2_SR_HARMONIZED"
     assert captured["sensor"].bands == ("B4", "B3", "B2")

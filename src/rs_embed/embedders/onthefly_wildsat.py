@@ -17,33 +17,69 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
-from ._vit_mae_utils import (
-    ensure_torch,
-    pool_from_tokens,
-    resize_rgb_u8,
-    tokens_to_grid_dhw,
-)
-from .base import EmbedderBase
-from .config_utils import model_config_value
-from .meta_utils import build_meta, temporal_to_range
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_s2_rgb_chw as _fetch_s2_rgb_chw,
 )
-from .runtime_utils import (
+from ..providers.resolution import (
     is_provider_backend,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     resolve_device_auto_torch as _resolve_device,
 )
+from .base import EmbedderBase
+from .config import model_config_value
+from .meta import build_meta, temporal_to_range
+
+
+def ensure_torch() -> None:
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        raise ModelError("This embedder requires torch installed.") from e
+
+
+def resize_rgb_u8(rgb_u8, out_size):
+    from PIL import Image
+
+    if rgb_u8.shape[0] == out_size and rgb_u8.shape[1] == out_size:
+        return rgb_u8
+    im = Image.fromarray(rgb_u8, mode="RGB")
+    return np.array(im.resize((out_size, out_size), resample=Image.BICUBIC), dtype=np.uint8)
+
+
+def pool_from_tokens(tokens, pooling):
+    n = len(tokens)
+    h2 = int((n - 1) ** 0.5)
+    has_cls = n > 1 and h2 * h2 == n - 1
+    patch = tokens[1:] if has_cls else tokens
+    if len(patch) == 0:
+        return tokens[0].astype("float32"), has_cls
+    if pooling == "mean":
+        return patch.mean(axis=0).astype("float32"), has_cls
+    if pooling == "max":
+        return patch.max(axis=0).astype("float32"), has_cls
+    raise ModelError(f"Unknown pooling={pooling!r} (expected 'mean' or 'max').")
+
+
+def tokens_to_grid_dhw(tokens):
+    n = len(tokens)
+    h2 = int((n - 1) ** 0.5)
+    has_cls = n > 1 and h2 * h2 == n - 1
+    patch = tokens[1:] if has_cls else tokens
+    p, d = patch.shape
+    hw = int(p**0.5)
+    if hw * hw != p:
+        raise ModelError(f"Patch token count {p} is not a perfect square.")
+    return patch.reshape(hw, hw, d).transpose(2, 0, 1).astype("float32"), (hw, hw), has_cls
+
 
 _SUPPORTED_ARCHES = {"vitb16", "resnet50", "swint"}
 
@@ -745,7 +781,6 @@ class WildSATEmbedder(EmbedderBase):
         bands=("B4", "B3", "B2"),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_clip"),
         image_size=224,
         expected_channels=3,
     )
@@ -848,7 +883,7 @@ class WildSATEmbedder(EmbedderBase):
                 cloudy_pct=int(ss.cloudy_pct),
                 composite=str(ss.composite),
             )
-            raw = np.clip(s2_rgb_chw * 10000.0, 0.0, 10000.0).astype(np.float32)
+            raw = np.clip(s2_rgb_chw, 0.0, 10000.0).astype(np.float32)
         else:
             raw = np.asarray(input_chw, dtype=np.float32)
             if raw.ndim != 3 or int(raw.shape[0]) != 3:
@@ -979,7 +1014,7 @@ class WildSATEmbedder(EmbedderBase):
                 cloudy_pct=cloudy_pct,
                 composite=composite,
             )
-            raw = np.clip(s2_rgb_chw * 10000.0, 0.0, 10000.0).astype(np.float32)
+            raw = np.clip(s2_rgb_chw, 0.0, 10000.0).astype(np.float32)
             return i, raw
 
         mw = self._resolve_fetch_workers(n)

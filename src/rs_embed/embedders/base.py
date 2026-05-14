@@ -39,7 +39,7 @@ class EmbedderBase:
         self._providers: dict[str, ProviderBase] = {}
 
     def _get_provider(self, backend: str) -> ProviderBase:
-        from .runtime_utils import get_cached_provider
+        from ..providers.resolution import get_cached_provider
 
         return get_cached_provider(
             self._providers, backend=backend, allow_auto=self._allow_auto_backend
@@ -83,8 +83,11 @@ class EmbedderBase:
 
         When ``input_spec`` is set and the method is not overridden, the
         default implementation performs a generic provider fetch using the
-        spec's collection, bands, scale, and normalization.  This ensures
-        both ``get_embedding()`` and ``export_batch()`` use identical fetch
+        spec's collection, bands, scale, and compositing parameters.  The
+        returned array contains raw provider values (DN / native units);
+        normalization to model input range is the embedder's responsibility
+        and must be applied in ``get_embedding()``.  This ensures both
+        ``get_embedding()`` and ``export_batch()`` use identical fetch
         semantics.
 
         Subclasses may override this for custom behavior (fallback chains,
@@ -115,7 +118,7 @@ class EmbedderBase:
         # input prep uses the same fetch overrides as the direct embedder path.
         fetch_sensor = sensor or spec.to_sensor_spec()
 
-        from .runtime_utils import (
+        from ..providers.fetch import (
             fetch_collection_patch_chw,
             fetch_s2_multiframe_raw_tchw,
         )

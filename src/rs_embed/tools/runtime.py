@@ -2,7 +2,8 @@
 
 This module owns embedder lifecycle concerns: instance caching, capability
 introspection, and request dispatch for single/batch embedding calls.
-Provider selection/fetch helpers live in ``embedders.runtime_utils``.
+Provider selection/management lives in ``providers.resolution``.
+Provider fetch helpers live in ``providers.fetch``.
 """
 
 from __future__ import annotations
@@ -25,9 +26,9 @@ from ..core.registry import get_embedder_cls
 from ..core.specs import OutputSpec, SensorSpec, SpatialSpec, TemporalSpec
 from ..core.types import FetchResult
 from ..core.validation import assert_supported
-from ..embedders.runtime_utils import default_provider_backend_name
 from ..providers import ProviderBase, get_provider, has_provider
-from ..providers.gee_utils import fetch_gee_patch_raw
+from ..providers.fetch import fetch_sensor_patch_chw as _fetch_sensor_patch_chw
+from ..providers.resolution import default_provider_backend_name
 from .model_defaults import default_sensor_for_model
 from .normalization import (
     _resolve_embedding_api_backend,
@@ -38,6 +39,33 @@ from .normalization import (
 from .output import normalize_embedding_output
 
 _T = TypeVar("_T")
+
+
+def resolve_device_auto_torch(device: str) -> str:
+    if device != "auto":
+        return device
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+    except Exception as _e:
+        return "cpu"
+
+
+def load_cached_with_device(
+    cached_loader: Callable[..., _T],
+    *,
+    device: str,
+    **kwargs: Any,
+) -> tuple[_T, str]:
+    """Resolve device once and call a cached loader that accepts `dev=...`."""
+    dev = resolve_device_auto_torch(device)
+    loaded = cached_loader(dev=dev, **kwargs)
+    return loaded, dev
 
 
 @dataclass(frozen=True)
@@ -399,7 +427,7 @@ def fetch_api_side_inputs(
             if fr is not None:
                 results.append(fr)
             else:
-                raw = fetch_gee_patch_raw(
+                raw = _fetch_sensor_patch_chw(
                     provider,
                     spatial=spatial,
                     temporal=temporal,

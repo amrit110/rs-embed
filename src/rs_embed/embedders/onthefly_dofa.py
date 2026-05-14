@@ -15,28 +15,27 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
     TemporalSpec,
 )
 from ..providers import ProviderBase
-from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
-from .base import EmbedderBase
-from .meta_utils import build_meta
-from .runtime_utils import (
-    coerce_single_input_chw,
-)
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
-from .runtime_utils import (
+from ..tools.normalization import (
+    coerce_single_input_chw,
+)
+from ..tools.runtime import (
     load_cached_with_device as _load_cached_with_device,
 )
-from .runtime_utils import (
+from ..tools.runtime import (
     resolve_device_auto_torch as _resolve_device_auto,
 )
+from ._vendor.dofa_vit import vit_base_patch16, vit_large_patch16
+from .base import EmbedderBase
+from .meta import build_meta
 
 # -----------------------------
 # Defaults: Sentinel-2 SR (official DOFA 9-band order)
@@ -646,7 +645,6 @@ class DOFAEmbedder(EmbedderBase):
         bands=tuple(_DOFA_S2_BANDS),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_raw"),
         image_size=224,
         expected_channels=9,
     )

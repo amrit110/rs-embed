@@ -20,7 +20,7 @@ from ..core.specs import (
 )
 from ._vendor.copernicus_embed import CopernicusEmbedGeoTiff
 from .base import EmbedderBase
-from .meta_utils import build_meta
+from .meta import build_meta
 
 SUPPORTED_YEARS = {2021}
 _COPERNICUS_PROJECTION_WARNED = False

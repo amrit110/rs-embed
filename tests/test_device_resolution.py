@@ -1,4 +1,4 @@
-"""Tests for resolve_device_auto_torch in embedders.runtime_utils.
+"""Tests for resolve_device_auto_torch in tools.runtime.
 
 Covers the priority order: cuda > mps > cpu, pass-through of explicit
 device strings, and the torch-not-installed fallback.
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from rs_embed.embedders.runtime_utils import resolve_device_auto_torch
+from rs_embed.tools.runtime import resolve_device_auto_torch
 
 # ---------------------------------------------------------------------------
 # Helpers

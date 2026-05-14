@@ -15,7 +15,6 @@ from ..core.errors import ModelError
 from ..core.registry import register
 from ..core.specs import (
     ModelInputSpec,
-    NormalizationSpec,
     OutputSpec,
     SensorSpec,
     SpatialSpec,
@@ -23,26 +22,26 @@ from ..core.specs import (
 )
 from ..core.types import FetchResult
 from ..providers import ProviderBase
-from .base import EmbedderBase
-from .meta_utils import build_meta
-from .runtime_utils import (
-    coerce_single_input_chw,
-)
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
 )
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_s1_vvvh_raw_chw as _fetch_s1_vvvh_raw_chw_shared,
 )
-from .runtime_utils import (
+from ..providers.fetch import (
     fetch_s1_vvvh_raw_chw_with_meta as _fetch_s1_vvvh_raw_chw_with_meta_shared,
 )
-from .runtime_utils import (
+from ..providers.fetch import (
     normalize_s1_vvvh_chw as _normalize_s1_vvvh_chw,
 )
-from .runtime_utils import (
+from ..tools.normalization import (
+    coerce_single_input_chw,
+)
+from ..tools.runtime import (
     resolve_device_auto_torch as _auto_device,
 )
+from .base import EmbedderBase
+from .meta import build_meta
 
 HF_REPO_ID = "MBZUAI/TerraFM"
 HF_WEIGHT_FILE_B = "TerraFM-B.pth"
@@ -411,7 +410,6 @@ class TerraFMBEmbedder(EmbedderBase):
         bands=tuple(_S2_SR_12_BANDS),
         scale_m=10,
         cloudy_pct=30,
-        normalization=NormalizationSpec(mode="s2_sr_clip"),
         image_size=224,
         expected_channels=12,
     )

@@ -15,9 +15,9 @@ import argparse
 import json
 import sys
 
+from .api import export_batch, inspect_gee_patch
 from .core.specs import BBox, OutputSpec, PointBuffer, SensorSpec, TemporalSpec
-from .export import export_npz
-from .inspect import inspect_gee_patch
+from .core.types import ExportConfig, ExportTarget
 
 
 def _parse_bands(s: str) -> tuple[str, ...]:
@@ -279,22 +279,24 @@ def main(argv: list[str] | None = None) -> None:
                 check_raise=False,
             )
 
-        manifest = export_npz(
-            out_path=args.out,
-            models=args.models,
-            spatial=spatial,
+        manifest = export_batch(
+            spatials=[spatial],
             temporal=temporal,
+            models=args.models,
+            target=ExportTarget.combined(args.out),
+            config=ExportConfig(
+                save_inputs=not args.no_inputs,
+                save_embeddings=not args.no_embeddings,
+                save_manifest=not args.no_json,
+                fail_on_bad_input=args.fail_on_bad_input,
+                continue_on_error=args.continue_on_error,
+                max_retries=args.max_retries,
+                retry_backoff_s=args.retry_backoff_s,
+            ),
             sensor=sensor_override,
             output=output,
             backend=args.backend,
             device=args.device,
-            save_inputs=not args.no_inputs,
-            save_embeddings=not args.no_embeddings,
-            save_manifest=not args.no_json,
-            fail_on_bad_input=args.fail_on_bad_input,
-            continue_on_error=args.continue_on_error,
-            max_retries=args.max_retries,
-            retry_backoff_s=args.retry_backoff_s,
         )
 
         json.dump(manifest, sys.stdout, ensure_ascii=False, indent=2)
