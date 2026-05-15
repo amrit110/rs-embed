@@ -8,6 +8,20 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLI `ModuleNotFoundError` on import.** `rs_embed.cli` was importing from `rs_embed.export` and `rs_embed.inspect`, two modules that do not exist in the current package layout. The imports now point directly to `rs_embed.api` (`export_batch`, `inspect_gee_patch`). The `export-npz` subcommand call site has been updated to match `export_batch`'s current signature: a single spatial argument is wrapped in `spatials=[...]`, the output path becomes `ExportTarget.combined(args.out)`, and the flat boolean flags (`save_inputs`, `save_manifest`, etc.) are grouped into an `ExportConfig` object. The stub injection in `tests/test_cli_parsers.py` that was masking the broken imports has been removed and the integration test updated to patch `cli.export_batch` instead of `cli.export_npz`.
+
+- **GEE tile orientation made explicit and self-contained.** `GEEProvider.fetch_array_chw` now applies `_flip_sample_tile_y` internally before returning, giving the method a documented north-up contract. Previously the flip was the caller's responsibility inside `_fetch_provider_array_chw_with_bbox_fallback`, which created a leaky abstraction: any `ProviderBase` subclass overriding `fetch_array_chw` had to know to return south-up raw data or risk being flipped twice. The caller no longer applies a second flip. The `_sample_image_bands_raw_chw` docstring now documents that GEE's `reproject(crs=..., scale=...)` **without** `.clip()` naturally returns north-up rows, and warns explicitly that adding `.clip()` would change the row ordering to south-up and break the multiframe fetch path. `_flip_sample_tile_y` docstring updated to describe exactly which call pattern requires it and which does not.
+
+### Changed
+
+- **`ProviderBase.fetch_array_chw` contract tightened to north-up.** The method is now required to return north-up CHW float32. Custom provider implementations must either return north-up data directly or apply `_flip_sample_tile_y` internally. Test fake providers in `test_api_helpers.py` have been updated accordingly (north-up row generation, renamed test functions).
+
+### Added
+
+- **Orientation regression test for `_fetch_all_bands_impl`.** `test_gee_provider.py` now includes `test_fetch_all_bands_impl_passes_through_gee_row_order`, which injects a mock GEE `sampleRectangle` response with a known row order and asserts the function output matches exactly (no flip applied). This locks in the pass-through behaviour so that any accidental flip addition is caught immediately, and documents that the north-up guarantee for `fetch_collection_patch_all_bands_chw` comes from GEE's empirical behaviour for the `reproject(crs=..., scale=...) + clip` call pattern rather than from Python-level normalization.
+
 ### Changed
 
 - **Normalization responsibility moved entirely to embedders.** `NormalizationSpec` has been removed from `ModelInputSpec` and from `rs_embed.core.specs`. The `apply_normalization()` helper in `rs_embed.providers.fetch` has been removed. `fetch_input()` and all fetch helpers (`fetch_collection_patch_chw`, `fetch_s2_rgb_chw`, `fetch_s2_multiframe_raw_tchw`, `fetch_s1_vvvh_raw_chw`) now consistently return raw provider values (S2 DN in [0, 10000], S1 linear float, etc.); each embedder applies its own normalization inside `get_embedding()`. This eliminates a misleading contract where `ModelInputSpec.normalization` was declared but never automatically applied, and removes a normalize→denormalize round-trip that existed in some batch paths (remoteclip, wildsat).

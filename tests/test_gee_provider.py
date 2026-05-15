@@ -668,3 +668,96 @@ def test_fetch_s1_vvvh_raw_chw_relaxes_iw_and_reports_meta(monkeypatch):
     assert meta["s1_iw_requested"] is True
     assert meta["s1_iw_applied"] is False
     assert meta["s1_iw_relaxed_on_empty"] is True
+
+
+# ══════════════════════════════════════════════════════════════════════
+# _fetch_all_bands_impl — orientation contract
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_fetch_all_bands_impl_passes_through_gee_row_order(monkeypatch):
+    """Orientation contract test for _fetch_all_bands_impl.
+
+    The function applies **no** spatial flip — it passes through whatever row
+    order GEE's ``sampleRectangle`` returns.  For the
+    ``reproject(crs=..., scale=...) + .clip()`` call pattern used here, GEE
+    empirically returns north-up rows (row 0 = northernmost).  This test locks
+    in the pass-through behaviour so that any accidental flip addition would be
+    caught immediately.
+
+    The mock injects two distinguishable rows:
+      row 0 → [1, 2]   (northernmost row, per the empirical GEE convention)
+      row 1 → [3, 4]   (southernmost row)
+
+    We assert the output preserves this exact order.  If GEE is ever found to
+    return south-up for this pattern, add ``_flip_sample_tile_y`` to
+    ``_fetch_all_bands_impl`` **and** update this test to expect the flipped
+    order.
+    """
+    import numpy as np
+
+    from rs_embed.core.specs import BBox, TemporalSpec
+
+    # ── GEE pixel data: row 0 = [1, 2], row 1 = [3, 4] ────────────────
+    _NORTH_ROW = [1.0, 2.0]
+    _SOUTH_ROW = [3.0, 4.0]
+
+    class _FakeImage:
+        def reproject(self, **_kw):
+            return self
+
+        def clip(self, _region):
+            return self
+
+        def bandNames(self):
+            class _Names:
+                def getInfo(self):
+                    return ["B1"]
+
+            return _Names()
+
+        def sampleRectangle(self, **_kw):
+            class _Rect:
+                def getInfo(self):
+                    return {"properties": {"B1": [_NORTH_ROW, _SOUTH_ROW]}}
+
+            return _Rect()
+
+    class _FakeCollection:
+        def filterBounds(self, _r):
+            return self
+
+        def filterDate(self, _s, _e):
+            return self
+
+        def size(self):
+            class _Size:
+                def getInfo(self):
+                    return 1
+
+            return _Size()
+
+        def median(self):
+            return _FakeImage()
+
+    fake_ee = types.SimpleNamespace(ImageCollection=lambda _c: _FakeCollection())
+    monkeypatch.setitem(sys.modules, "ee", fake_ee)
+
+    provider = GEEProvider(auto_auth=False)
+    monkeypatch.setattr(provider, "ensure_ready", lambda: None)
+    monkeypatch.setattr(provider, "get_region", lambda _spatial: object())
+
+    arr, names = provider._fetch_all_bands_impl(
+        spatial=BBox(minlon=0.0, minlat=0.0, maxlon=1.0, maxlat=1.0),
+        temporal=TemporalSpec.year(2024),
+        collection="FAKE/COLL",
+        scale_m=10,
+        fill_value=0.0,
+    )
+
+    assert names == ("B1",)
+    assert arr.shape == (1, 2, 2)
+    # Row order is preserved as-is from GEE — no flip applied.
+    # Empirically GEE returns north-up for this call pattern, so row 0 = northernmost.
+    np.testing.assert_allclose(arr[0, 0], _NORTH_ROW)
+    np.testing.assert_allclose(arr[0, 1], _SOUTH_ROW)

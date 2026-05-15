@@ -372,6 +372,20 @@ def _sample_image_bands_raw_chw(
     scale_m: int,
     fill_value: float,
 ) -> np.ndarray:
+    """Sample a GEE image as **north-up** CHW float32 in [0, 10_000].
+
+    GEE's ``sampleRectangle`` returns rows in north-to-south order when the
+    image is reprojected via ``reproject(crs=..., scale=...)`` **without** a
+    prior ``.clip()``.  This specific call pattern is what guarantees north-up
+    output here — no explicit flip is applied.
+
+    .. warning::
+        Do **not** add ``.clip(region)`` before ``sampleRectangle`` in this
+        function.  With the ``reproject(crs=..., scale=...)`` form, clipping
+        causes GEE to return south-up rows (the opposite convention), which
+        would silently invert every multiframe tile.  If masking of
+        non-rectangular regions is required, use ``fetch_array_chw`` instead.
+    """
     img = img.select(list(bands)).reproject(crs="EPSG:3857", scale=int(scale_m))
     rect = img.sampleRectangle(region=region, defaultValue=float(fill_value)).getInfo()
     props = rect.get("properties", {}) if isinstance(rect, dict) else {}
@@ -390,7 +404,18 @@ def _sample_image_bands_raw_chw(
 
 
 def _flip_sample_tile_y(arr: np.ndarray) -> np.ndarray:
-    """Normalize a fetched tile to north-up row order once at the leaf fetch."""
+    """Flip the penultimate (height) axis of a CHW or TCHW array from south-up to north-up.
+
+    Called by ``_fetch_provider_array_chw_with_bbox_fallback`` (the single-frame
+    leaf-fetch layer) to normalise the raw south-up output of
+    ``GEEProvider.fetch_array_chw``.  ``fetch_array_chw`` uses
+    ``ee.Projection.atScale() + .clip(region)`` before ``sampleRectangle``,
+    which causes GEE to return rows in south-up order.
+
+    ``_sample_image_bands_raw_chw`` uses a different call pattern
+    (``reproject(crs=..., scale=...)`` **without** clip) that already returns
+    north-up rows from GEE; applying this flip there would invert those tiles.
+    """
     a = np.asarray(arr, dtype=np.float32)
     if a.ndim < 2:
         raise ModelError(f"Expected fetched tile with spatial last2 dims, got shape={a.shape}")
@@ -486,15 +511,18 @@ def _fetch_provider_array_chw_with_bbox_fallback(
 ) -> np.ndarray:
     def _do(sp: SpatialSpec) -> np.ndarray:
         region = provider.get_region(sp)
-        arr = provider.fetch_array_chw(
-            image=image,
-            bands=bands,
-            region=region,
-            scale_m=int(scale_m),
-            fill_value=float(fill_value),
-            collection=collection,
+        # fetch_array_chw owns its orientation contract: always returns north-up.
+        return np.asarray(
+            provider.fetch_array_chw(
+                image=image,
+                bands=bands,
+                region=region,
+                scale_m=int(scale_m),
+                fill_value=float(fill_value),
+                collection=collection,
+            ),
+            dtype=np.float32,
         )
-        return _flip_sample_tile_y(np.asarray(arr, dtype=np.float32))
 
     return _fetch_with_bbox_fallback(
         spatial=spatial,
