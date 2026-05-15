@@ -406,11 +406,10 @@ def _sample_image_bands_raw_chw(
 def _flip_sample_tile_y(arr: np.ndarray) -> np.ndarray:
     """Flip the penultimate (height) axis of a CHW or TCHW array from south-up to north-up.
 
-    Called by ``_fetch_provider_array_chw_with_bbox_fallback`` (the single-frame
-    leaf-fetch layer) to normalise the raw south-up output of
-    ``GEEProvider.fetch_array_chw``.  ``fetch_array_chw`` uses
-    ``ee.Projection.atScale() + .clip(region)`` before ``sampleRectangle``,
-    which causes GEE to return rows in south-up order.
+    Called inside ``GEEProvider.fetch_array_chw``, which uses
+    ``ee.Projection.atScale() + .clip(region)`` before ``sampleRectangle``.
+    That call pattern causes GEE to return rows in south-up order, so the flip
+    is applied at the end of ``fetch_array_chw`` before returning to callers.
 
     ``_sample_image_bands_raw_chw`` uses a different call pattern
     (``reproject(crs=..., scale=...)`` **without** clip) that already returns
