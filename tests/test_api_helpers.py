@@ -40,7 +40,8 @@ class _FakeBBoxSplitProvider(ProviderBase):
                 f"{self.max_pixels}. Got "
                 f"{h * w}."
             )
-        yy = np.arange(y0 + h - 1, y0 - 1, -1, dtype=np.float32)[:, None]
+        # fetch_array_chw contract: returns north-up CHW (row 0 = northernmost).
+        yy = np.arange(y0, y0 + h, dtype=np.float32)[:, None]
         xx = np.arange(x0, x0 + w, dtype=np.float32)[None, :]
         base = yy * 100.0 + xx
         out = np.stack([base + float(i) * 1000.0 for i in range(len(bands))], axis=0)
@@ -89,7 +90,8 @@ class _FakeBoundaryOverlapProvider(_FakeBBoxSplitProvider):
             if x0 + w < self.full_w:
                 w += 1
 
-        yy = np.arange(y0 + h - 1, y0 - 1, -1, dtype=np.float32)[:, None]
+        # fetch_array_chw contract: returns north-up CHW (row 0 = northernmost).
+        yy = np.arange(y0, y0 + h, dtype=np.float32)[:, None]
         xx = np.arange(x0, x0 + w, dtype=np.float32)[None, :]
         base = yy * 100.0 + xx
         out = np.stack([base + float(i) * 1000.0 for i in range(len(bands))], axis=0)
@@ -170,7 +172,7 @@ def test_fetch_provider_patch_raw_uses_generic_path_for_s1():
 
         def fetch_array_chw(self, *, image, bands, region, scale_m, fill_value, collection=None):
             self.fetch_calls += 1
-            # Return south-up array (will be flipped by _flip_sample_tile_y)
+            # fetch_array_chw contract: return north-up CHW.
             return np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)
 
     provider = _FakeGenericS1Provider()
@@ -194,7 +196,7 @@ def test_fetch_provider_patch_raw_uses_generic_path_for_s1():
     assert provider.fetch_calls == 1
 
 
-def test_fetch_provider_patch_raw_flips_single_south_up_tile_before_return():
+def test_fetch_provider_patch_raw_returns_north_up_tile():
     provider = _FakeBBoxSplitProvider()
     sensor = SensorSpec(collection="FAKE/COLL", bands=("B1",), scale_m=75000, fill_value=0.0)
     spatial = BBox(minlon=0.0, minlat=0.0, maxlon=2.0, maxlat=1.0)
@@ -230,7 +232,7 @@ def test_fetch_provider_patch_raw_trims_boundary_overlap_when_stitching():
     np.testing.assert_allclose(arr, expected)
 
 
-def test_fetch_provider_patch_raw_flips_south_up_tiles_for_y_stitch():
+def test_fetch_provider_patch_raw_correctly_stitches_y_split_tiles():
     provider = _FakeVerticalSouthUpProvider()
     sensor = SensorSpec(collection="FAKE/COLL", bands=("B1",), scale_m=75000, fill_value=0.0)
 
@@ -249,7 +251,7 @@ def test_fetch_provider_patch_raw_flips_south_up_tiles_for_y_stitch():
     np.testing.assert_allclose(arr, expected)
 
 
-def test_fetch_provider_patch_raw_flips_south_up_tiles_across_recursive_y_stitch():
+def test_fetch_provider_patch_raw_correctly_stitches_recursive_y_split_tiles():
     provider = _FakeDeepVerticalSouthUpProvider()
     sensor = SensorSpec(collection="FAKE/COLL", bands=("B1",), scale_m=75000, fill_value=0.0)
 

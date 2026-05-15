@@ -15,6 +15,7 @@ from .gee_utils import (
     _build_s1_dualpol_collection,
     _collection_size_or_none,
     _fetch_with_bbox_fallback,
+    _flip_sample_tile_y,
     _format_s1_empty_collection_message,
     _gee_error_message,
     _gee_init_kwargs,
@@ -138,11 +139,17 @@ class GEEProvider(ProviderBase):
         fill_value: float,
         collection: str | None = None,
     ) -> np.ndarray:
-        """Download a rectangular patch as CHW array.
+        """Download a rectangular patch as **north-up** CHW float32.
 
-        - Resolves band aliases like BLUE/GREEN/RED -> B2/B3/B4 (S2) etc.
-        - Forces deterministic pixel grid by reprojecting to EPSG:3857 at `scale_m`
-          before sampleRectangle (prevents accidental (C,1,1)).
+        Uses ``ee.Projection.atScale()`` + ``.clip(region)`` before
+        ``sampleRectangle``.  That combination causes GEE to return rows in
+        south-up order, so ``_flip_sample_tile_y`` is applied here before
+        returning — callers always receive north-up output and must not flip
+        again.
+
+        Also resolves band aliases (BLUE/GREEN/RED → B2/B3/B4 for S2, etc.)
+        and clips to ``region`` so that pixels outside non-rectangular
+        geometries (e.g. PointBuffer) are filled with ``fill_value``.
         """
         import ee
 
@@ -155,11 +162,11 @@ class GEEProvider(ProviderBase):
         # 2) Select resolved bands (this will error at compute-time if typo)
         img = image.select(list(resolved))
 
-        # 3) Force pixel grid at desired scale
+        # 3) Force pixel grid at desired scale; clip masks non-rectangular regions
         proj = ee.Projection("EPSG:3857").atScale(int(scale_m))
         img = img.reproject(proj).clip(region)
 
-        # 4) Sample and build CHW
+        # 4) Sample and build CHW (raw GEE output is south-up with atScale+clip)
         rect = img.sampleRectangle(region=region, defaultValue=fill_value).getInfo()
         props = rect.get("properties", {})
         if not props:
@@ -180,7 +187,8 @@ class GEEProvider(ProviderBase):
                 f"Requested={resolved}. Available bands={avail}"
             )
 
-        return np.stack(arrs, axis=0)
+        # 5) Normalise to north-up: atScale+clip yields south-up rows from GEE
+        return _flip_sample_tile_y(np.stack(arrs, axis=0))
 
     def normalize_bands(
         self,
@@ -591,6 +599,9 @@ class GEEProvider(ProviderBase):
         else:
             raise ProviderError(f"Unknown composite='{composite}'. Use 'median' or 'mosaic'.")
 
+        # reproject(crs=..., scale=...) + clip: empirically north-up (matches
+        # _sample_image_bands_raw_chw's no-clip behaviour).  If this is ever
+        # found to be south-up, add _flip_sample_tile_y to the return value.
         img = img.reproject(crs="EPSG:3857", scale=int(scale_m)).clip(region)
         band_names_raw = img.bandNames().getInfo()
         band_names = tuple(str(b) for b in (band_names_raw or []))
