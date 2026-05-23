@@ -756,7 +756,9 @@ class FoMoEmbedder(EmbedderBase):
         depth = int(os.environ.get("RS_EMBED_FOMO_DEPTH", str(self.DEFAULT_DEPTH)))
         heads = int(os.environ.get("RS_EMBED_FOMO_HEADS", str(self.DEFAULT_HEADS)))
         mlp_dim = int(os.environ.get("RS_EMBED_FOMO_MLP_DIM", str(self.DEFAULT_MLP_DIM)))
-        num_classes = int(os.environ.get("RS_EMBED_FOMO_NUM_CLASSES", str(self.DEFAULT_NUM_CLASSES)))
+        num_classes = int(
+            os.environ.get("RS_EMBED_FOMO_NUM_CLASSES", str(self.DEFAULT_NUM_CLASSES))
+        )
         norm_mode = os.environ.get("RS_EMBED_FOMO_NORM", "unit_scale").strip()
 
         ckpt_path = _resolve_fomo_ckpt_path()
@@ -766,12 +768,10 @@ class FoMoEmbedder(EmbedderBase):
         for inp in input_chws:
             raw = np.asarray(inp, dtype=np.float32)
             if raw.ndim != 3 or int(raw.shape[0]) != len(_S2_SR_12_BANDS):
-                raise ModelError(
-                    f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}"
-                )
-            raw = np.clip(
-                np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0
-            ).astype(np.float32)
+                raise ModelError(f"input_chw must be CHW with 12 bands for fomo, got {raw.shape}")
+            raw = np.clip(np.nan_to_num(raw, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 10000.0).astype(
+                np.float32
+            )
             x = _normalize_s2(raw, mode=norm_mode)
             if int(x.shape[-2]) != image_size or int(x.shape[-1]) != image_size:
                 x = _resize_chw(x, out_hw=image_size)

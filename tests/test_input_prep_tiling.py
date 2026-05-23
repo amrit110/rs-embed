@@ -1,8 +1,8 @@
 import numpy as np
 
 from rs_embed.core.embedding import Embedding
-from rs_embed.core.specs import BBox, InputPrepSpec, OutputSpec, SpatialSpec
-from rs_embed.core.types import ExportConfig, TaskResult
+from rs_embed.core.specs import BBox, InputPrepSpec, OutputSpec
+from rs_embed.core.types import ExportConfig
 from rs_embed.tools.tiling import (
     _call_embedder_get_embedding_with_input_prep,
     _tile_yx_starts,
@@ -182,16 +182,26 @@ class _FakeTileEmbedderWithBase(_FakeTileEmbedder):
     def describe(self):
         return {"defaults": {"image_size": 4}}
 
-    def get_embedding(self, *, spatial, temporal=None, sensor=None,
-                      output=OutputSpec.pooled(), backend="gee", device="cpu",
-                      input_chw=None):
+    def get_embedding(
+        self,
+        *,
+        spatial,
+        temporal=None,
+        sensor=None,
+        output=OutputSpec.pooled(),
+        backend="gee",
+        device="cpu",
+        input_chw=None,
+    ):
         self.single_calls += 1
         x = np.asarray(input_chw, dtype=np.float32)
         if output.mode == "grid":
             return Embedding(
                 data=x[:1].copy(),
-                meta={"y_axis_direction": "north_to_south",
-                      "grid_hw": (int(x.shape[-2]), int(x.shape[-1]))},
+                meta={
+                    "y_axis_direction": "north_to_south",
+                    "grid_hw": (int(x.shape[-2]), int(x.shape[-1])),
+                },
             )
         return Embedding(data=np.asarray([float(x.mean())], dtype=np.float32), meta={})
 
@@ -208,8 +218,6 @@ def test_run_batch_tiled_aggregates_multiple_points():
     """_run_batch_tiled should tile each image and return one result per spatial point."""
     import threading
 
-    from rs_embed.pipelines.inference import InferenceEngine
-
     emb = _FakeTileEmbedderWithBase()
     lock = threading.RLock()
     engine = _make_engine(tile_size=4)
@@ -217,11 +225,11 @@ def test_run_batch_tiled_aggregates_multiple_points():
     n_points = 3
     # Each image is 6x6 → 4 tiles of size 4x4
     images = {
-        i: np.arange(36, dtype=np.float32).reshape(1, 6, 6) * (i + 1)
-        for i in range(n_points)
+        i: np.arange(36, dtype=np.float32).reshape(1, 6, 6) * (i + 1) for i in range(n_points)
     }
-    spatials = [BBox(minlon=float(i), minlat=0.0, maxlon=float(i + 1), maxlat=1.0)
-                for i in range(n_points)]
+    spatials = [
+        BBox(minlon=float(i), minlat=0.0, maxlon=float(i + 1), maxlat=1.0) for i in range(n_points)
+    ]
 
     done_indices: list[int] = []
 
@@ -266,17 +274,18 @@ def test_infer_chunk_tile_mode_uses_batch_on_gpu(monkeypatch):
     # Force prefer_batch=True without a real GPU
     monkeypatch.setattr(inf_mod, "_device_has_gpu", lambda _: True)
 
-    from rs_embed.pipelines.inference import InferenceEngine
-    from rs_embed.core.types import ModelConfig, ExportConfig
     from rs_embed.core.specs import InputPrepSpec, OutputSpec
+    from rs_embed.core.types import ExportConfig, ModelConfig
+    from rs_embed.pipelines.inference import InferenceEngine
 
     cfg = ExportConfig(input_prep=InputPrepSpec.tile(tile_size=4, max_tiles=16))
     engine = InferenceEngine(device="cpu", output=OutputSpec.pooled("mean"), config=cfg)
 
     n = 2
     images = {i: np.ones((1, 6, 6), dtype=np.float32) * (i + 1) for i in range(n)}
-    spatials = [BBox(minlon=float(i), minlat=0.0, maxlon=float(i + 1), maxlat=1.0)
-                for i in range(n)]
+    spatials = [
+        BBox(minlon=float(i), minlat=0.0, maxlon=float(i + 1), maxlat=1.0) for i in range(n)
+    ]
 
     tiled_called: list[bool] = []
     original_run_batch_tiled = engine._run_batch_tiled
@@ -287,8 +296,8 @@ def test_infer_chunk_tile_mode_uses_batch_on_gpu(monkeypatch):
 
     engine._run_batch_tiled = _spy_tiled
 
-    from rs_embed.tools.serialization import sensor_cache_key
     from rs_embed.core.specs import SensorSpec
+    from rs_embed.tools.serialization import sensor_cache_key
 
     sensor = SensorSpec(collection="FAKE/S2", bands=("B2", "B3", "B4"), scale_m=10, fill_value=0.0)
     skey = sensor_cache_key(sensor)
@@ -296,6 +305,7 @@ def test_infer_chunk_tile_mode_uses_batch_on_gpu(monkeypatch):
 
     # Patch resolve_model_context to return our fake embedder
     from rs_embed.pipelines.inference import _ModelContext
+
     monkeypatch.setattr(
         engine,
         "_resolve_model_context",

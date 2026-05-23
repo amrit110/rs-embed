@@ -473,7 +473,7 @@ class InferenceEngine:
                 all_tile_embs.extend(sub_embs)
 
             # Step 3: stitch tiles back into per-point embeddings.
-            for i, _spatial, inp in ready:
+            for i, _spatial, _inp in ready:
                 flat_start, tile_count, tile_metas, h, w, tiled_mc = tile_map[i]
                 tile_embs = all_tile_embs[flat_start : flat_start + tile_count]
                 tile_embs_n = [

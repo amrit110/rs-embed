@@ -1590,8 +1590,7 @@ class SatVisionTOAEmbedder(EmbedderBase):
                         for k in _normalize_indices(rt["reflectance_indices"], rt["in_chans"])
                     ),
                     "emissive_indices": tuple(
-                        int(k)
-                        for k in _normalize_indices(rt["emissive_indices"], rt["in_chans"])
+                        int(k) for k in _normalize_indices(rt["emissive_indices"], rt["in_chans"])
                     ),
                     "reflectance_divisor": float(rt["reflectance_divisor"]),
                     "emissive_mins": tuple(float(v) for v in rt["emissive_mins"]),

@@ -823,7 +823,7 @@ def _wildsat_forward_batch(
         if not hasattr(out, "ndim"):
             raise ModelError(f"WildSAT backbone returned unsupported output type: {type(out)}")
         if int(out.ndim) == 2:
-            backbone_vec_t = out       # B×D
+            backbone_vec_t = out  # B×D
         elif int(out.ndim) == 4:
             backbone_vec_t = out.mean(dim=(2, 3))  # B×D
         else:
@@ -882,18 +882,20 @@ def _wildsat_forward_batch(
                     "grid_cls_removed": False,
                 }
 
-        results.append((
-            vec_np,
-            grid_np,
-            {
-                "feature_source": used_source,
-                "feature_dim": int(vec_np.shape[0]),
-                "pooled_from_tokens": bool(pooled_from_tokens and (tok_np is not None)),
-                "pooled_cls_removed": bool(pooled_cls_removed),
-                "tokens_available": bool(tok_np is not None),
-                **grid_meta,
-            },
-        ))
+        results.append(
+            (
+                vec_np,
+                grid_np,
+                {
+                    "feature_source": used_source,
+                    "feature_dim": int(vec_np.shape[0]),
+                    "pooled_from_tokens": bool(pooled_from_tokens and (tok_np is not None)),
+                    "pooled_cls_removed": bool(pooled_cls_removed),
+                    "tokens_available": bool(tok_np is not None),
+                    **grid_meta,
+                },
+            )
+        )
 
     return results
 
@@ -1248,8 +1250,7 @@ class WildSATEmbedder(EmbedderBase):
         )
 
         embeddings: list[Embedding] = []
-        for i, (vec, grid, fmeta) in enumerate(batch_results):
-            sp = spatials[i] if i < len(spatials) else spatials[-1]
+        for _i, (vec, grid, fmeta) in enumerate(batch_results):
             meta = build_meta(
                 model=self.model_name,
                 kind="on_the_fly",

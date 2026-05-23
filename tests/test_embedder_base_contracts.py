@@ -227,12 +227,14 @@ def test_copernicus_vendor_axis_order_detection():
 # batch implementation.
 # ---------------------------------------------------------------------------
 
-_KNOWN_MISSING_BATCH_FROM_INPUTS: frozenset[str] = frozenset({
-    "agrifm",
-    "anysat",
-    "galileo",
-    "thor",
-})
+_KNOWN_MISSING_BATCH_FROM_INPUTS: frozenset[str] = frozenset(
+    {
+        "agrifm",
+        "anysat",
+        "galileo",
+        "thor",
+    }
+)
 
 
 def test_onthefly_embedders_that_accept_input_chw_implement_batch_from_inputs():
@@ -241,8 +243,8 @@ def test_onthefly_embedders_that_accept_input_chw_implement_batch_from_inputs():
     """
     from importlib import import_module
 
-    from rs_embed.embedders.catalog import MODEL_SPECS as _CATALOG
     from rs_embed.embedders.base import EmbedderBase
+    from rs_embed.embedders.catalog import MODEL_SPECS as _CATALOG
     from rs_embed.tools.runtime import embedder_accepts_input_chw
 
     missing_override: list[str] = []
@@ -266,8 +268,8 @@ def test_onthefly_embedders_that_accept_input_chw_implement_batch_from_inputs():
                 missing_override.append(model_id)
 
     assert not missing_override, (
-        f"The following on-the-fly embedders accept input_chw but do NOT override "
-        f"get_embeddings_batch_from_inputs (add a real batch implementation, then "
-        f"remove from _KNOWN_MISSING_BATCH_FROM_INPUTS if present):\n  "
+        "The following on-the-fly embedders accept input_chw but do NOT override "
+        "get_embeddings_batch_from_inputs (add a real batch implementation, then "
+        "remove from _KNOWN_MISSING_BATCH_FROM_INPUTS if present):\n  "
         + "\n  ".join(sorted(missing_override))
     )
