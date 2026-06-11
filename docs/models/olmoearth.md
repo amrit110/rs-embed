@@ -123,6 +123,43 @@ Target pixel size for the resize step. The fetched patch is always resized to `(
 
 Default: `256` (matching the OlmoEarth training tile size).
 
+### `temporal_mode`
+
+| Value             | Behavior                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `single` (default) | One composite over the whole temporal range (`T=1`), timestamp = range midpoint               |
+| `multi`           | One composite per **30-day bin** anchored at the range start, up to **12 frames**             |
+
+`multi` mirrors how OlmoEarth was pretrained: the official pipeline slices each
+sample's year window into fixed 30-day bins (`duration=30d` strides in the
+rslearn config — *not* calendar months), and feeds each frame's start date as
+its `(day, month, year)` timestamp. The adapter reproduces exactly that:
+
+- Bins: `[start, start+30d), [start+30d, start+60d), …`, last bin truncated at
+  the range end, capped at 12 frames (ranges longer than ~360 days are truncated).
+- Per-frame timestamp = bin start date (matching the official pipeline).
+- Bins with no imagery are **dropped from the sequence** (the encoder runs with
+  `fast_pass=True`, which ignores attention masks, so empty frames cannot be
+  masked out — they are excluded instead). At least one bin must have data.
+- Works for both `s2` and `s1`. S1 reuses the single-frame S1 fetch per bin, so
+  IW filtering and dB handling apply within each bin.
+
+```python
+emb = rs.get_embedding(
+    "olmoearth",
+    spatial=BBox(minlon=-2.0, minlat=6.0, maxlon=-1.9, maxlat=6.1),
+    temporal=TemporalSpec.year(2022),       # → 12 monthly-cadence frames
+    temporal_mode="multi",
+    output=OutputSpec.pooled(),
+)
+print(emb.meta["n_frames"])   # ≤ 12, depending on data availability
+```
+
+!!! note "Multi-frame `input_chw` contract"
+    When overriding inputs in `multi` mode, pass `[T, C, H, W]` where `T` equals
+    the number of 30-day bins of the temporal range; represent empty bins as
+    all-NaN frames. Plain `[C, H, W]` inputs are always treated as single-frame.
+
 ---
 
 ## Output Semantics
@@ -152,6 +189,7 @@ For defaults (256, patch_size=4): `64 × 64` grid.
 | `RS_EMBED_OLMOEARTH_VARIANT`     | `nano`   | Default model variant when `model_config` not given |
 | `RS_EMBED_OLMOEARTH_PATCH_SIZE`  | `4`      | Default patch size when `model_config` not given    |
 | `RS_EMBED_OLMOEARTH_IMAGE_SIZE`  | `256`    | Default image resize target                         |
+| `RS_EMBED_OLMOEARTH_TEMPORAL_MODE` | `single` | Default temporal mode (`single` / `multi`)        |
 | `RS_EMBED_OLMOEARTH_FETCH_WORKERS` | `8`    | Parallel GEE fetch workers for batch calls          |
 | `RS_EMBED_OLMOEARTH_BATCH_SIZE`  | `4` (CPU) / `16` (CUDA) | Inference batch size for `get_embeddings_batch_from_inputs` |
 

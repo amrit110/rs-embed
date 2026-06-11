@@ -20,7 +20,13 @@ from ..core.specs import (
 from ..core.types import FetchResult
 from ..providers import ProviderBase
 from ..providers.fetch import (
+    fetch_collection_binned_raw_tchw as _fetch_collection_binned_raw_tchw,
+)
+from ..providers.fetch import (
     fetch_collection_patch_chw as _fetch_collection_patch_chw,
+)
+from ..providers.fetch import (
+    fetch_s1_vvvh_binned_raw_tchw as _fetch_s1_vvvh_binned_raw_tchw,
 )
 from ..providers.fetch import (
     fetch_s1_vvvh_raw_chw_with_meta as _fetch_s1_vvvh_raw_chw_with_meta,
@@ -84,11 +90,18 @@ _VARIANT_ALIASES: dict[str, str] = {
     "base_11": "base_v1_1",
 }
 
-_DEFAULT_VARIANT = "nano"
+_DEFAULT_VARIANT = "base_v1_1"
 _DEFAULT_IMAGE_SIZE = 256  # training tile size; model accepts any size divisible by patch_size
 _DEFAULT_PATCH_SIZE = 4
 _DEFAULT_SCALE_M = 10
 _DEFAULT_CLOUDY_PCT = 30
+_DEFAULT_TEMPORAL_MODE = "single"
+
+# Multi-frame mode mirrors OlmoEarth pretraining: fixed 30-day bins anchored at
+# the range start (offsets in the official rslearn config are 30d strides, not
+# calendar months), at most 12 frames per sample (YEAR regime).
+_FRAME_STRIDE_DAYS = 30
+_MAX_FRAMES = 12
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +178,32 @@ def _resolve_image_size(model_config: dict[str, Any] | None) -> int:
     if env:
         return int(env)
     return _DEFAULT_IMAGE_SIZE
+
+
+def _normalize_temporal_mode(mode: Any) -> str:
+    m = str(mode or _DEFAULT_TEMPORAL_MODE).strip().lower()
+    if m not in ("single", "multi"):
+        raise ModelError(f"olmoearth temporal_mode must be 'single' or 'multi', got {mode!r}.")
+    return m
+
+
+def _resolve_temporal_mode(model_config: dict[str, Any] | None) -> str:
+    v = model_config_value(model_config, "temporal_mode")
+    if v is not None:
+        return _normalize_temporal_mode(v)
+    env = os.environ.get("RS_EMBED_OLMOEARTH_TEMPORAL_MODE", "").strip()
+    if env:
+        return _normalize_temporal_mode(env)
+    return _DEFAULT_TEMPORAL_MODE
+
+
+def _temporal_bins(t: TemporalSpec) -> tuple[tuple[str, str], ...]:
+    """30-day bins anchored at the range start, capped at 12 frames."""
+    from ..tools.temporal import split_date_range_fixed_days  # noqa: PLC0415
+
+    return split_date_range_fixed_days(
+        str(t.start), str(t.end), stride_days=_FRAME_STRIDE_DAYS, max_bins=_MAX_FRAMES
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -298,26 +337,81 @@ def _date_to_timestamp(date_str: str | None) -> tuple[int, int, int]:
     return (d.day, d.month - 1, d.year)  # month is 0-indexed in OlmoEarth
 
 
+def _prepare_frames(
+    x_tchw: np.ndarray,
+    *,
+    bins: tuple[tuple[str, str], ...],
+    modality: str,
+    image_size: int,
+    patch_size: int,
+) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Prepare a binned [T,C,H,W] stack: drop empty frames, normalize, resize.
+
+    Empty bins arrive as all-NaN sentinel frames (see the binned fetch
+    helpers); they are dropped here — under ``fast_pass=True`` the encoder
+    ignores attention masks, so excluding empty frames is the only way to keep
+    them out of the forward pass. Timestamps (frame-start dates, mirroring the
+    official pipeline) are kept aligned with the surviving frames.
+    """
+    n_bands = _modality_n_bands(modality)
+    if x_tchw.ndim != 4 or x_tchw.shape[1] != n_bands:
+        raise ModelError(
+            f"OlmoEarth ({modality}) multi-frame input must be [T,{n_bands},H,W], "
+            f"got {getattr(x_tchw, 'shape', None)}."
+        )
+    if x_tchw.shape[0] != len(bins):
+        raise ModelError(
+            f"Multi-frame input has T={x_tchw.shape[0]} frames but the temporal range "
+            f"yields {len(bins)} 30-day bins; frames must align with the binning."
+        )
+
+    frames: list[np.ndarray] = []
+    timestamps: list[tuple[int, int, int]] = []
+    for i, (start, _end) in enumerate(bins):
+        frame = x_tchw[i]
+        if np.isnan(frame).all():
+            continue  # empty bin sentinel
+        frames.append(
+            _prepare_chw(
+                np.nan_to_num(frame, nan=0.0).astype(np.float32),
+                image_size=image_size,
+                patch_size=patch_size,
+                modality=modality,
+            )
+        )
+        timestamps.append(_date_to_timestamp(start))
+    if not frames:
+        raise ModelError("All frames in the multi-frame OlmoEarth input are empty.")
+    return np.stack(frames, axis=0), timestamps
+
+
 # ---------------------------------------------------------------------------
 # Inference helpers
 # ---------------------------------------------------------------------------
 
 
-def _build_sample(x_chw: np.ndarray, *, timestamp: tuple[int, int, int], modality: str = "s2"):
-    """Wrap a single CHW patch as a batched MaskedOlmoEarthSample (B=1, T=1)."""
+def _build_sample(
+    x_tchw: np.ndarray,
+    *,
+    timestamps: list[tuple[int, int, int]],
+    modality: str = "s2",
+):
+    """Wrap a [T,C,H,W] stack as a batched MaskedOlmoEarthSample (B=1, T>=1)."""
     torch = _ensure_torch()
     from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (  # type: ignore
         MaskedOlmoEarthSample,
     )
 
-    _, h, w = x_chw.shape
+    t, _, h, w = x_tchw.shape
+    if len(timestamps) != t:
+        raise ModelError(f"timestamps length {len(timestamps)} != T={t}.")
     # Model expects (B, H, W, T, C)
-    data = torch.from_numpy(x_chw).permute(1, 2, 0).unsqueeze(0).unsqueeze(3)  # [1,H,W,1,C]
+    data = torch.from_numpy(x_tchw).permute(2, 3, 0, 1).unsqueeze(0)  # [1,H,W,T,C]
     # Mask: all ONLINE_ENCODER (0)
-    mask = torch.zeros(1, h, w, 1, _modality_n_band_sets(modality), dtype=torch.float32)
+    mask = torch.zeros(1, h, w, t, _modality_n_band_sets(modality), dtype=torch.float32)
     ts = torch.tensor(
-        [[[*timestamp]]], dtype=torch.long
-    )  # [1, T=1, 3]; must be int for month embedding
+        [[list(s) for s in timestamps]], dtype=torch.long
+    )  # [1, T, 3]; must be int for month embedding
     field = _modality_field(modality)
     return MaskedOlmoEarthSample(
         timestamps=ts,
@@ -326,24 +420,26 @@ def _build_sample(x_chw: np.ndarray, *, timestamp: tuple[int, int, int], modalit
 
 
 def _build_batch_sample(
-    x_bchw: np.ndarray,
+    x_btchw: np.ndarray,
     *,
-    timestamps: list[tuple[int, int, int]],
+    timestamps: list[list[tuple[int, int, int]]],
     modality: str = "s2",
 ):
-    """Wrap a BCHW batch as a batched MaskedOlmoEarthSample (B, T=1)."""
+    """Wrap a [B,T,C,H,W] batch as a batched MaskedOlmoEarthSample (B, T>=1)."""
     torch = _ensure_torch()
     from olmoearth_pretrain_minimal.olmoearth_pretrain_v1.utils.datatypes import (  # type: ignore
         MaskedOlmoEarthSample,
     )
 
-    b, _, h, w = x_bchw.shape
-    # (B, H, W, T=1, C)
-    data = torch.from_numpy(x_bchw).permute(0, 2, 3, 1).unsqueeze(3)
-    mask = torch.zeros(b, h, w, 1, _modality_n_band_sets(modality), dtype=torch.float32)
+    b, t, _, h, w = x_btchw.shape
+    if len(timestamps) != b or any(len(item) != t for item in timestamps):
+        raise ModelError(f"timestamps must be {b} lists of length T={t}.")
+    # (B, H, W, T, C)
+    data = torch.from_numpy(x_btchw).permute(0, 3, 4, 1, 2)
+    mask = torch.zeros(b, h, w, t, _modality_n_band_sets(modality), dtype=torch.float32)
     ts = torch.tensor(
-        [[list(t)] for t in timestamps], dtype=torch.long
-    )  # [B, 1, 3]; int for month embedding
+        [[list(s) for s in item] for item in timestamps], dtype=torch.long
+    )  # [B, T, 3]; int for month embedding
     field = _modality_field(modality)
     return MaskedOlmoEarthSample(
         timestamps=ts,
@@ -435,6 +531,12 @@ class OlmoEarthEmbedder(EmbedderBase):
       s2 : 12-band S2 L2A SR DN patches (default)
       s1 : 2-band S1 GRD VV/VH in dB; ``input_chw`` overrides must be dB
 
+    Temporal modes (via ``temporal_mode="multi"``):
+      single : one composite over the whole range, T=1 (default)
+      multi  : 30-day bins anchored at range start (max 12 frames), mirroring
+               OlmoEarth pretraining; per-frame timestamps are bin start dates
+               and bins without imagery are dropped from the sequence
+
     Model variants (via ``model_config={"variant": "..."}``):
       v1  : nano (128-d), tiny (192-d), base (768-d), large (1024-d)
       v1.1: nano_v1_1 (128-d), tiny_v1_1 (192-d), base_v1_1 (768-d)
@@ -508,6 +610,16 @@ class OlmoEarthEmbedder(EmbedderBase):
                     "default": self.DEFAULT_IMAGE_SIZE,
                     "description": "Image resize target before encoding (pixels). Must be divisible by patch_size.",
                 },
+                "temporal_mode": {
+                    "type": "string",
+                    "default": _DEFAULT_TEMPORAL_MODE,
+                    "choices": ["single", "multi"],
+                    "description": (
+                        "single: one composite over the whole range (T=1). "
+                        "multi: 30-day bins anchored at range start (max 12 frames, "
+                        "mirroring OlmoEarth pretraining); empty bins are dropped."
+                    ),
+                },
             },
             "notes": [
                 "OlmoEarth is a Vision Transformer trained on the Major TOM dataset.",
@@ -515,6 +627,7 @@ class OlmoEarthEmbedder(EmbedderBase):
                 "Weights are downloaded automatically from Hugging Face on first use.",
                 "Normalization: per-band mean±2σ clipping (OlmoEarth COMPUTED strategy).",
                 "S1 modality via modality='s1' (VV/VH dB, COPERNICUS/S1_GRD).",
+                "temporal_mode='multi' fetches one composite per 30-day bin (S1 and S2).",
             ],
         }
 
@@ -529,15 +642,59 @@ class OlmoEarthEmbedder(EmbedderBase):
         spatial: SpatialSpec,
         temporal: TemporalSpec | None,
         sensor: SensorSpec,
+        temporal_mode: str | None = None,
     ) -> FetchResult | None:
         """Fetch raw OlmoEarth input, routing by ``sensor.modality`` (s2/s1).
 
         S1 values are always returned in dB: with ``use_float_linear=True``
         the linear-power fetch is converted via 10·log10, matching the dB
         statistics used by the OlmoEarth normalizer.
+
+        ``temporal_mode="multi"`` fetches one composite per 30-day bin and
+        returns ``[T,C,H,W]`` (empty bins are all-NaN sentinel frames; see
+        the binned fetch helpers). When not given, the mode falls back to
+        ``RS_EMBED_OLMOEARTH_TEMPORAL_MODE`` / ``"single"`` so generic
+        pipeline callers keep working unchanged.
         """
         modality = _normalize_modality(getattr(sensor, "modality", "s2"))
+        mode = (
+            _normalize_temporal_mode(temporal_mode)
+            if temporal_mode is not None
+            else _resolve_temporal_mode(None)
+        )
         t = temporal_to_range(temporal)
+
+        if mode == "multi":
+            bins = _temporal_bins(t)
+            if modality == "s2":
+                raw_t, meta = _fetch_collection_binned_raw_tchw(
+                    provider,
+                    spatial=spatial,
+                    bins=bins,
+                    collection=sensor.collection,
+                    bands=_S2_BANDS_GEE,
+                    scale_m=int(sensor.scale_m),
+                    cloudy_pct=int(sensor.cloudy_pct),
+                    composite=str(sensor.composite),
+                    fill_value=float(sensor.fill_value),
+                )
+            else:
+                raw_t, meta = _fetch_s1_vvvh_binned_raw_tchw(
+                    provider,
+                    spatial=spatial,
+                    bins=bins,
+                    scale_m=int(sensor.scale_m),
+                    use_float_linear=bool(sensor.use_float_linear),
+                    composite=str(sensor.composite),
+                    fill_value=float(sensor.fill_value),
+                    require_iw=bool(sensor.s1_require_iw),
+                    relax_iw_on_empty=bool(sensor.s1_relax_iw_on_empty),
+                )
+                if bool(sensor.use_float_linear):
+                    raw_t = _s1_linear_to_db(raw_t)  # NaN sentinel frames stay NaN
+            meta["temporal_mode"] = "multi"
+            return FetchResult(data=raw_t, meta=meta)
+
         if modality == "s2":
             raw = _fetch_collection_patch_chw(
                 provider,
@@ -608,6 +765,7 @@ class OlmoEarthEmbedder(EmbedderBase):
         if sensor is None:
             sensor = self._default_sensor()
         modality = _normalize_modality(getattr(sensor, "modality", "s2"))
+        temporal_mode = _resolve_temporal_mode(model_config)
         t = temporal_to_range(temporal)
 
         variant = _resolve_variant(model_config)
@@ -620,26 +778,47 @@ class OlmoEarthEmbedder(EmbedderBase):
         fetch_meta: dict[str, Any] = {}
         if input_chw is None:
             provider = self._get_provider(backend)
-            fr = self.fetch_input(provider, spatial=spatial, temporal=t, sensor=sensor)
+            fr = self.fetch_input(
+                provider,
+                spatial=spatial,
+                temporal=t,
+                sensor=sensor,
+                temporal_mode=temporal_mode,
+            )
             assert fr is not None
-            x_chw = np.asarray(fr.data, dtype=np.float32)
+            x_raw = np.asarray(fr.data, dtype=np.float32)
             fetch_meta = dict(fr.meta or {})
         else:
             n_bands = _modality_n_bands(modality)
-            if input_chw.ndim != 3 or input_chw.shape[0] != n_bands:
+            ok_3d = input_chw.ndim == 3 and input_chw.shape[0] == n_bands
+            ok_4d = input_chw.ndim == 4 and input_chw.shape[1] == n_bands
+            if not (ok_3d or ok_4d):
                 raise ModelError(
-                    f"input_chw must be CHW with {n_bands} bands for olmoearth ({modality}), "
-                    f"got {getattr(input_chw, 'shape', None)}."
+                    f"input_chw must be CHW (or TCHW) with {n_bands} bands for "
+                    f"olmoearth ({modality}), got {getattr(input_chw, 'shape', None)}."
                 )
-            x_chw = input_chw.astype(np.float32)
+            x_raw = input_chw.astype(np.float32)
 
-        x_chw = _prepare_chw(x_chw, image_size=image_size, patch_size=patch_size, modality=modality)
-
+        # Frame layout is decided by the array shape so that arrays survive
+        # array-only transport (prefetch pipelines, user-provided input_chw).
         date_str = temporal_midpoint_str(t)
-        timestamp = _date_to_timestamp(date_str)
-        sample = _build_sample(x_chw, timestamp=timestamp, modality=modality)
+        if x_raw.ndim == 4:
+            bins = _temporal_bins(t)
+            x_t, timestamps = _prepare_frames(
+                x_raw, bins=bins, modality=modality, image_size=image_size, patch_size=patch_size
+            )
+        else:
+            x_t = _prepare_chw(
+                x_raw, image_size=image_size, patch_size=patch_size, modality=modality
+            )[np.newaxis]
+            timestamps = [_date_to_timestamp(date_str)]
+
+        sample = _build_sample(x_t, timestamps=timestamps, modality=modality)
         tokens_and_masks = _encoder_forward(model, sample, patch_size=patch_size, device=dev)
 
+        extra: dict[str, Any] = {"temporal_mode": temporal_mode, "n_frames": len(timestamps)}
+        if fetch_meta:
+            extra["s1_fetch" if modality == "s1" else "fetch"] = fetch_meta
         meta = _build_embedding_meta(
             model_name=self.model_name,
             wmeta=wmeta,
@@ -649,11 +828,11 @@ class OlmoEarthEmbedder(EmbedderBase):
             backend=backend,
             sensor=sensor,
             temporal=t,
-            image_size=int(x_chw.shape[-1]),
+            image_size=int(x_t.shape[-1]),
             patch_size=patch_size,
             date_str=date_str,
             modality=modality,
-            extra={"s1_fetch": fetch_meta} if fetch_meta else None,
+            extra=extra,
         )
 
         if output.mode == "pooled":
@@ -689,12 +868,15 @@ class OlmoEarthEmbedder(EmbedderBase):
         if sensor is None:
             sensor = self._default_sensor()
         t = temporal_to_range(temporal)
+        temporal_mode = _resolve_temporal_mode(model_config)
         provider = self._get_provider(backend)
         n = len(spatials)
         prefetched: list[np.ndarray | None] = [None] * n
 
         def _fetch_one(i: int, sp: SpatialSpec) -> tuple[int, np.ndarray]:
-            fr = self.fetch_input(provider, spatial=sp, temporal=t, sensor=sensor)
+            fr = self.fetch_input(
+                provider, spatial=sp, temporal=t, sensor=sensor, temporal_mode=temporal_mode
+            )
             assert fr is not None
             return i, np.asarray(fr.data, dtype=np.float32)
 
@@ -762,27 +944,45 @@ class OlmoEarthEmbedder(EmbedderBase):
         infer_bs = self._resolve_infer_batch(dev)
 
         date_str = temporal_midpoint_str(t)
-        timestamp = _date_to_timestamp(date_str)
 
-        # Prepare all inputs (normalize + resize) and group by shape
+        # Prepare all inputs (normalize + resize) and group by shape.
+        # Frame layout is decided per item by array shape: CHW → single frame,
+        # TCHW → 30-day binned frames (empty bins arrive as all-NaN sentinels
+        # and are dropped, so prepared T may vary per item).
         n_bands = _modality_n_bands(modality)
-        prepared: list[np.ndarray] = []
-        for i, x_chw in enumerate(input_chws):
-            if x_chw.ndim != 3 or x_chw.shape[0] != n_bands:
-                raise ModelError(
-                    f"input_chw at index {i} must be CHW with {n_bands} bands ({modality}), "
-                    f"got {getattr(x_chw, 'shape', None)}."
+        bins: tuple[tuple[str, str], ...] | None = None
+        prepared: list[np.ndarray] = []  # each (T_i, C, H, W)
+        item_timestamps: list[list[tuple[int, int, int]]] = []
+        for i, x_raw in enumerate(input_chws):
+            if x_raw.ndim == 3 and x_raw.shape[0] == n_bands:
+                prepared.append(
+                    _prepare_chw(
+                        x_raw.astype(np.float32),
+                        image_size=image_size,
+                        patch_size=patch_size,
+                        modality=modality,
+                    )[np.newaxis]
                 )
-            prepared.append(
-                _prepare_chw(
-                    x_chw.astype(np.float32),
+                item_timestamps.append([_date_to_timestamp(date_str)])
+            elif x_raw.ndim == 4 and x_raw.shape[1] == n_bands:
+                if bins is None:
+                    bins = _temporal_bins(t)
+                x_t, ts = _prepare_frames(
+                    x_raw.astype(np.float32),
+                    bins=bins,
+                    modality=modality,
                     image_size=image_size,
                     patch_size=patch_size,
-                    modality=modality,
                 )
-            )
+                prepared.append(x_t)
+                item_timestamps.append(ts)
+            else:
+                raise ModelError(
+                    f"input_chw at index {i} must be CHW (or TCHW) with {n_bands} bands "
+                    f"({modality}), got {getattr(x_raw, 'shape', None)}."
+                )
 
-        shape_groups: dict[tuple[int, int, int], list[int]] = {}
+        shape_groups: dict[tuple[int, ...], list[int]] = {}
         for i, x in enumerate(prepared):
             shape_groups.setdefault(x.shape, []).append(i)
 
@@ -802,9 +1002,9 @@ class OlmoEarthEmbedder(EmbedderBase):
         for idxs in shape_groups.values():
             for s0 in range(0, len(idxs), infer_bs):
                 chunk = idxs[s0 : s0 + infer_bs]
-                xb = np.stack([prepared[i] for i in chunk], axis=0)
+                xb = np.stack([prepared[i] for i in chunk], axis=0)  # (B, T, C, H, W)
                 sample = _build_batch_sample(
-                    xb, timestamps=[timestamp] * len(chunk), modality=modality
+                    xb, timestamps=[item_timestamps[i] for i in chunk], modality=modality
                 )
                 tokens_and_masks = _encoder_forward(
                     model, sample, patch_size=patch_size, device=dev
@@ -826,7 +1026,7 @@ class OlmoEarthEmbedder(EmbedderBase):
                             patch_size=patch_size,
                             date_str=date_str,
                             modality=modality,
-                            extra={"batch_infer": True},
+                            extra={"batch_infer": True, "n_frames": len(item_timestamps[i])},
                         )
                         meta["pooling"] = f"spatial_temporal_bandset_{output.pooling}"
                         out[i] = Embedding(data=pooled[j], meta=meta)
@@ -854,7 +1054,7 @@ class OlmoEarthEmbedder(EmbedderBase):
                             patch_size=patch_size,
                             date_str=date_str,
                             modality=modality,
-                            extra={"batch_infer": True},
+                            extra={"batch_infer": True, "n_frames": len(item_timestamps[i])},
                         )
                         d, h, w = grid_np.shape
                         meta.update({"grid_hw": (h, w), "grid_kind": "spatial_tokens"})

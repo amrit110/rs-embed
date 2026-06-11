@@ -54,9 +54,9 @@ def test_resolve_variant_from_model_config():
     assert oe._resolve_variant({"variant": "nano_v1_1"}) == "nano_v1_1"
 
 
-def test_resolve_variant_defaults_to_nano():
-    assert oe._resolve_variant(None) == "nano"
-    assert oe._resolve_variant({}) == "nano"
+def test_resolve_variant_defaults_to_base_v1_1():
+    assert oe._resolve_variant(None) == "base_v1_1"
+    assert oe._resolve_variant({}) == "base_v1_1"
 
 
 def test_resolve_variant_env_fallback(monkeypatch):
@@ -71,7 +71,7 @@ def test_resolve_variant_model_config_overrides_env(monkeypatch):
 
 def test_resolve_variant_env_auto_gives_default(monkeypatch):
     monkeypatch.setenv("RS_EMBED_OLMOEARTH_VARIANT", "auto")
-    assert oe._resolve_variant(None) == "nano"
+    assert oe._resolve_variant(None) == "base_v1_1"
 
 
 # ---------------------------------------------------------------------------
@@ -816,10 +816,205 @@ def test_embedding_meta_has_required_fields(monkeypatch):
     assert meta["model"] == "olmoearth"
     assert meta["type"] == "on_the_fly"
     assert meta["backend"] == "gee"
-    assert meta["variant"] == "nano"
-    assert meta["model_size"] == "nano"
-    assert meta["model_version"] == "v1"
+    assert meta["variant"] == "base_v1_1"
+    assert meta["model_size"] == "base"
+    assert meta["model_version"] == "v1.1"
     assert meta["patch_size"] == oe._DEFAULT_PATCH_SIZE
     assert meta["hf_repo"] is not None
     assert "temporal_range" in meta
     assert "image_size" in meta
+
+
+# ---------------------------------------------------------------------------
+# temporal_mode='multi' — 30-day binning
+# ---------------------------------------------------------------------------
+
+
+def test_split_date_range_fixed_days_strides_and_truncates():
+    from rs_embed.tools.temporal import split_date_range_fixed_days
+
+    bins = split_date_range_fixed_days("2022-06-15", "2022-07-31", stride_days=30)
+    assert bins == (("2022-06-15", "2022-07-15"), ("2022-07-15", "2022-07-31"))
+
+    # full year → 13 bins of 30d, capped at 12
+    bins = split_date_range_fixed_days("2022-01-01", "2023-01-01", stride_days=30, max_bins=12)
+    assert len(bins) == 12
+    assert bins[0] == ("2022-01-01", "2022-01-31")
+    assert bins[-1][0] == "2022-11-27"
+
+
+def test_resolve_temporal_mode_sources(monkeypatch):
+    assert oe._resolve_temporal_mode(None) == "single"
+    assert oe._resolve_temporal_mode({"temporal_mode": "multi"}) == "multi"
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_TEMPORAL_MODE", "multi")
+    assert oe._resolve_temporal_mode(None) == "multi"
+    assert oe._resolve_temporal_mode({"temporal_mode": "single"}) == "single"
+    with pytest.raises(ModelError, match="temporal_mode must be"):
+        oe._resolve_temporal_mode({"temporal_mode": "monthly"})
+
+
+def test_temporal_bins_caps_at_12():
+    bins = oe._temporal_bins(TemporalSpec.range("2022-01-01", "2024-01-01"))
+    assert len(bins) == 12
+    assert bins[0] == ("2022-01-01", "2022-01-31")
+
+
+def test_prepare_frames_drops_nan_frames_and_aligns_timestamps():
+    bins = (
+        ("2022-06-15", "2022-07-15"),
+        ("2022-07-15", "2022-08-14"),
+        ("2022-08-14", "2022-08-31"),
+    )
+    x = np.random.uniform(0, 3000, (3, 12, 32, 32)).astype(np.float32)
+    x[1] = np.nan  # empty-bin sentinel
+    out, ts = oe._prepare_frames(x, bins=bins, modality="s2", image_size=64, patch_size=4)
+    assert out.shape == (2, 12, 64, 64)
+    assert ts == [(15, 5, 2022), (14, 7, 2022)]  # June and August bin starts
+
+
+def test_prepare_frames_all_nan_raises():
+    bins = (("2022-06-15", "2022-07-15"),)
+    x = np.full((1, 2, 8, 8), np.nan, dtype=np.float32)
+    with pytest.raises(ModelError, match="All frames"):
+        oe._prepare_frames(x, bins=bins, modality="s1", image_size=32, patch_size=4)
+
+
+def test_prepare_frames_bin_count_mismatch_raises():
+    bins = (("2022-06-15", "2022-07-15"), ("2022-07-15", "2022-07-31"))
+    x = np.zeros((3, 12, 8, 8), dtype=np.float32)
+    with pytest.raises(ModelError, match="30-day bins"):
+        oe._prepare_frames(x, bins=bins, modality="s2", image_size=32, patch_size=4)
+
+
+def test_build_sample_multi_frame_shapes():
+    pytest.importorskip("torch")
+    x = np.zeros((3, 2, 16, 16), dtype=np.float32)
+    ts = [(15, 5, 2022), (15, 6, 2022), (14, 7, 2022)]
+    sample = oe._build_sample(x, timestamps=ts, modality="s1")
+    assert tuple(sample.sentinel1.shape) == (1, 16, 16, 3, 2)  # (B,H,W,T,C)
+    assert tuple(sample.sentinel1_mask.shape) == (1, 16, 16, 3, 1)  # S=1 for s1
+    assert tuple(sample.timestamps.shape) == (1, 3, 3)
+    assert sample.timestamps[0, 2].tolist() == [14, 7, 2022]
+
+
+def test_fetch_input_multi_s2_routes_to_binned_helper(monkeypatch):
+    emb = oe.OlmoEarthEmbedder()
+    seen = {}
+
+    def _fake_binned(provider, *, spatial, bins, **kw):
+        seen["bins"] = bins
+        seen["collection"] = kw["collection"]
+        return np.zeros((len(bins), 12, 8, 8), dtype=np.float32), {"frames": [], "n_empty": 0}
+
+    monkeypatch.setattr(oe, "_fetch_collection_binned_raw_tchw", _fake_binned)
+    fr = emb.fetch_input(
+        object(),
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=TemporalSpec.range("2022-06-15", "2022-07-31"),
+        sensor=None or emb._default_sensor(),
+        temporal_mode="multi",
+    )
+    assert fr is not None
+    assert fr.data.shape == (2, 12, 8, 8)
+    assert fr.meta["temporal_mode"] == "multi"
+    assert seen["bins"][0] == ("2022-06-15", "2022-07-15")
+
+
+def test_fetch_input_multi_s1_converts_linear_and_keeps_nan(monkeypatch):
+    from dataclasses import replace
+
+    emb = oe.OlmoEarthEmbedder()
+    sensor = replace(_s1_sensor(), use_float_linear=True)
+
+    def _fake_binned_s1(provider, *, spatial, bins, **kw):
+        arr = np.full((len(bins), 2, 8, 8), 0.1, dtype=np.float32)
+        arr[1] = np.nan  # empty bin sentinel
+        return arr, {"frames": [], "n_empty": 1}
+
+    monkeypatch.setattr(oe, "_fetch_s1_vvvh_binned_raw_tchw", _fake_binned_s1)
+    fr = emb.fetch_input(
+        object(),
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=TemporalSpec.range("2022-06-01", "2022-08-30"),
+        sensor=sensor,
+        temporal_mode="multi",
+    )
+    assert fr is not None
+    np.testing.assert_allclose(fr.data[0], -10.0, atol=1e-4)  # 10·log10(0.1)
+    assert np.isnan(fr.data[1]).all()  # sentinel survives dB conversion
+
+
+def test_get_embedding_multi_s1_pooled(monkeypatch):
+    emb = oe.OlmoEarthEmbedder()
+    monkeypatch.setattr(emb, "_get_provider", lambda _: object())
+
+    def _fake_binned_s1(provider, *, spatial, bins, **kw):
+        arr = np.full((len(bins), 2, 64, 64), -15.0, dtype=np.float32)
+        arr[1] = np.nan
+        return arr, {"frames": [{"start": s, "end": e, "empty": False} for s, e in bins]}
+
+    monkeypatch.setattr(oe, "_fetch_s1_vvvh_binned_raw_tchw", _fake_binned_s1)
+
+    seen = {}
+
+    def _fake_forward(model, sample, **kw):
+        seen["t"] = sample.sentinel1.shape[3]
+        seen["ts"] = sample.timestamps[0].tolist()
+        return _fake_encoder_output(1, 4, 128, modality="s1")
+
+    monkeypatch.setattr(oe, "_encoder_forward", _fake_forward)
+    monkeypatch.setattr(
+        oe,
+        "_load_olmoearth",
+        lambda variant, device: (object(), {"hf_repo": "allenai/OlmoEarth-v1-Nano"}, "cpu"),
+    )
+
+    out = emb.get_embedding(
+        spatial=PointBuffer(lon=10.0, lat=20.0, buffer_m=256),
+        temporal=TemporalSpec.range("2022-06-15", "2022-09-15"),  # 92d → 4 bins
+        sensor=_s1_sensor(),
+        output=OutputSpec.pooled(),
+        backend="gee",
+        model_config={"temporal_mode": "multi"},
+    )
+
+    assert out.meta["temporal_mode"] == "multi"
+    assert out.meta["n_frames"] == 3  # 4 bins, 1 empty → 3 frames
+    assert seen["t"] == 3
+    # timestamps = surviving bin starts: 06-15, 08-14, 09-13 (07-15 bin was empty)
+    assert seen["ts"] == [[15, 5, 2022], [14, 7, 2022], [13, 8, 2022]]
+
+
+def test_get_embeddings_batch_from_inputs_multi_variable_frames(monkeypatch):
+    emb = oe.OlmoEarthEmbedder()
+    monkeypatch.setattr(
+        oe,
+        "_load_olmoearth",
+        lambda variant, device: (object(), {"hf_repo": "allenai/OlmoEarth-v1-Nano"}, "cpu"),
+    )
+    monkeypatch.setattr(
+        oe,
+        "_encoder_forward",
+        lambda model, sample, **kw: _fake_encoder_output(
+            sample.sentinel2_l2a.shape[0], 4, 128, modality="s2"
+        ),
+    )
+
+    t = TemporalSpec.range("2022-06-15", "2022-08-14")  # 60d → 2 bins
+    full = np.random.uniform(0, 3000, (2, 12, 64, 64)).astype(np.float32)
+    partial = full.copy()
+    partial[1] = np.nan  # second item lost its second bin
+
+    out = emb.get_embeddings_batch_from_inputs(
+        spatials=[PointBuffer(lon=0.0, lat=0.0, buffer_m=256)] * 2,
+        input_chws=[full, partial],
+        temporal=t,
+        output=OutputSpec.pooled(),
+        backend="gee",
+    )
+
+    assert len(out) == 2
+    assert out[0].meta["n_frames"] == 2
+    assert out[1].meta["n_frames"] == 1
+    for e in out:
+        assert e.data.shape == (128,)
