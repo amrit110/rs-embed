@@ -101,6 +101,41 @@ def test_resolve_image_size_from_config():
     assert oe._resolve_image_size({"image_size": 128}) == 128
 
 
+def test_resolve_patch_size_env_validated(monkeypatch):
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_PATCH_SIZE", "16")
+    with pytest.raises(ModelError, match="patch_size must be 1"):
+        oe._resolve_patch_size(None)
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_PATCH_SIZE", "abc")
+    with pytest.raises(ModelError, match="must be an integer"):
+        oe._resolve_patch_size(None)
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_PATCH_SIZE", "2")
+    assert oe._resolve_patch_size(None) == 2
+
+
+def test_resolve_patch_size_rejects_non_integer_config():
+    with pytest.raises(ModelError, match="must be an integer"):
+        oe._resolve_patch_size({"patch_size": "four"})
+
+
+def test_resolve_image_size_env_validated(monkeypatch):
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_IMAGE_SIZE", "abc")
+    with pytest.raises(ModelError, match="must be an integer"):
+        oe._resolve_image_size(None)
+    monkeypatch.setenv("RS_EMBED_OLMOEARTH_IMAGE_SIZE", "128")
+    assert oe._resolve_image_size(None) == 128
+
+
+def test_resolve_image_size_rejects_non_positive():
+    with pytest.raises(ModelError, match="must be positive"):
+        oe._resolve_image_size({"image_size": 0})
+
+
+def test_resolve_geometry_enforces_divisibility():
+    assert oe._resolve_geometry({"image_size": 128, "patch_size": 8}) == (128, 8)
+    with pytest.raises(ModelError, match="divisible by"):
+        oe._resolve_geometry({"image_size": 257, "patch_size": 4})
+
+
 # ---------------------------------------------------------------------------
 # _date_to_timestamp
 # ---------------------------------------------------------------------------
@@ -205,6 +240,12 @@ def test_prepare_chw_resizes_to_image_size():
     raw = np.random.uniform(0, 3000, (12, 64, 64)).astype(np.float32)
     out = oe._prepare_chw(raw, image_size=256, patch_size=4)
     assert out.shape == (12, 256, 256)
+
+
+def test_prepare_chw_rejects_non_divisible_image_size():
+    raw = np.random.uniform(0, 3000, (12, 64, 64)).astype(np.float32)
+    with pytest.raises(ModelError, match="positive multiple"):
+        oe._prepare_chw(raw, image_size=257, patch_size=4)
 
 
 def test_prepare_chw_wrong_channels_raises():
@@ -429,6 +470,38 @@ def test_get_embedding_accepts_input_chw(monkeypatch):
 
     assert isinstance(out, Embedding)
     assert out.data.ndim == 1
+    assert out.meta["temporal_mode"] == "single"
+    assert "requested_temporal_mode" not in out.meta
+
+
+def test_get_embedding_input_tchw_meta_reports_effective_mode(monkeypatch):
+    emb = oe.OlmoEarthEmbedder()
+    monkeypatch.setattr(
+        oe,
+        "_encoder_forward",
+        lambda model, sample, **kw: _fake_encoder_output(1, 4, 128),
+    )
+    monkeypatch.setattr(
+        oe,
+        "_load_olmoearth",
+        lambda variant, device: (object(), {"hf_repo": "allenai/OlmoEarth-v1_1-Tiny"}, "cpu"),
+    )
+
+    # TCHW override while temporal_mode resolves to the default "single":
+    # meta must report the layout actually used, plus the requested mode.
+    x_tchw = np.full((2, 12, 64, 64), 2000.0, dtype=np.float32)
+    out = emb.get_embedding(
+        spatial=PointBuffer(lon=0.0, lat=0.0, buffer_m=256),
+        temporal=TemporalSpec.range("2022-06-15", "2022-08-14"),  # 60d → 2 bins
+        sensor=None,
+        output=OutputSpec.pooled(),
+        backend="gee",
+        input_chw=x_tchw,
+    )
+
+    assert out.meta["temporal_mode"] == "multi"
+    assert out.meta["requested_temporal_mode"] == "single"
+    assert out.meta["n_frames"] == 2
 
 
 def test_get_embedding_wrong_input_chw_raises(monkeypatch):

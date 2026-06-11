@@ -157,27 +157,59 @@ def _resolve_variant(model_config: dict[str, Any] | None) -> str:
     return _DEFAULT_VARIANT
 
 
+def _coerce_patch_size(v: Any, *, source: str) -> int:
+    try:
+        ps = int(v)
+    except (TypeError, ValueError) as exc:
+        raise ModelError(
+            f"OlmoEarth patch_size from {source} must be an integer, got {v!r}."
+        ) from exc
+    if ps < 1 or ps > 8:
+        raise ModelError(f"OlmoEarth patch_size must be 1–8, got {ps}.")
+    return ps
+
+
 def _resolve_patch_size(model_config: dict[str, Any] | None) -> int:
     v = model_config_value(model_config, "patch_size")
     if v is not None:
-        ps = int(v)
-        if ps < 1 or ps > 8:
-            raise ModelError(f"OlmoEarth patch_size must be 1–8, got {ps}.")
-        return ps
+        return _coerce_patch_size(v, source="model_config")
     env = os.environ.get("RS_EMBED_OLMOEARTH_PATCH_SIZE", "").strip()
     if env:
-        return int(env)
+        return _coerce_patch_size(env, source="RS_EMBED_OLMOEARTH_PATCH_SIZE")
     return _DEFAULT_PATCH_SIZE
+
+
+def _coerce_image_size(v: Any, *, source: str) -> int:
+    try:
+        s = int(v)
+    except (TypeError, ValueError) as exc:
+        raise ModelError(
+            f"OlmoEarth image_size from {source} must be an integer, got {v!r}."
+        ) from exc
+    if s < 1:
+        raise ModelError(f"OlmoEarth image_size must be positive, got {s}.")
+    return s
 
 
 def _resolve_image_size(model_config: dict[str, Any] | None) -> int:
     v = model_config_value(model_config, "image_size")
     if v is not None:
-        return int(v)
+        return _coerce_image_size(v, source="model_config")
     env = os.environ.get("RS_EMBED_OLMOEARTH_IMAGE_SIZE", "").strip()
     if env:
-        return int(env)
+        return _coerce_image_size(env, source="RS_EMBED_OLMOEARTH_IMAGE_SIZE")
     return _DEFAULT_IMAGE_SIZE
+
+
+def _resolve_geometry(model_config: dict[str, Any] | None) -> tuple[int, int]:
+    """Resolve (image_size, patch_size), enforcing the divisibility contract."""
+    patch_size = _resolve_patch_size(model_config)
+    image_size = _resolve_image_size(model_config)
+    if image_size % patch_size != 0:
+        raise ModelError(
+            f"OlmoEarth image_size ({image_size}) must be divisible by patch_size ({patch_size})."
+        )
+    return image_size, patch_size
 
 
 def _normalize_temporal_mode(mode: Any) -> str:
@@ -318,12 +350,14 @@ def _prepare_chw(
         raise ModelError(
             f"OlmoEarth ({modality}) expects {n_bands}-band CHW input, got {x_chw.shape}."
         )
+    if image_size < 1 or image_size % patch_size != 0:
+        raise ModelError(
+            f"OlmoEarth image_size ({image_size}) must be a positive multiple of "
+            f"patch_size ({patch_size})."
+        )
     x = _normalize_chw(x_chw, modality=modality)
-
-    # Ensure H and W are divisible by patch_size
-    target = max(patch_size, (image_size // patch_size) * patch_size)
-    if x.shape[1] != target or x.shape[2] != target:
-        x = _resize_chw(x, size=target)
+    if x.shape[1] != image_size or x.shape[2] != image_size:
+        x = _resize_chw(x, size=image_size)
     return x
 
 
@@ -769,8 +803,7 @@ class OlmoEarthEmbedder(EmbedderBase):
         t = temporal_to_range(temporal)
 
         variant = _resolve_variant(model_config)
-        patch_size = _resolve_patch_size(model_config)
-        image_size = _resolve_image_size(model_config)
+        image_size, patch_size = _resolve_geometry(model_config)
         _, size, version = _VARIANT_SPECS[variant]
 
         model, wmeta, dev = _load_olmoearth(variant, device=device)
@@ -816,7 +849,12 @@ class OlmoEarthEmbedder(EmbedderBase):
         sample = _build_sample(x_t, timestamps=timestamps, modality=modality)
         tokens_and_masks = _encoder_forward(model, sample, patch_size=patch_size, device=dev)
 
-        extra: dict[str, Any] = {"temporal_mode": temporal_mode, "n_frames": len(timestamps)}
+        # Report the mode actually used (decided by the array shape above), which
+        # can differ from the configured one when input_chw overrides the fetch.
+        effective_mode = "multi" if x_raw.ndim == 4 else "single"
+        extra: dict[str, Any] = {"temporal_mode": effective_mode, "n_frames": len(timestamps)}
+        if effective_mode != temporal_mode:
+            extra["requested_temporal_mode"] = temporal_mode
         if fetch_meta:
             extra["s1_fetch" if modality == "s1" else "fetch"] = fetch_meta
         meta = _build_embedding_meta(
@@ -936,8 +974,7 @@ class OlmoEarthEmbedder(EmbedderBase):
         t = temporal_to_range(temporal)
 
         variant = _resolve_variant(model_config)
-        patch_size = _resolve_patch_size(model_config)
-        image_size = _resolve_image_size(model_config)
+        image_size, patch_size = _resolve_geometry(model_config)
         _, size, version = _VARIANT_SPECS[variant]
 
         model, wmeta, dev = _load_olmoearth(variant, device=device)
@@ -953,6 +990,7 @@ class OlmoEarthEmbedder(EmbedderBase):
         bins: tuple[tuple[str, str], ...] | None = None
         prepared: list[np.ndarray] = []  # each (T_i, C, H, W)
         item_timestamps: list[list[tuple[int, int, int]]] = []
+        item_modes: list[str] = []  # effective temporal mode per item (by array shape)
         for i, x_raw in enumerate(input_chws):
             if x_raw.ndim == 3 and x_raw.shape[0] == n_bands:
                 prepared.append(
@@ -964,6 +1002,7 @@ class OlmoEarthEmbedder(EmbedderBase):
                     )[np.newaxis]
                 )
                 item_timestamps.append([_date_to_timestamp(date_str)])
+                item_modes.append("single")
             elif x_raw.ndim == 4 and x_raw.shape[1] == n_bands:
                 if bins is None:
                     bins = _temporal_bins(t)
@@ -976,6 +1015,7 @@ class OlmoEarthEmbedder(EmbedderBase):
                 )
                 prepared.append(x_t)
                 item_timestamps.append(ts)
+                item_modes.append("multi")
             else:
                 raise ModelError(
                     f"input_chw at index {i} must be CHW (or TCHW) with {n_bands} bands "
@@ -1026,7 +1066,11 @@ class OlmoEarthEmbedder(EmbedderBase):
                             patch_size=patch_size,
                             date_str=date_str,
                             modality=modality,
-                            extra={"batch_infer": True, "n_frames": len(item_timestamps[i])},
+                            extra={
+                                "batch_infer": True,
+                                "temporal_mode": item_modes[i],
+                                "n_frames": len(item_timestamps[i]),
+                            },
                         )
                         meta["pooling"] = f"spatial_temporal_bandset_{output.pooling}"
                         out[i] = Embedding(data=pooled[j], meta=meta)
@@ -1054,7 +1098,11 @@ class OlmoEarthEmbedder(EmbedderBase):
                             patch_size=patch_size,
                             date_str=date_str,
                             modality=modality,
-                            extra={"batch_infer": True, "n_frames": len(item_timestamps[i])},
+                            extra={
+                                "batch_infer": True,
+                                "temporal_mode": item_modes[i],
+                                "n_frames": len(item_timestamps[i]),
+                            },
                         )
                         d, h, w = grid_np.shape
                         meta.update({"grid_hw": (h, w), "grid_kind": "spatial_tokens"})
