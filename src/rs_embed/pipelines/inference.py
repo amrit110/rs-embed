@@ -396,8 +396,8 @@ class InferenceEngine:
 
             all_tiles: list[np.ndarray] = []
             all_tile_spatials: list[SpatialSpec] = []
-            # {spatial_idx: (flat_start, tile_count, tile_metas, h, w, tiled_mc)}
-            tile_map: dict[int, tuple[int, int, list[dict[str, Any]], int, int, Any]] = {}
+            # {spatial_idx: (flat_start, tile_count, tile_metas, h, w)}
+            tile_map: dict[int, tuple[int, int, list[dict[str, Any]], int, int]] = {}
 
             for i, spatial, inp in ready:
                 h, w = int(inp.shape[-2]), int(inp.shape[-1])
@@ -445,7 +445,7 @@ class InferenceEngine:
                 flat_start = len(all_tiles)
                 all_tiles.extend(tiles)
                 all_tile_spatials.extend(tile_spatials_pt)
-                tile_map[i] = (flat_start, len(tiles), tile_metas, h, w, tiled_model_config)
+                tile_map[i] = (flat_start, len(tiles), tile_metas, h, w)
 
             if not all_tiles:
                 return out, True
@@ -485,9 +485,10 @@ class InferenceEngine:
                     )
                 all_tile_embs.extend(sub_embs)
 
-            # Step 3: stitch tiles back into per-point embeddings.
-            for i, _spatial, _inp in ready:
-                flat_start, tile_count, tile_metas, h, w, tiled_mc = tile_map[i]
+            # Step 3: stitch tiles back into per-point embeddings. Iterate
+            # tile_map (not ready): points that exceeded max_tiles under
+            # continue_on_error were already marked failed and never tiled.
+            for i, (flat_start, tile_count, tile_metas, h, w) in tile_map.items():
                 tile_embs = all_tile_embs[flat_start : flat_start + tile_count]
                 tile_embs_n = [
                     normalize_embedding_output(emb=e, output=self.output) for e in tile_embs

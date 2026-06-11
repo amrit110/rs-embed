@@ -361,6 +361,50 @@ def test_run_batch_tiled_honors_max_tiles():
     assert emb.batch_input_shapes == []
 
 
+def test_run_batch_tiled_continue_on_error_skips_oversized_point():
+    """A point exceeding max_tiles must not abort stitching for the valid points."""
+    import threading
+
+    emb = _FakeTileEmbedderWithBase()
+    lock = threading.RLock()
+    engine = _make_engine(tile_size=4, max_tiles=1)
+
+    # Index 1 (5x5 → 4 tiles) exceeds max_tiles=1; indices 0 and 2 (4x4 → 1 tile) are valid.
+    images = {
+        0: np.arange(16, dtype=np.float32).reshape(1, 4, 4),
+        1: np.arange(25, dtype=np.float32).reshape(1, 5, 5),
+        2: np.arange(16, dtype=np.float32).reshape(1, 4, 4) * 2,
+    }
+    spatials = [
+        BBox(minlon=float(i), minlat=0.0, maxlon=float(i + 1), maxlat=1.0) for i in range(3)
+    ]
+    done_indices: list[int] = []
+
+    out, succeeded = engine._run_batch_tiled(
+        idxs=[0, 1, 2],
+        spatials=spatials,
+        temporal=None,
+        sensor=None,
+        embedder=emb,
+        lock=lock,
+        backend="gee",
+        get_input_fn=lambda i: images[i],
+        batch_size=16,
+        continue_on_error=True,
+        on_done=done_indices.append,
+        use_lock=False,
+        model_name="fake_tile",
+    )
+
+    assert succeeded, "tiled batch should succeed despite one oversized point"
+    assert set(out.keys()) == {0, 1, 2}
+    assert out[0].status.value == "ok", f"point 0 failed: {out[0].error}"
+    assert out[2].status.value == "ok", f"point 2 failed: {out[2].error}"
+    assert out[1].status.value == "failed"
+    assert "would create 4 tiles (> max_tiles=1)" in str(out[1].error)
+    assert sorted(done_indices) == [0, 1, 2]
+
+
 def test_run_batch_tiled_falls_back_when_batch_lacks_model_config():
     """_run_batch_tiled should not silently drop model_config for tiled batch calls."""
     import threading
